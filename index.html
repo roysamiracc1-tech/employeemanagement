@@ -55,6 +55,8 @@
           <th>Location</th>
           <th>Designation</th>
           <th>Skills</th>
+          <th>Experience (Years)</th>
+          <th>Skill Ratings</th>
         </tr>
       </thead>
       <tbody id="employee-table-body"></tbody>
@@ -72,17 +74,23 @@
           throw new Error(`HTTP ${response.status}`);
         }
         const employees = await response.json();
-        tbody.innerHTML = employees.map(emp => `
-          <tr>
-            <td>${emp.id}</td>
-            <td>${emp.name}</td>
-            <td>${emp.title}</td>
-            <td>${emp.department}</td>
-            <td>${emp.location}</td>
-            <td>${emp.designation}</td>
-            <td>${emp.skills ? emp.skills.join(', ') : ''}</td>
-          </tr>
-        `).join('');
+        tbody.innerHTML = employees.map(emp => {
+          const skillRatingsStr = emp.skill_ratings ? 
+            emp.skill_ratings.map(r => `${r.skill}: ${r.rating}/10`).join(', ') : '';
+          return `
+            <tr>
+              <td>${emp.id}</td>
+              <td>${emp.name}</td>
+              <td>${emp.title}</td>
+              <td>${emp.department}</td>
+              <td>${emp.location}</td>
+              <td>${emp.designation}</td>
+              <td>${emp.skills ? emp.skills.join(', ') : ''}</td>
+              <td>${emp.years_of_experience || 0}</td>
+              <td>${skillRatingsStr}</td>
+            </tr>
+          `;
+        }).join('');
         status.textContent = `Loaded ${employees.length} employees from backend.`;
       } catch (error) {
         status.textContent = `Failed to load employees: ${error.message}`;

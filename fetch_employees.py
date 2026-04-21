@@ -24,7 +24,7 @@ def fetch_employees_from_db():
     with get_db_connection() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute(
-                'SELECT id, name, title, department, location, designation, skills FROM employees ORDER BY id'
+                'SELECT id, name, title, department, location, designation, skills, years_of_experience, skill_ratings FROM employees ORDER BY id'
             )
             return [dict(row) for row in cur.fetchall()]
 
