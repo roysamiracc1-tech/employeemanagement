@@ -3,28 +3,51 @@ import json
 import os
 from urllib.parse import urlparse
 
-EMPLOYEES = [
-    {"id": "1", "name": "Priya Shah", "title": "Engineering Manager", "department": "Engineering", "location": "New York"},
-    {"id": "2", "name": "James Carter", "title": "Product Designer", "department": "Design", "location": "San Francisco"},
-    {"id": "3", "name": "Sara Kim", "title": "Software Engineer", "department": "Engineering", "location": "Boston"},
-    {"id": "4", "name": "Rohit Patel", "title": "QA Lead", "department": "Quality Assurance", "location": "Chicago"},
-    {"id": "5", "name": "Ashley Jones", "title": "HR Business Partner", "department": "Human Resources", "location": "Seattle"},
-    {"id": "6", "name": "Victor Alvarez", "title": "Sales Director", "department": "Sales", "location": "Miami"},
-    {"id": "7", "name": "Nadia Khan", "title": "Marketing Manager", "department": "Marketing", "location": "London"},
-    {"id": "8", "name": "Ethan Reed", "title": "Customer Success Lead", "department": "Customer Success", "location": "Toronto"},
-    {"id": "9", "name": "Olivia Nguyen", "title": "Data Analyst", "department": "Business Intelligence", "location": "Berlin"},
-    {"id": "10", "name": "Leonardo Silva", "title": "Operations Coordinator", "department": "Operations", "location": "Sydney"},
-]
+import psycopg2
+import psycopg2.extras
+
+
+DB_CONFIG = {
+    'host': os.getenv('PGHOST', 'localhost'),
+    'port': int(os.getenv('PGPORT', 5432)),
+    'dbname': os.getenv('PGDATABASE', 'employeedb'),
+    'user': os.getenv('PGUSER', 'postgres'),
+    'password': os.getenv('PGPASSWORD', ''),
+}
+
+
+def get_db_connection():
+    return psycopg2.connect(**DB_CONFIG)
+
+
+def fetch_employees_from_db():
+    with get_db_connection() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                'SELECT id, name, title, department, location FROM employees ORDER BY id'
+            )
+            return [dict(row) for row in cur.fetchall()]
 
 
 class EmployeeRequestHandler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
         parsed_path = urlparse(self.path)
         if parsed_path.path == '/employees':
+            try:
+                employees = fetch_employees_from_db()
+            except Exception as exc:
+                self.send_response(500)
+                self.send_header('Content-Type', 'application/json; charset=utf-8')
+                self.end_headers()
+                self.wfile.write(
+                    json.dumps({'error': str(exc)}).encode('utf-8')
+                )
+                return
+
             self.send_response(200)
             self.send_header('Content-Type', 'application/json; charset=utf-8')
             self.end_headers()
-            self.wfile.write(json.dumps(EMPLOYEES).encode('utf-8'))
+            self.wfile.write(json.dumps(employees).encode('utf-8'))
         else:
             super().do_GET()
 
@@ -34,6 +57,7 @@ def run(server_class=http.server.ThreadingHTTPServer, handler_class=EmployeeRequ
     server_address = ('', port)
     httpd = server_class(server_address, handler_class)
     print(f'Serving on http://127.0.0.1:{port}')
+    print(f'Connecting to Postgres at {DB_CONFIG["host"]}:{DB_CONFIG["port"]} database={DB_CONFIG["dbname"]}')
     print('Press Ctrl+C to stop')
     httpd.serve_forever()
 
