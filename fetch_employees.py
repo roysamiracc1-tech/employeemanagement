@@ -1,4 +1,8 @@
+import http.server
+import json
+import os
 from html.parser import HTMLParser
+from urllib.parse import urlparse
 
 
 class EmployeeHTMLParser(HTMLParser):
@@ -26,7 +30,6 @@ class EmployeeHTMLParser(HTMLParser):
         elif tag == 'td':
             self.in_td = False
         elif tag == 'tr' and self.current_row:
-            # Only add rows that contain data (skip header row)
             if len(self.current_row) == 5:
                 self.employees.append({
                     'id': self.current_row[0],
@@ -45,6 +48,7 @@ class EmployeeHTMLParser(HTMLParser):
 
 
 def read_employee_html(path='index.html'):
+    path = os.path.join(os.path.dirname(__file__), path)
     with open(path, 'r', encoding='utf-8') as f:
         html = f.read()
 
@@ -53,12 +57,27 @@ def read_employee_html(path='index.html'):
     return parser.employees
 
 
-def main():
-    employees = read_employee_html('index.html')
-    print('Employee list from HTML:')
-    for emp in employees:
-        print(f"{emp['id']}. {emp['name']} - {emp['title']} ({emp['department']}, {emp['location']})")
+class EmployeeRequestHandler(http.server.SimpleHTTPRequestHandler):
+    def do_GET(self):
+        parsed_path = urlparse(self.path)
+        if parsed_path.path == '/employees':
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json; charset=utf-8')
+            self.end_headers()
+            employees = read_employee_html('index.html')
+            self.wfile.write(json.dumps(employees).encode('utf-8'))
+        else:
+            super().do_GET()
+
+
+def run(server_class=http.server.ThreadingHTTPServer, handler_class=EmployeeRequestHandler, port=8000):
+    os.chdir(os.path.dirname(__file__))
+    server_address = ('', port)
+    httpd = server_class(server_address, handler_class)
+    print(f'Serving on http://127.0.0.1:{port}')
+    print('Press Ctrl+C to stop')
+    httpd.serve_forever()
 
 
 if __name__ == '__main__':
-    main()
+    run()

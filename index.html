@@ -44,7 +44,7 @@
 <body>
   <div class="container">
     <h1>Company Employee Directory</h1>
-    <p>This is a static list of 10 employees in the company.</p>
+    <p>This employee list is loaded from the backend service.</p>
     <table>
       <thead>
         <tr>
@@ -55,79 +55,37 @@
           <th>Location</th>
         </tr>
       </thead>
-      <tbody>
-        <tr>
-          <td>1</td>
-          <td>Priya Shah</td>
-          <td>Engineering Manager</td>
-          <td>Engineering</td>
-          <td>New York</td>
-        </tr>
-        <tr>
-          <td>2</td>
-          <td>James Carter</td>
-          <td>Product Designer</td>
-          <td>Design</td>
-          <td>San Francisco</td>
-        </tr>
-        <tr>
-          <td>3</td>
-          <td>Sara Kim</td>
-          <td>Software Engineer</td>
-          <td>Engineering</td>
-          <td>Boston</td>
-        </tr>
-        <tr>
-          <td>4</td>
-          <td>Rohit Patel</td>
-          <td>QA Lead</td>
-          <td>Quality Assurance</td>
-          <td>Chicago</td>
-        </tr>
-        <tr>
-          <td>5</td>
-          <td>Ashley Jones</td>
-          <td>HR Business Partner</td>
-          <td>Human Resources</td>
-          <td>Seattle</td>
-        </tr>
-        <tr>
-          <td>6</td>
-          <td>Victor Alvarez</td>
-          <td>Sales Director</td>
-          <td>Sales</td>
-          <td>Miami</td>
-        </tr>
-        <tr>
-          <td>7</td>
-          <td>Nadia Khan</td>
-          <td>Marketing Manager</td>
-          <td>Marketing</td>
-          <td>London</td>
-        </tr>
-        <tr>
-          <td>8</td>
-          <td>Ethan Reed</td>
-          <td>Customer Success Lead</td>
-          <td>Customer Success</td>
-          <td>Toronto</td>
-        </tr>
-        <tr>
-          <td>9</td>
-          <td>Olivia Nguyen</td>
-          <td>Data Analyst</td>
-          <td>Business Intelligence</td>
-          <td>Berlin</td>
-        </tr>
-        <tr>
-          <td>10</td>
-          <td>Leonardo Silva</td>
-          <td>Operations Coordinator</td>
-          <td>Operations</td>
-          <td>Sydney</td>
-        </tr>
-      </tbody>
+      <tbody id="employee-table-body"></tbody>
     </table>
+    <p id="status" style="margin-top: 1rem; color: #334155;">Loading employee list...</p>
   </div>
+
+  <script>
+    async function loadEmployees() {
+      const status = document.getElementById('status');
+      const tbody = document.getElementById('employee-table-body');
+      try {
+        const response = await fetch('/employees');
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        const employees = await response.json();
+        tbody.innerHTML = employees.map(emp => `
+          <tr>
+            <td>${emp.id}</td>
+            <td>${emp.name}</td>
+            <td>${emp.title}</td>
+            <td>${emp.department}</td>
+            <td>${emp.location}</td>
+          </tr>
+        `).join('');
+        status.textContent = `Loaded ${employees.length} employees from backend.`;
+      } catch (error) {
+        status.textContent = `Failed to load employees: ${error.message}`;
+      }
+    }
+
+    loadEmployees();
+  </script>
 </body>
 </html>
