@@ -38,7 +38,7 @@ INSERT INTO employees (name, title, department, location) VALUES
 3. Run the backend:
 
 ```bash
-PGHOST=localhost PGPORT=5432 PGDATABASE=employee PGUSER=postgres python3 fetch_employees.py
+PGHOST=localhost PGPORT=5432 PGDATABASE=employee PGUSER=samirroy python3 fetch_employees.py
 ```
 
 4. Open the app:

@@ -11,7 +11,7 @@ DB_CONFIG = {
     'host': os.getenv('PGHOST', 'localhost'),
     'port': int(os.getenv('PGPORT', 5432)),
     'dbname': os.getenv('PGDATABASE', 'employee'),
-    'user': os.getenv('PGUSER', 'postgres'),
+    'user': os.getenv('PGUSER', 'samirroy'),
     'password': os.getenv('PGPASSWORD', None),
 }
 
@@ -36,6 +36,7 @@ class EmployeeRequestHandler(http.server.SimpleHTTPRequestHandler):
             try:
                 employees = fetch_employees_from_db()
             except Exception as exc:
+                print(f"DB Error: {exc}")  # Debug print
                 self.send_response(500)
                 self.send_header('Content-Type', 'application/json; charset=utf-8')
                 self.end_headers()
