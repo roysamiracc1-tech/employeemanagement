@@ -1,60 +1,20 @@
 import http.server
 import json
 import os
-from html.parser import HTMLParser
 from urllib.parse import urlparse
 
-
-class EmployeeHTMLParser(HTMLParser):
-    def __init__(self):
-        super().__init__()
-        self.in_table = False
-        self.in_tbody = False
-        self.in_td = False
-        self.current_row = []
-        self.employees = []
-
-    def handle_starttag(self, tag, attrs):
-        if tag == 'table':
-            self.in_table = True
-        elif tag == 'tbody' and self.in_table:
-            self.in_tbody = True
-        elif tag == 'td' and self.in_tbody:
-            self.in_td = True
-
-    def handle_endtag(self, tag):
-        if tag == 'table':
-            self.in_table = False
-        elif tag == 'tbody':
-            self.in_tbody = False
-        elif tag == 'td':
-            self.in_td = False
-        elif tag == 'tr' and self.current_row:
-            if len(self.current_row) == 5:
-                self.employees.append({
-                    'id': self.current_row[0],
-                    'name': self.current_row[1],
-                    'title': self.current_row[2],
-                    'department': self.current_row[3],
-                    'location': self.current_row[4],
-                })
-            self.current_row = []
-
-    def handle_data(self, data):
-        if self.in_td:
-            text = data.strip()
-            if text:
-                self.current_row.append(text)
-
-
-def read_employee_html(path='index.html'):
-    path = os.path.join(os.path.dirname(__file__), path)
-    with open(path, 'r', encoding='utf-8') as f:
-        html = f.read()
-
-    parser = EmployeeHTMLParser()
-    parser.feed(html)
-    return parser.employees
+EMPLOYEES = [
+    {"id": "1", "name": "Priya Shah", "title": "Engineering Manager", "department": "Engineering", "location": "New York"},
+    {"id": "2", "name": "James Carter", "title": "Product Designer", "department": "Design", "location": "San Francisco"},
+    {"id": "3", "name": "Sara Kim", "title": "Software Engineer", "department": "Engineering", "location": "Boston"},
+    {"id": "4", "name": "Rohit Patel", "title": "QA Lead", "department": "Quality Assurance", "location": "Chicago"},
+    {"id": "5", "name": "Ashley Jones", "title": "HR Business Partner", "department": "Human Resources", "location": "Seattle"},
+    {"id": "6", "name": "Victor Alvarez", "title": "Sales Director", "department": "Sales", "location": "Miami"},
+    {"id": "7", "name": "Nadia Khan", "title": "Marketing Manager", "department": "Marketing", "location": "London"},
+    {"id": "8", "name": "Ethan Reed", "title": "Customer Success Lead", "department": "Customer Success", "location": "Toronto"},
+    {"id": "9", "name": "Olivia Nguyen", "title": "Data Analyst", "department": "Business Intelligence", "location": "Berlin"},
+    {"id": "10", "name": "Leonardo Silva", "title": "Operations Coordinator", "department": "Operations", "location": "Sydney"},
+]
 
 
 class EmployeeRequestHandler(http.server.SimpleHTTPRequestHandler):
@@ -64,8 +24,7 @@ class EmployeeRequestHandler(http.server.SimpleHTTPRequestHandler):
             self.send_response(200)
             self.send_header('Content-Type', 'application/json; charset=utf-8')
             self.end_headers()
-            employees = read_employee_html('index.html')
-            self.wfile.write(json.dumps(employees).encode('utf-8'))
+            self.wfile.write(json.dumps(EMPLOYEES).encode('utf-8'))
         else:
             super().do_GET()
 
