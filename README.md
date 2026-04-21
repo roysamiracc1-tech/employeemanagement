@@ -1,6 +1,6 @@
 # Employee Management
 
-This repository serves a simple employee directory frontend backed by a Python HTTP server.
+This repository serves a simple employee directory frontend backed by a Python HTTP server. It includes employee competencies (designation and skills) for future dashboard visualization.
 
 ## Local PostgreSQL setup
 
@@ -20,19 +20,21 @@ CREATE TABLE employees (
   name TEXT NOT NULL,
   title TEXT NOT NULL,
   department TEXT NOT NULL,
-  location TEXT NOT NULL
+  location TEXT NOT NULL,
+  designation TEXT NOT NULL,
+  skills TEXT[] NOT NULL
 );
-INSERT INTO employees (name, title, department, location) VALUES
-  ('Priya Shah', 'Engineering Manager', 'Engineering', 'New York'),
-  ('James Carter', 'Product Designer', 'Design', 'San Francisco'),
-  ('Sara Kim', 'Software Engineer', 'Engineering', 'Boston'),
-  ('Rohit Patel', 'QA Lead', 'Quality Assurance', 'Chicago'),
-  ('Ashley Jones', 'HR Business Partner', 'Human Resources', 'Seattle'),
-  ('Victor Alvarez', 'Sales Director', 'Sales', 'Miami'),
-  ('Nadia Khan', 'Marketing Manager', 'Marketing', 'London'),
-  ('Ethan Reed', 'Customer Success Lead', 'Customer Success', 'Toronto'),
-  ('Olivia Nguyen', 'Data Analyst', 'Business Intelligence', 'Berlin'),
-  ('Leonardo Silva', 'Operations Coordinator', 'Operations', 'Sydney');
+INSERT INTO employees (name, title, department, location, designation, skills) VALUES
+  ('Priya Shah', 'Engineering Manager', 'Engineering', 'New York', 'Senior Manager', ARRAY['Leadership', 'Python', 'Project Management']),
+  ('James Carter', 'Product Designer', 'Design', 'San Francisco', 'Lead Designer', ARRAY['UI/UX', 'Figma', 'Prototyping']),
+  ('Sara Kim', 'Software Engineer', 'Engineering', 'Boston', 'Senior Engineer', ARRAY['JavaScript', 'React', 'Node.js']),
+  ('Rohit Patel', 'QA Lead', 'Quality Assurance', 'Chicago', 'QA Manager', ARRAY['Testing', 'Automation', 'Selenium']),
+  ('Ashley Jones', 'HR Business Partner', 'Human Resources', 'Seattle', 'HR Specialist', ARRAY['Recruitment', 'Employee Relations', 'Compliance']),
+  ('Victor Alvarez', 'Sales Director', 'Sales', 'Miami', 'Director', ARRAY['Sales Strategy', 'Negotiation', 'CRM']),
+  ('Nadia Khan', 'Marketing Manager', 'Marketing', 'London', 'Marketing Lead', ARRAY['Digital Marketing', 'SEO', 'Content Creation']),
+  ('Ethan Reed', 'Customer Success Lead', 'Customer Success', 'Toronto', 'Success Manager', ARRAY['Customer Support', 'Retention', 'Analytics']),
+  ('Olivia Nguyen', 'Data Analyst', 'Business Intelligence', 'Berlin', 'Data Specialist', ARRAY['SQL', 'Python', 'Data Visualization']),
+  ('Leonardo Silva', 'Operations Coordinator', 'Operations', 'Sydney', 'Coordinator', ARRAY['Operations', 'Logistics', 'Process Improvement']);
 ```
 
 3. Run the backend:

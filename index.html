@@ -53,6 +53,8 @@
           <th>Title</th>
           <th>Department</th>
           <th>Location</th>
+          <th>Designation</th>
+          <th>Skills</th>
         </tr>
       </thead>
       <tbody id="employee-table-body"></tbody>
@@ -77,6 +79,8 @@
             <td>${emp.title}</td>
             <td>${emp.department}</td>
             <td>${emp.location}</td>
+            <td>${emp.designation}</td>
+            <td>${emp.skills ? emp.skills.join(', ') : ''}</td>
           </tr>
         `).join('');
         status.textContent = `Loaded ${employees.length} employees from backend.`;
