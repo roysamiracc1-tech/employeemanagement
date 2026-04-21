@@ -10,9 +10,9 @@ import psycopg2.extras
 DB_CONFIG = {
     'host': os.getenv('PGHOST', 'localhost'),
     'port': int(os.getenv('PGPORT', 5432)),
-    'dbname': os.getenv('PGDATABASE', 'employeedb'),
+    'dbname': os.getenv('PGDATABASE', 'employee'),
     'user': os.getenv('PGUSER', 'postgres'),
-    'password': os.getenv('PGPASSWORD', ''),
+    'password': os.getenv('PGPASSWORD', None),
 }
 
 

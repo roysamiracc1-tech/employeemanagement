@@ -13,8 +13,8 @@ python3 -m pip install --user -r requirements.txt
 2. Create a local PostgreSQL database and table, for example:
 
 ```sql
-CREATE DATABASE employeedb;
-\c employeedb
+CREATE DATABASE employee;
+\c employee
 CREATE TABLE employees (
   id SERIAL PRIMARY KEY,
   name TEXT NOT NULL,
@@ -38,7 +38,7 @@ INSERT INTO employees (name, title, department, location) VALUES
 3. Run the backend:
 
 ```bash
-PGHOST=localhost PGPORT=5432 PGDATABASE=employeedb PGUSER=postgres PGPASSWORD=yourpassword python3 fetch_employees.py
+PGHOST=localhost PGPORT=5432 PGDATABASE=employee PGUSER=postgres python3 fetch_employees.py
 ```
 
 4. Open the app:
