@@ -37,6 +37,15 @@ INSERT INTO employees (name, title, department, location, designation, skills) V
   ('Leonardo Silva', 'Operations Coordinator', 'Operations', 'Sydney', 'Coordinator', ARRAY['Operations', 'Logistics', 'Process Improvement']);
 ```
 
+If you have existing employees without designation/skills, add the columns first:
+
+```sql
+ALTER TABLE employees ADD COLUMN designation TEXT;
+ALTER TABLE employees ADD COLUMN skills TEXT[];
+```
+
+Then run the updates from `update_employees.sql`.
+
 3. Run the backend:
 
 ```bash
