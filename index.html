@@ -3,97 +3,471 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Employee Management</title>
+  <title>Employee Directory</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
     body {
-      font-family: Arial, sans-serif;
-      margin: 40px;
-      background-color: #f7f9fb;
-      color: #1f2937;
+      font-family: 'Inter', sans-serif;
+      background: #f0f4f8;
+      color: #1e293b;
+      min-height: 100vh;
     }
-    h1 {
-      color: #0f172a;
+
+    /* ── Header ── */
+    .header {
+      background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%);
+      color: #fff;
+      padding: 32px 40px 28px;
     }
+    .header-inner {
+      max-width: 1400px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .header h1 {
+      font-size: 1.6rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+    .header p {
+      font-size: 0.875rem;
+      opacity: 0.75;
+      margin-top: 4px;
+    }
+    .header-badge {
+      background: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.25);
+      border-radius: 999px;
+      padding: 6px 16px;
+      font-size: 0.8rem;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+
+    /* ── Main ── */
+    .main {
+      max-width: 1400px;
+      margin: 32px auto;
+      padding: 0 24px 48px;
+    }
+
+    /* ── Search / filter bar ── */
+    .toolbar {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .search-wrap {
+      position: relative;
+      flex: 1;
+      min-width: 220px;
+    }
+    .search-wrap svg {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #94a3b8;
+      pointer-events: none;
+    }
+    .search-input {
+      width: 100%;
+      padding: 10px 14px 10px 38px;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      font-size: 0.875rem;
+      font-family: inherit;
+      background: #fff;
+      color: #1e293b;
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .search-input:focus {
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59,130,246,0.12);
+    }
+    .dept-filter {
+      padding: 10px 14px;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      font-size: 0.875rem;
+      font-family: inherit;
+      background: #fff;
+      color: #1e293b;
+      outline: none;
+      cursor: pointer;
+      transition: border-color 0.15s;
+    }
+    .dept-filter:focus { border-color: #3b82f6; }
+
+    /* ── Table card ── */
+    .table-card {
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.06);
+      overflow: hidden;
+    }
+    .table-wrap { overflow-x: auto; }
+
     table {
       width: 100%;
       border-collapse: collapse;
-      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
-      background: #fff;
     }
-    th, td {
-      text-align: left;
-      padding: 14px 16px;
-      border-bottom: 1px solid #e2e8f0;
+    thead tr {
+      background: #f8fafc;
+      border-bottom: 2px solid #e2e8f0;
     }
     th {
-      background-color: #e2e8f0;
-      color: #0f172a;
+      padding: 13px 16px;
+      text-align: left;
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: #64748b;
       text-transform: uppercase;
-      letter-spacing: 0.05em;
-      font-size: 0.85rem;
+      letter-spacing: 0.07em;
+      white-space: nowrap;
     }
-    tr:hover {
-      background-color: #f1f5f9;
+    td {
+      padding: 14px 16px;
+      border-bottom: 1px solid #f1f5f9;
+      font-size: 0.875rem;
+      vertical-align: top;
     }
-    .container {
-      max-width: 960px;
-      margin: 0 auto;
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr { transition: background 0.12s; }
+    tbody tr:hover { background: #f8fafc; }
+
+    /* ── Avatar + name cell ── */
+    .name-cell {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: #fff;
+      flex-shrink: 0;
+    }
+    .name-text { font-weight: 600; color: #0f172a; }
+    .title-text { font-size: 0.78rem; color: #64748b; margin-top: 1px; }
+
+    /* ── Department badge ── */
+    .dept-badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 0.72rem;
+      font-weight: 600;
+    }
+
+    /* ── Location ── */
+    .location-cell {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      color: #475569;
+      font-size: 0.82rem;
+    }
+    .location-cell svg { flex-shrink: 0; color: #94a3b8; }
+
+    /* ── Designation chip ── */
+    .designation-chip {
+      display: inline-block;
+      background: #eff6ff;
+      color: #2563eb;
+      border: 1px solid #bfdbfe;
+      border-radius: 6px;
+      padding: 3px 9px;
+      font-size: 0.75rem;
+      font-weight: 500;
+    }
+
+    /* ── Skill tags ── */
+    .skill-tags { display: flex; flex-wrap: wrap; gap: 5px; }
+    .skill-tag {
+      background: #f1f5f9;
+      color: #334155;
+      border-radius: 5px;
+      padding: 2px 8px;
+      font-size: 0.72rem;
+      font-weight: 500;
+    }
+
+    /* ── Experience badge ── */
+    .exp-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: #f0fdf4;
+      color: #166534;
+      border: 1px solid #bbf7d0;
+      border-radius: 999px;
+      padding: 3px 10px;
+      font-size: 0.78rem;
+      font-weight: 600;
+    }
+
+    /* ── Skill ratings ── */
+    .skill-ratings { display: flex; flex-direction: column; gap: 6px; min-width: 160px; }
+    .skill-rating {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .skill-name {
+      font-size: 0.75rem;
+      color: #475569;
+      width: 88px;
+      flex-shrink: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .skill-bar-track {
+      flex: 1;
+      height: 5px;
+      background: #e2e8f0;
+      border-radius: 999px;
+      overflow: hidden;
+    }
+    .skill-bar-fill {
+      height: 100%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #3b82f6, #818cf8);
+      transition: width 0.6s cubic-bezier(.4,0,.2,1);
+    }
+    .skill-score {
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: #3b82f6;
+      width: 22px;
+      text-align: right;
+      flex-shrink: 0;
+    }
+
+    /* ── Status bar ── */
+    .status-bar {
+      margin-top: 16px;
+      font-size: 0.8rem;
+      color: #64748b;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .status-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #22c55e;
+      flex-shrink: 0;
+    }
+    .status-dot.loading { background: #f59e0b; animation: pulse 1s infinite; }
+    .status-dot.error { background: #ef4444; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+    /* ── Empty / loading row ── */
+    .empty-row td {
+      text-align: center;
+      padding: 48px;
+      color: #94a3b8;
+      font-size: 0.875rem;
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h1>Company Employee Directory</h1>
-    <p>This employee list is loaded from the backend service.</p>
-    <table>
-      <thead>
-        <tr>
-          <th>#</th>
-          <th>Name</th>
-          <th>Title</th>
-          <th>Department</th>
-          <th>Location</th>
-          <th>Designation</th>
-          <th>Skills</th>
-          <th>Experience (Years)</th>
-          <th>Skill Ratings</th>
-        </tr>
-      </thead>
-      <tbody id="employee-table-body"></tbody>
-    </table>
-    <p id="status" style="margin-top: 1rem; color: #334155;">Loading employee list...</p>
+
+  <div class="header">
+    <div class="header-inner">
+      <div>
+        <h1>Employee Directory</h1>
+        <p>Manage and explore your organisation's talent</p>
+      </div>
+      <span class="header-badge" id="header-count">Loading…</span>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="toolbar">
+      <div class="search-wrap">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+        </svg>
+        <input class="search-input" id="search" type="text" placeholder="Search by name, title, location…">
+      </div>
+      <select class="dept-filter" id="dept-filter">
+        <option value="">All Departments</option>
+      </select>
+    </div>
+
+    <div class="table-card">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Employee</th>
+              <th>Department</th>
+              <th>Location</th>
+              <th>Designation</th>
+              <th>Skills</th>
+              <th>Experience</th>
+              <th>Skill Ratings</th>
+            </tr>
+          </thead>
+          <tbody id="employee-table-body">
+            <tr class="empty-row"><td colspan="8">Loading employees…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="status-bar">
+      <span class="status-dot loading" id="status-dot"></span>
+      <span id="status">Loading employee list…</span>
+    </div>
   </div>
 
   <script>
+    const AVATAR_COLORS = [
+      '#3b82f6','#8b5cf6','#ec4899','#f59e0b',
+      '#10b981','#06b6d4','#ef4444','#6366f1'
+    ];
+    const DEPT_COLORS = {
+      'Engineering':  { bg: '#eff6ff', color: '#1d4ed8' },
+      'Marketing':    { bg: '#fdf4ff', color: '#7e22ce' },
+      'Sales':        { bg: '#fff7ed', color: '#c2410c' },
+      'HR':           { bg: '#f0fdf4', color: '#15803d' },
+      'Finance':      { bg: '#fefce8', color: '#a16207' },
+      'Design':       { bg: '#fdf4ff', color: '#a21caf' },
+      'Operations':   { bg: '#f0f9ff', color: '#0369a1' },
+    };
+
+    function initials(name) {
+      return name.split(' ').map(p => p[0]).join('').slice(0, 2).toUpperCase();
+    }
+    function avatarColor(name) {
+      let h = 0;
+      for (const c of name) h = (h * 31 + c.charCodeAt(0)) & 0xffffffff;
+      return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length];
+    }
+    function deptStyle(dept) {
+      const s = DEPT_COLORS[dept];
+      return s ? `background:${s.bg};color:${s.color}` : 'background:#f1f5f9;color:#334155';
+    }
+
+    let allEmployees = [];
+
+    function renderRows(employees) {
+      const tbody = document.getElementById('employee-table-body');
+      if (!employees.length) {
+        tbody.innerHTML = '<tr class="empty-row"><td colspan="8">No employees found.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = employees.map((emp, idx) => {
+        const skillRatingsHtml = emp.skill_ratings
+          ? `<div class="skill-ratings">${emp.skill_ratings.map(r => `
+              <div class="skill-rating">
+                <span class="skill-name" title="${r.skill}">${r.skill}</span>
+                <div class="skill-bar-track">
+                  <div class="skill-bar-fill" style="width:${r.rating * 10}%"></div>
+                </div>
+                <span class="skill-score">${r.rating}</span>
+              </div>`).join('')}</div>`
+          : '—';
+
+        const skillTagsHtml = emp.skills
+          ? `<div class="skill-tags">${emp.skills.map(s => `<span class="skill-tag">${s}</span>`).join('')}</div>`
+          : '—';
+
+        return `
+          <tr>
+            <td style="color:#94a3b8;font-size:0.78rem;font-weight:500">${emp.id}</td>
+            <td>
+              <div class="name-cell">
+                <div class="avatar" style="background:${avatarColor(emp.name)}">${initials(emp.name)}</div>
+                <div>
+                  <div class="name-text">${emp.name}</div>
+                  <div class="title-text">${emp.title}</div>
+                </div>
+              </div>
+            </td>
+            <td><span class="dept-badge" style="${deptStyle(emp.department)}">${emp.department}</span></td>
+            <td>
+              <div class="location-cell">
+                <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
+                  <circle cx="12" cy="9" r="2.5"/>
+                </svg>
+                ${emp.location}
+              </div>
+            </td>
+            <td><span class="designation-chip">${emp.designation || '—'}</span></td>
+            <td>${skillTagsHtml}</td>
+            <td><span class="exp-badge">${emp.years_of_experience || 0} yrs</span></td>
+            <td>${skillRatingsHtml}</td>
+          </tr>`;
+      }).join('');
+    }
+
+    function applyFilters() {
+      const q = document.getElementById('search').value.toLowerCase();
+      const dept = document.getElementById('dept-filter').value;
+      const filtered = allEmployees.filter(emp => {
+        const matchQ = !q ||
+          emp.name.toLowerCase().includes(q) ||
+          (emp.title || '').toLowerCase().includes(q) ||
+          (emp.location || '').toLowerCase().includes(q) ||
+          (emp.designation || '').toLowerCase().includes(q);
+        const matchDept = !dept || emp.department === dept;
+        return matchQ && matchDept;
+      });
+      renderRows(filtered);
+      document.getElementById('header-count').textContent =
+        filtered.length === allEmployees.length
+          ? `${allEmployees.length} Employees`
+          : `${filtered.length} / ${allEmployees.length} Employees`;
+    }
+
     async function loadEmployees() {
       const status = document.getElementById('status');
-      const tbody = document.getElementById('employee-table-body');
+      const dot = document.getElementById('status-dot');
       try {
         const response = await fetch('/employees');
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
-        }
-        const employees = await response.json();
-        tbody.innerHTML = employees.map(emp => {
-          const skillRatingsStr = emp.skill_ratings ? 
-            emp.skill_ratings.map(r => `${r.skill}: ${r.rating}/10`).join(', ') : '';
-          return `
-            <tr>
-              <td>${emp.id}</td>
-              <td>${emp.name}</td>
-              <td>${emp.title}</td>
-              <td>${emp.department}</td>
-              <td>${emp.location}</td>
-              <td>${emp.designation}</td>
-              <td>${emp.skills ? emp.skills.join(', ') : ''}</td>
-              <td>${emp.years_of_experience || 0}</td>
-              <td>${skillRatingsStr}</td>
-            </tr>
-          `;
-        }).join('');
-        status.textContent = `Loaded ${employees.length} employees from backend.`;
-      } catch (error) {
-        status.textContent = `Failed to load employees: ${error.message}`;
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        allEmployees = await response.json();
+
+        const deptFilter = document.getElementById('dept-filter');
+        [...new Set(allEmployees.map(e => e.department).filter(Boolean))].sort().forEach(d => {
+          const opt = document.createElement('option');
+          opt.value = d; opt.textContent = d;
+          deptFilter.appendChild(opt);
+        });
+
+        renderRows(allEmployees);
+        dot.className = 'status-dot';
+        status.textContent = `${allEmployees.length} employees loaded`;
+        document.getElementById('header-count').textContent = `${allEmployees.length} Employees`;
+
+        document.getElementById('search').addEventListener('input', applyFilters);
+        deptFilter.addEventListener('change', applyFilters);
+      } catch (err) {
+        dot.className = 'status-dot error';
+        status.textContent = `Failed to load employees: ${err.message}`;
+        document.getElementById('header-count').textContent = 'Error';
       }
     }
 
