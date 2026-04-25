@@ -1,0 +1,239 @@
+{% extends 'base.html' %}
+{% block title %}Register User — HR Portal{% endblock %}
+{% block page_title %}Register New User{% endblock %}
+
+{% block content %}
+<div class="page" style="max-width:720px">
+
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px">
+    <a href="{{ url_for('admin') }}" class="btn btn-ghost btn-sm">
+      <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+      Back to Admin
+    </a>
+    <div>
+      <div style="font-size:1.1rem;font-weight:700">Register New User</div>
+      <div style="font-size:.78rem;color:#64748b">Create a portal account for an employee</div>
+    </div>
+  </div>
+
+  {% if not unregistered %}
+  <div class="card">
+    <div class="card-body" style="text-align:center;padding:40px">
+      <div style="font-size:2rem;margin-bottom:12px">🎉</div>
+      <div style="font-weight:600;margin-bottom:6px">All employees have accounts</div>
+      <div style="font-size:.83rem;color:#64748b">Every active employee already has a portal login.</div>
+      <a href="{{ url_for('admin') }}" class="btn btn-ghost btn-sm" style="margin-top:16px">Back to Admin</a>
+    </div>
+  </div>
+  {% else %}
+
+  <form method="POST" action="{{ url_for('admin_register_user') }}" id="reg-form">
+
+    <!-- ── Step 1: Pick employee ──────────────────────────── -->
+    <div class="card reg-step" style="margin-bottom:16px">
+      <div class="card-header" style="display:flex;align-items:center;gap:10px">
+        <span class="step-badge">1</span>
+        <h2>Select Employee</h2>
+        <span style="font-size:.75rem;color:#64748b;margin-left:auto">{{ unregistered|length }} without account</span>
+      </div>
+      <div class="card-body" style="padding-top:12px">
+
+        <!-- Search filter -->
+        <div class="search-wrap" style="margin-bottom:10px">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"
+               style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#94a3b8">
+            <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+          </svg>
+          <input class="search-input" type="text" id="emp-search" placeholder="Search by name, title or location…">
+        </div>
+
+        <!-- Employee list -->
+        <div id="emp-list" style="max-height:280px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:10px">
+          {% for emp in unregistered %}
+          <label class="emp-row" id="er-{{ emp.id }}"
+                 data-name="{{ (emp.first_name + ' ' + emp.last_name)|lower }}"
+                 data-title="{{ (emp.job_title or '')|lower }}"
+                 data-loc="{{ (emp.location or '')|lower }}">
+            <input type="radio" name="employee_id" value="{{ emp.id }}"
+                   data-email="{{ emp.email }}"
+                   data-fname="{{ emp.first_name }}"
+                   data-lname="{{ emp.last_name }}"
+                   data-title="{{ emp.job_title or '' }}"
+                   data-loc="{{ emp.location or '' }}"
+                   data-bu="{{ emp.business_unit or '' }}"
+                   data-num="{{ emp.employee_number }}"
+                   onchange="onEmployeeSelect(this)">
+            <div class="emp-row-avatar" id="era-{{ emp.id }}">{{ emp.first_name[0] }}</div>
+            <div class="emp-row-info">
+              <div class="emp-row-name">{{ emp.first_name }} {{ emp.last_name }}</div>
+              <div class="emp-row-meta">
+                {{ emp.job_title or '—' }}
+                {% if emp.location %} · {{ emp.location }}{% endif %}
+                {% if emp.business_unit %} · {{ emp.business_unit }}{% endif %}
+              </div>
+            </div>
+            <span class="emp-row-num">{{ emp.employee_number }}</span>
+          </label>
+          {% endfor %}
+        </div>
+
+        <!-- Selected preview -->
+        <div id="selected-preview" style="display:none;margin-top:12px;padding:12px 14px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;display:none;align-items:center;gap:12px">
+          <div class="avatar sm" id="preview-avatar" style="flex-shrink:0"></div>
+          <div>
+            <div style="font-weight:600;font-size:.88rem" id="preview-name"></div>
+            <div style="font-size:.75rem;color:#15803d" id="preview-meta"></div>
+          </div>
+          <span class="badge badge-green" style="margin-left:auto" id="preview-num"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Step 2: Account details ─────────────────────────── -->
+    <div class="card reg-step" style="margin-bottom:16px">
+      <div class="card-header" style="display:flex;align-items:center;gap:10px">
+        <span class="step-badge">2</span>
+        <h2>Account Details</h2>
+      </div>
+      <div class="card-body">
+        <div class="two-col" style="gap:14px">
+          <div class="form-group" style="margin-bottom:0">
+            <label for="email">Work Email *</label>
+            <input type="email" id="email" name="email" class="form-control"
+                   placeholder="user@company.com" required autocomplete="off">
+            <div style="font-size:.7rem;color:#94a3b8;margin-top:4px">Used to log in. Must be unique.</div>
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label for="username">Username *</label>
+            <input type="text" id="username" name="username" class="form-control"
+                   placeholder="firstname.lastname" required autocomplete="off">
+            <div style="font-size:.7rem;color:#94a3b8;margin-top:4px">Auto-filled from name. Must be unique.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Step 3: Assign roles ────────────────────────────── -->
+    <div class="card reg-step" style="margin-bottom:20px">
+      <div class="card-header" style="display:flex;align-items:center;gap:10px">
+        <span class="step-badge">3</span>
+        <h2>Assign Roles</h2>
+      </div>
+      <div class="card-body">
+        <div style="font-size:.78rem;color:#64748b;margin-bottom:14px">
+          <strong>EMPLOYEE</strong> is always assigned. Add additional roles as needed.
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <!-- EMPLOYEE always on, shown as locked -->
+          <label class="role-check" style="opacity:.6;pointer-events:none">
+            <input type="checkbox" checked disabled>
+            <span>
+              <span class="role-badge" style="background:#64748b18;color:#64748b;padding:2px 8px;border-radius:4px;font-size:.7rem;font-weight:600">EMPLOYEE</span>
+              <span style="font-size:.7rem;color:#64748b;margin-left:6px">Always assigned</span>
+            </span>
+          </label>
+          {% for r in all_roles if r.name != 'EMPLOYEE' %}
+          <label class="role-check">
+            <input type="checkbox" name="roles" value="{{ r.name }}" id="role-{{ r.name }}">
+            <span>
+              <span class="role-badge role-{{ r.name|lower|replace('_','-') }}"
+                    style="padding:2px 8px;border-radius:4px;font-size:.7rem;font-weight:600;display:inline-block">
+                {{ r.name.replace('_',' ') }}
+              </span>
+              {% if r.description %}
+              <span style="font-size:.68rem;color:#64748b;display:block;margin-top:2px;margin-left:2px">{{ r.description }}</span>
+              {% endif %}
+            </span>
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Submit -->
+    <div style="display:flex;align-items:center;gap:12px">
+      <button type="submit" class="btn btn-primary" id="submit-btn" disabled
+              style="padding:10px 24px;font-size:.9rem">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+          <circle cx="9" cy="7" r="4"/>
+          <path d="M19 8l2 2 4-4"/>
+        </svg>
+        Create Account
+      </button>
+      <a href="{{ url_for('admin') }}" class="btn btn-ghost">Cancel</a>
+      <span id="no-emp-hint" style="font-size:.78rem;color:#f59e0b">
+        ← Select an employee to continue
+      </span>
+    </div>
+  </form>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const AVATAR_COLORS = ['#3b82f6','#8b5cf6','#ec4899','#f59e0b','#10b981','#06b6d4','#ef4444','#6366f1'];
+function avatarColor(n){let h=0;for(const c of n)h=(h*31+c.charCodeAt(0))&0xffffffff;return AVATAR_COLORS[Math.abs(h)%AVATAR_COLORS.length];}
+
+// Colour the employee row avatars
+document.querySelectorAll('[id^="era-"]').forEach(av => {
+  const label = av.closest('label');
+  const name  = (label.dataset.name || '');
+  av.style.background = avatarColor(name);
+});
+
+// ── Employee selection ───────────────────────────────────────
+function onEmployeeSelect(radio) {
+  const fname = radio.dataset.fname;
+  const lname = radio.dataset.lname;
+  const full  = fname + ' ' + lname;
+  const email = radio.dataset.email;
+  const num   = radio.dataset.num;
+
+  // Auto-fill account fields
+  document.getElementById('email').value    = email || '';
+  document.getElementById('username').value = (fname + '.' + lname).toLowerCase().replace(/\s+/g,'').replace(/[^a-z0-9_.]/g,'');
+
+  // Show preview card
+  const preview = document.getElementById('selected-preview');
+  document.getElementById('preview-name').textContent = full;
+  document.getElementById('preview-meta').textContent =
+    [radio.dataset.title, radio.dataset.loc, radio.dataset.bu].filter(Boolean).join(' · ');
+  document.getElementById('preview-num').textContent = num;
+  const av = document.getElementById('preview-avatar');
+  av.textContent  = fname[0];
+  av.style.background = avatarColor(full);
+  preview.style.display = 'flex';
+
+  // Highlight selected row
+  document.querySelectorAll('.emp-row').forEach(r => r.classList.remove('selected'));
+  radio.closest('.emp-row').classList.add('selected');
+
+  // Enable submit
+  document.getElementById('submit-btn').disabled = false;
+  document.getElementById('no-emp-hint').style.display = 'none';
+}
+
+// ── Employee search filter ───────────────────────────────────
+document.getElementById('emp-search')?.addEventListener('input', function() {
+  const q = this.value.toLowerCase();
+  document.querySelectorAll('.emp-row').forEach(row => {
+    const match = !q ||
+      row.dataset.name.includes(q) ||
+      row.dataset.title.includes(q) ||
+      row.dataset.loc.includes(q);
+    row.style.display = match ? '' : 'none';
+  });
+});
+
+// ── Form validation before submit ───────────────────────────
+document.getElementById('reg-form')?.addEventListener('submit', function(e) {
+  const emp = document.querySelector('input[name="employee_id"]:checked');
+  if (!emp) { e.preventDefault(); alert('Please select an employee.'); return; }
+  const email = document.getElementById('email').value.trim();
+  const uname = document.getElementById('username').value.trim();
+  if (!email || !uname) { e.preventDefault(); alert('Email and username are required.'); }
+});
+</script>
+{% endblock %}

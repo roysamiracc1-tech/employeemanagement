@@ -532,6 +532,75 @@ def api_org_fus():
     """)
     return jsonify([to_dict(r) for r in rows])
 
+# ─── Admin: register user ──────────────────────────────────────────────────────
+
+@app.route('/admin/register-user', methods=['GET', 'POST'])
+@require_roles('SYSTEM_ADMIN')
+def admin_register_user():
+    if request.method == 'POST':
+        employee_id = request.form.get('employee_id', '').strip()
+        email       = request.form.get('email', '').strip().lower()
+        username    = request.form.get('username', '').strip()
+        roles_list  = request.form.getlist('roles')
+
+        if not employee_id or not email or not username:
+            flash('Employee, email and username are all required.', 'error')
+            return redirect(url_for('admin_register_user'))
+
+        if query("SELECT 1 FROM users WHERE LOWER(email) = %s", (email,), one=True):
+            flash('That email address is already registered.', 'error')
+            return redirect(url_for('admin_register_user'))
+
+        if query("SELECT 1 FROM users WHERE username = %s", (username,), one=True):
+            flash(f'Username "{username}" is already taken.', 'error')
+            return redirect(url_for('admin_register_user'))
+
+        # Insert user
+        execute("""
+            INSERT INTO users (employee_id, email, username, is_active)
+            VALUES (%s::uuid, %s, %s, TRUE)
+        """, (employee_id, email, username))
+
+        new_user = query("SELECT id::text FROM users WHERE LOWER(email) = %s",
+                         (email,), one=True)
+        user_id = new_user['id']
+
+        # Always include EMPLOYEE, plus any extras chosen
+        assigned = set(roles_list) | {'EMPLOYEE'}
+        for role_name in assigned:
+            execute("""
+                INSERT INTO user_roles (user_id, role_id)
+                SELECT %s::uuid, id FROM roles WHERE name = %s
+                ON CONFLICT DO NOTHING
+            """, (user_id, role_name))
+
+        emp = query("SELECT first_name, last_name FROM employees WHERE id = %s::uuid",
+                    (employee_id,), one=True)
+        name = f"{emp['first_name']} {emp['last_name']}" if emp else email
+        flash(f'User account created for {name}.', 'success')
+        return redirect(url_for('admin'))
+
+    # GET — list employees that don't yet have a user account
+    unregistered = [to_dict(r) for r in query("""
+        SELECT e.id::text, e.employee_number,
+               e.first_name, e.last_name, e.job_title,
+               COALESCE(e.email, '') AS email,
+               COALESCE(l.name, '')  AS location,
+               COALESCE(bu.name, '') AS business_unit
+        FROM employees e
+        LEFT JOIN employee_org_assignments oa ON oa.employee_id = e.id AND oa.is_current
+        LEFT JOIN locations l      ON l.id  = oa.location_id
+        LEFT JOIN business_units bu ON bu.id = oa.business_unit_id
+        WHERE e.employment_status = 'ACTIVE'
+          AND e.id NOT IN (SELECT employee_id FROM users WHERE employee_id IS NOT NULL)
+        ORDER BY e.first_name, e.last_name
+    """)]
+    all_roles = [to_dict(r) for r in
+                 query("SELECT id::text, name, description FROM roles ORDER BY name")]
+    return render_template('admin_register.html',
+                           unregistered=unregistered,
+                           all_roles=all_roles)
+
 @app.route('/api/dashboard/stats')
 @login_required
 def api_dashboard_stats():
