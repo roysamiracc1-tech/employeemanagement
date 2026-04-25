@@ -1,1 +1,31 @@
+# Python
 __pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Environment secrets
+.env
+*.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Flask
+instance/
+flask_session/
+
+# Uploads (keep dir, ignore contents)
+static/uploads/logos/*
+!static/uploads/logos/.gitkeep
