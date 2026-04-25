@@ -666,6 +666,71 @@ select.filter-sel:focus { border-color: var(--primary); }
 /* ── Section title ───────────────────────────────────────── */
 .section-title { font-size: .7rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .07em; margin-bottom: 10px; }
 
+/* ── Anniversary badge ───────────────────────────────────── */
+.anniv-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 5px;
+  vertical-align: middle;
+  cursor: default;
+  position: relative;
+  color: #f59e0b;
+  animation: anniv-sway 3s ease-in-out infinite;
+  flex-shrink: 0;
+}
+.anniv-badge.soon    { color: #f97316; animation: anniv-sway 2s ease-in-out infinite; }
+.anniv-badge.urgent  { color: #ef4444; animation: anniv-pulse-scale .9s ease-in-out infinite; }
+
+@keyframes anniv-sway {
+  0%,100% { transform: rotate(0deg) scale(1); }
+  25%      { transform: rotate(-12deg) scale(1.05); }
+  75%      { transform: rotate(12deg) scale(1.05); }
+}
+@keyframes anniv-pulse-scale {
+  0%,100% { transform: scale(1); filter: drop-shadow(0 0 0 transparent); }
+  50%      { transform: scale(1.25); filter: drop-shadow(0 0 4px #ef444488); }
+}
+
+/* Tooltip */
+.anniv-badge::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 9px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  background: #0f172a;
+  color: #f8fafc;
+  padding: 7px 11px;
+  border-radius: 8px;
+  font-size: .71rem;
+  font-weight: 500;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .18s ease, transform .18s ease;
+  z-index: 999;
+  box-shadow: 0 6px 20px rgba(0,0,0,.25);
+  letter-spacing: .01em;
+}
+.anniv-badge::before {
+  content: '';
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  border: 5px solid transparent;
+  border-top-color: #0f172a;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .18s ease, transform .18s ease;
+  z-index: 999;
+}
+.anniv-badge:hover::after,
+.anniv-badge:hover::before {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
 /* ── Live refresh bar ────────────────────────────────────── */
 .refresh-bar {
   display: flex; align-items: center; gap: 6px;

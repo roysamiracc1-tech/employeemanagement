@@ -116,6 +116,28 @@
 {% block scripts %}
 <script>
 const AVATAR_COLORS = ['#3b82f6','#8b5cf6','#ec4899','#f59e0b','#10b981','#06b6d4','#ef4444','#6366f1'];
+const MGMT_ROLES   = ['SYSTEM_ADMIN','HR_ADMIN','DEPARTMENT_HEAD','LOCATION_HEAD',
+                      'HIRING_MANAGER','SOLID_LINE_MANAGER','DOTTED_LINE_MANAGER'];
+const USER_ROLES   = {{ session.roles | tojson }};
+const CAN_SEE_ANNIV = USER_ROLES.some(r => MGMT_ROLES.includes(r));
+
+function anniversaryBadge(joinDate) {
+  if (!CAN_SEE_ANNIV || !joinDate) return '';
+  const today = new Date(); today.setHours(0,0,0,0);
+  const join  = new Date(joinDate);
+  let anniv   = new Date(today.getFullYear(), join.getMonth(), join.getDate());
+  if (anniv < today) anniv = new Date(today.getFullYear()+1, join.getMonth(), join.getDate());
+  const daysUntil = Math.round((anniv - today) / 86400000);
+  if (daysUntil > 15) return '';
+  const years = anniv.getFullYear() - join.getFullYear();
+  if (years <= 0) return '';
+  const dateStr = anniv.toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+  const when    = daysUntil === 0 ? 'Today! 🎉' : `in ${daysUntil} day${daysUntil!==1?'s':''}`;
+  const tip     = `${years}-year work anniversary · ${dateStr} (${when})`;
+  const cls     = daysUntil <= 3 ? 'anniv-badge urgent' : daysUntil <= 7 ? 'anniv-badge soon' : 'anniv-badge';
+  return `<span class="${cls}" data-tooltip="${tip}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-8a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8"/><path d="M4 16s.5-1 2-1 2.5 2 4 2 2.5-2 4-2 2.5 2 4 2 2-1 2-1"/><path d="M2 21h20"/><path d="M7 8v2"/><path d="M12 8v2"/><path d="M17 8v2"/><path d="M7 4s.8-2 2-2 2 2 2 2"/><path d="M12 4s.8-2 2-2 2 2 2 2"/><path d="M17 4s.8-2 2-2 2 2 2 2"/></svg></span>`;
+}
+
 const DEPT_COLORS = {
   'Platform Engineering': {bg:'#eff6ff',color:'#1d4ed8'},
   'Logistics Solutions':  {bg:'#fff7ed',color:'#c2410c'},
@@ -157,7 +179,7 @@ function buildRow(emp) {
     <td><a href="/profile/${emp.id}" style="text-decoration:none">
       <div class="name-cell">
         <div class="avatar" style="background:${avatarColor(emp.full_name)}">${initials(emp.full_name)}</div>
-        <div><div class="name-text">${emp.full_name}</div><div class="title-text">${emp.job_title}</div></div>
+        <div><div class="name-text">${emp.full_name}${anniversaryBadge(emp.join_date)}</div><div class="title-text">${emp.job_title}</div></div>
       </div></a></td>
     <td><span class="dept-badge" style="${deptStyle(emp.business_unit)}">${emp.business_unit||'—'}</span></td>
     <td>${emp.functional_unit?`<span class="unit-badge">${emp.functional_unit}</span>`:'—'}</td>
