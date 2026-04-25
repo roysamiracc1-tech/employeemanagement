@@ -1,0 +1,259 @@
+{% extends 'base.html' %}
+{% block title %}Employee Directory — HR Portal{% endblock %}
+{% block page_title %}Employee Directory{% endblock %}
+
+{% block content %}
+<div class="page" style="padding-bottom:20px">
+  <div id="page-top"></div>
+
+  <div class="table-card">
+
+    <!-- TOP pagination -->
+    <div class="pagination-bar top" id="pagination-bar-top" style="display:none">
+      <div class="rows-per-page">
+        Rows per page:
+        <select class="rows-select" id="rows-select-top">
+          <option value="20" selected>20</option>
+          <option value="50">50</option>
+          <option value="100">100</option>
+          <option value="200">200</option>
+          <option value="500">500</option>
+          <option value="1000">1000</option>
+        </select>
+      </div>
+      <div class="pagination-info" id="pagination-info-top"></div>
+      <div class="pagination-controls" id="pagination-controls-top"></div>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="toolbar">
+      <div class="search-wrap">
+        <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+        </svg>
+        <input class="search-input" id="search" type="text" placeholder="Search name, title, location…">
+      </div>
+      <select class="filter-sel" id="dept-filter">
+        <option value="">All Departments</option>
+        {% for d in departments %}
+        <option value="{{ d.name }}">{{ d.name }}</option>
+        {% endfor %}
+      </select>
+      <select class="filter-sel" id="loc-filter">
+        <option value="">All Locations</option>
+        {% for l in locations %}
+        <option value="{{ l.name }}">{{ l.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Employee</th>
+            <th>Department</th>
+            <th>Product Unit</th>
+            <th>Location</th>
+            <th>Designation</th>
+            <th>Skills</th>
+            <th>Experience</th>
+            <th>Skill Ratings</th>
+            <th>Solid-Line Manager</th>
+            <th>Dotted-Line Manager</th>
+          </tr>
+        </thead>
+        <tbody id="employee-table-body">
+          <tr class="empty-row"><td colspan="11">Loading employees…</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- BOTTOM pagination -->
+    <div class="pagination-bar bottom" id="pagination-bar-bottom" style="display:none">
+      <div class="rows-per-page">
+        Rows per page:
+        <select class="rows-select" id="rows-select-bottom">
+          <option value="20" selected>20</option>
+          <option value="50">50</option>
+          <option value="100">100</option>
+          <option value="200">200</option>
+          <option value="500">500</option>
+          <option value="1000">1000</option>
+        </select>
+      </div>
+      <div class="pagination-info" id="pagination-info-bottom"></div>
+      <div class="pagination-controls" id="pagination-controls-bottom"></div>
+    </div>
+  </div>
+
+  <div id="page-bottom"></div>
+  <div class="status-bar">
+    <span class="status-dot loading" id="status-dot"></span>
+    <span id="status-text">Loading…</span>
+  </div>
+</div>
+
+<!-- Floating scroll buttons -->
+<div class="scroll-btns">
+  <button class="scroll-btn" onclick="document.getElementById('page-top').scrollIntoView({behavior:'smooth'})" title="Scroll to top">
+    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M18 15l-6-6-6 6"/></svg>
+  </button>
+  <button class="scroll-btn" onclick="document.getElementById('page-bottom').scrollIntoView({behavior:'smooth'})" title="Scroll to bottom">
+    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+  </button>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const AVATAR_COLORS = ['#3b82f6','#8b5cf6','#ec4899','#f59e0b','#10b981','#06b6d4','#ef4444','#6366f1'];
+const DEPT_COLORS = {
+  'Platform Engineering': {bg:'#eff6ff',color:'#1d4ed8'},
+  'Logistics Solutions':  {bg:'#fff7ed',color:'#c2410c'},
+  'Corporate':            {bg:'#f0fdf4',color:'#15803d'},
+  'Engineering':          {bg:'#eff6ff',color:'#1d4ed8'},
+  'Product':              {bg:'#fdf4ff',color:'#7e22ce'},
+};
+
+function initials(n){ return n.split(' ').map(p=>p[0]).join('').slice(0,2).toUpperCase(); }
+function avatarColor(n){ let h=0; for(const c of n) h=(h*31+c.charCodeAt(0))&0xffffffff; return AVATAR_COLORS[Math.abs(h)%AVATAR_COLORS.length]; }
+function deptStyle(d){ const s=DEPT_COLORS[d]; return s?`background:${s.bg};color:${s.color}`:'background:#f1f5f9;color:#334155'; }
+
+let all=[], filtered=[], currentPage=1, rowsPerPage=20;
+
+function buildRow(emp) {
+  const skills = Array.isArray(emp.skills) ? emp.skills : [];
+  const certs  = Array.isArray(emp.certifications) ? emp.certifications : [];
+
+  const ratingsHtml = skills.length
+    ? `<div class="skill-ratings">${skills.slice(0,3).map(r=>`
+        <div class="skill-rating">
+          <span class="skill-name" title="${r.skill}">${r.skill}</span>
+          <div class="skill-bar-track"><div class="skill-bar-fill ${r.val_order>0?'validated':''}" style="width:${(r.val_order||r.self_order)*25}%"></div></div>
+          <span class="skill-score">${r.val_order||r.self_order}</span>
+        </div>`).join('')}</div>` : '—';
+
+  const tagsHtml = skills.length
+    ? `<div class="skill-tags">${skills.slice(0,3).map(s=>`<span class="skill-tag">${s.skill}</span>`).join('')}${skills.length>3?`<span class="skill-tag">+${skills.length-3}</span>`:''}</div>` : '—';
+
+  const managerCell = (name, title, id) => name
+    ? `<a href="/profile/${id}" style="text-decoration:none"><div class="manager-cell">
+        <span class="manager-name">${name}</span>
+        ${title?`<span class="manager-desig">${title}</span>`:''}
+       </div></a>` : '—';
+
+  return `<tr>
+    <td style="color:#94a3b8;font-size:.75rem;font-weight:500">${emp.employee_number||emp.id.slice(0,8)}</td>
+    <td><a href="/profile/${emp.id}" style="text-decoration:none">
+      <div class="name-cell">
+        <div class="avatar" style="background:${avatarColor(emp.full_name)}">${initials(emp.full_name)}</div>
+        <div><div class="name-text">${emp.full_name}</div><div class="title-text">${emp.job_title}</div></div>
+      </div></a></td>
+    <td><span class="dept-badge" style="${deptStyle(emp.business_unit)}">${emp.business_unit||'—'}</span></td>
+    <td>${emp.functional_unit?`<span class="unit-badge">${emp.functional_unit}</span>`:'—'}</td>
+    <td><div class="location-cell">
+      <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
+        <circle cx="12" cy="9" r="2.5"/>
+      </svg>${emp.location||'—'}</div></td>
+    <td>${emp.job_title?`<span class="designation-chip">${emp.job_title}</span>`:'—'}</td>
+    <td>${tagsHtml}</td>
+    <td><span class="exp-badge">${emp.join_date ? Math.floor((new Date()-new Date(emp.join_date))/(365.25*24*3600*1000)) : 0} yrs</span></td>
+    <td>${ratingsHtml}</td>
+    <td>${managerCell(emp.solid_manager_name, emp.solid_manager_title, emp.solid_manager_id)}</td>
+    <td>${emp.dotted_manager_name?`<div class="manager-cell"><span class="manager-name">${emp.dotted_manager_name}</span>${emp.dotted_manager_title?`<span class="manager-desig">${emp.dotted_manager_title}</span>`:''}</div>`:'—'}</td>
+  </tr>`;
+}
+
+function pagesToShow(c,t){
+  if(t<=7) return Array.from({length:t},(_,i)=>i+1);
+  if(c<=4) return [1,2,3,4,5,'…',t];
+  if(c>=t-3) return [1,'…',t-4,t-3,t-2,t-1,t];
+  return [1,'…',c-1,c,c+1,'…',t];
+}
+
+function renderPage(){
+  const tbody=document.getElementById('employee-table-body');
+  if(!filtered.length){
+    tbody.innerHTML='<tr class="empty-row"><td colspan="11">No employees found.</td></tr>';
+    ['top','bottom'].forEach(s=>document.getElementById(`pagination-bar-${s}`).style.display='none');
+    return;
+  }
+  const total=Math.ceil(filtered.length/rowsPerPage);
+  currentPage=Math.min(currentPage,total);
+  const start=(currentPage-1)*rowsPerPage, end=Math.min(start+rowsPerPage,filtered.length);
+  tbody.innerHTML=filtered.slice(start,end).map(buildRow).join('');
+
+  const info=`Showing <strong>${start+1}–${end}</strong> of <strong>${filtered.length}</strong> employees`;
+  const ctrl=buildCtrl(total);
+  ['top','bottom'].forEach(s=>{
+    document.getElementById(`pagination-bar-${s}`).style.display='flex';
+    document.getElementById(`pagination-info-${s}`).innerHTML=info;
+    const el=document.getElementById(`pagination-controls-${s}`);
+    el.innerHTML=ctrl;
+    el.querySelector('[data-action=prev]').addEventListener('click',()=>go(currentPage-1));
+    el.querySelector('[data-action=next]').addEventListener('click',()=>go(currentPage+1));
+    el.querySelectorAll('[data-page]').forEach(b=>b.addEventListener('click',()=>go(+b.dataset.page)));
+    document.getElementById(`rows-select-${s}`).value=String(rowsPerPage);
+  });
+}
+
+function buildCtrl(t){
+  const pd=currentPage===1?'disabled':'', nd=currentPage===t?'disabled':'';
+  let h=`<button class="page-btn" data-action="prev" ${pd}>
+    <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+  </button>`;
+  pagesToShow(currentPage,t).forEach(p=>{
+    h += p==='…'?`<span class="page-ellipsis">…</span>`
+      :`<button class="page-btn ${p===currentPage?'active':''}" data-page="${p}">${p}</button>`;
+  });
+  h+=`<button class="page-btn" data-action="next" ${nd}>
+    <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+  </button>`;
+  return h;
+}
+
+function go(p){ currentPage=p; renderPage(); document.getElementById('page-top').scrollIntoView({behavior:'smooth'}); }
+
+function applyFilters(){
+  const q=document.getElementById('search').value.toLowerCase();
+  const dept=document.getElementById('dept-filter').value;
+  const loc=document.getElementById('loc-filter').value;
+  filtered=all.filter(e=>{
+    const mq=!q||e.full_name.toLowerCase().includes(q)||(e.job_title||'').toLowerCase().includes(q)||(e.location||'').toLowerCase().includes(q)||(e.designation||'').toLowerCase().includes(q);
+    const md=!dept||e.business_unit===dept;
+    const ml=!loc||e.location===loc;
+    return mq&&md&&ml;
+  });
+  currentPage=1; renderPage();
+}
+
+function onRowsChange(e){
+  rowsPerPage=+e.target.value;
+  ['top','bottom'].forEach(s=>document.getElementById(`rows-select-${s}`).value=e.target.value);
+  currentPage=1; renderPage();
+}
+
+async function loadEmployees(){
+  try{
+    const res=await fetch('/api/employees');
+    if(!res.ok) throw new Error(`HTTP ${res.status}`);
+    all=await res.json(); filtered=all;
+    renderPage();
+    document.getElementById('status-dot').className='status-dot';
+    document.getElementById('status-text').textContent=`${all.length} employees loaded`;
+    document.getElementById('search').addEventListener('input',applyFilters);
+    document.getElementById('dept-filter').addEventListener('change',applyFilters);
+    document.getElementById('loc-filter').addEventListener('change',applyFilters);
+    document.getElementById('rows-select-top').addEventListener('change',onRowsChange);
+    document.getElementById('rows-select-bottom').addEventListener('change',onRowsChange);
+  }catch(err){
+    document.getElementById('status-dot').className='status-dot error';
+    document.getElementById('status-text').textContent=`Failed: ${err.message}`;
+  }
+}
+loadEmployees();
+</script>
+{% endblock %}

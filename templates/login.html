@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login — HR Portal</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body style="display:block">
+
+<div class="login-page">
+  <div class="login-card">
+    <div class="login-card-header">
+      <div class="login-logo">HR</div>
+      <h1>HR Competency Portal</h1>
+      <p>Sign in with your work email to continue</p>
+    </div>
+
+    <div class="login-card-body">
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, message in messages %}
+            <div class="flash flash-{{ category }}" style="border-radius:8px;margin-bottom:12px">{{ message }}</div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+
+      <!-- Quick demo logins -->
+      {% if demo_users %}
+      <div class="demo-panel">
+        <h4>Demo Accounts</h4>
+        {% for u in demo_users %}
+        <div class="demo-user" onclick="setEmail('{{ u.email }}')">
+          <div>
+            <div class="demo-user-name">{{ u.name }}</div>
+            <div class="demo-user-role">
+              {{ u.job_title }}
+              &nbsp;·&nbsp;
+              {% for r in u.roles %}
+                {% if r != 'EMPLOYEE' %}
+                  <span style="color:#2563eb;font-size:.65rem;font-weight:600">{{ r.replace('_',' ') }}</span>
+                {% endif %}
+              {% endfor %}
+            </div>
+          </div>
+          <button class="demo-use-btn">Use →</button>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      <form method="POST" action="{{ url_for('login') }}">
+        <div class="form-group">
+          <label for="email">Work Email</label>
+          <input id="email" name="email" type="email" class="form-control"
+                 placeholder="you@company.com" required autocomplete="email">
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;padding:10px">
+          Sign In
+        </button>
+      </form>
+
+      <p style="text-align:center;font-size:.72rem;color:#94a3b8;margin-top:14px">
+        Demo mode — no password required
+      </p>
+    </div>
+  </div>
+</div>
+
+<script>
+function setEmail(email) {
+  document.getElementById('email').value = email;
+  document.getElementById('email').focus();
+}
+</script>
+</body>
+</html>

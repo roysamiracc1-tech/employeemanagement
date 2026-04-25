@@ -1,0 +1,147 @@
+{% extends 'base.html' %}
+{% block title %}My Team — HR Portal{% endblock %}
+{% block page_title %}My Team{% endblock %}
+
+{% block content %}
+<div class="page">
+  <div class="page-header" style="display:flex;align-items:center;justify-content:space-between">
+    <div>
+      <h1>My Team</h1>
+      <p id="team-subtitle">Loading direct reports…</p>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <div class="search-wrap" style="width:220px">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#94a3b8">
+          <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+        </svg>
+        <input class="search-input" id="search" type="text" placeholder="Search team…">
+      </div>
+    </div>
+  </div>
+
+  <div class="team-grid" id="team-grid">
+    <!-- skeleton -->
+    {% for _ in range(3) %}
+    <div class="team-card" style="opacity:.4">
+      <div class="team-card-header">
+        <div class="avatar" style="background:#e2e8f0"></div>
+        <div style="flex:1">
+          <div style="height:12px;background:#e2e8f0;border-radius:4px;width:60%;margin-bottom:6px"></div>
+          <div style="height:10px;background:#f1f5f9;border-radius:4px;width:40%"></div>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="status-bar" id="status-bar" style="display:none">
+    <span class="status-dot" id="status-dot"></span>
+    <span id="status-text"></span>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const AVATAR_COLORS=['#3b82f6','#8b5cf6','#ec4899','#f59e0b','#10b981','#06b6d4','#ef4444','#6366f1'];
+function initials(n){return n.split(' ').map(p=>p[0]).join('').slice(0,2).toUpperCase();}
+function avatarColor(n){let h=0;for(const c of n)h=(h*31+c.charCodeAt(0))&0xffffffff;return AVATAR_COLORS[Math.abs(h)%AVATAR_COLORS.length];}
+
+const LEVEL_COLORS={1:'#94a3b8',2:'#3b82f6',3:'#8b5cf6',4:'#10b981'};
+const LEVEL_LABELS={1:'Beginner',2:'Intermediate',3:'Advanced',4:'Expert'};
+
+function buildCard(emp){
+  const skills = Array.isArray(emp.skills) ? emp.skills : [];
+  const certs  = Array.isArray(emp.certifications) ? emp.certifications : [];
+  const yrs = emp.join_date ? Math.floor((new Date()-new Date(emp.join_date))/(365.25*24*3600*1000)) : 0;
+
+  const primarySkills = skills.filter(s=>s.is_primary).slice(0,4);
+  const otherSkills   = skills.filter(s=>!s.is_primary).slice(0,2);
+  const displaySkills = [...primarySkills,...otherSkills].slice(0,5);
+
+  const validatedCerts = certs.filter(c=>c.status==='VERIFIED').length;
+
+  return `
+  <div class="team-card" data-name="${emp.full_name.toLowerCase()}" data-title="${(emp.job_title||'').toLowerCase()}">
+    <div class="team-card-header">
+      <div class="avatar" style="background:${avatarColor(emp.full_name)}">${initials(emp.full_name)}</div>
+      <div class="team-card-info">
+        <div class="tc-name">${emp.full_name}</div>
+        <div class="tc-title">${emp.job_title||'—'}</div>
+      </div>
+    </div>
+
+    <div class="team-card-meta">
+      ${emp.location?`<span class="badge badge-gray" style="font-size:.68rem">📍 ${emp.location}</span>`:''}
+      ${emp.business_unit?`<span class="badge badge-blue" style="font-size:.68rem">${emp.business_unit}</span>`:''}
+      ${emp.functional_unit?`<span class="badge badge-purple" style="font-size:.68rem">${emp.functional_unit}</span>`:''}
+    </div>
+
+    ${displaySkills.length ? `
+    <div class="team-card-skills">
+      <div class="section-title">Skills</div>
+      <div class="skill-ratings">
+        ${displaySkills.map(s=>{
+          const order = s.val_order||s.self_order||0;
+          const isValidated = s.val_order>0;
+          return `<div class="skill-rating">
+            <span class="skill-name" title="${s.skill}">${s.skill}</span>
+            <div class="skill-bar-track">
+              <div class="skill-bar-fill ${isValidated?'validated':''}" style="width:${order*25}%"></div>
+            </div>
+            <span class="skill-score" style="color:${LEVEL_COLORS[order]||'#64748b'}">${order}</span>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>` : ''}
+
+    <div class="team-card-footer">
+      <div style="display:flex;gap:10px">
+        <span class="exp-badge">${yrs} yrs</span>
+        ${validatedCerts>0?`<span class="badge badge-green">🏅 ${validatedCerts} cert${validatedCerts>1?'s':''}</span>`:''}
+        ${emp.employment_type==='CONTRACTOR'?'<span class="badge badge-amber">Contractor</span>':''}
+      </div>
+      <a href="/profile/${emp.id}">View Profile →</a>
+    </div>
+  </div>`;
+}
+
+let allTeam=[];
+
+function renderTeam(data){
+  const grid=document.getElementById('team-grid');
+  if(!data.length){
+    grid.innerHTML='<p style="color:#94a3b8;font-size:.875rem">No team members found.</p>';
+    return;
+  }
+  grid.innerHTML=data.map(buildCard).join('');
+}
+
+function filterTeam(){
+  const q=document.getElementById('search').value.toLowerCase();
+  renderTeam(q ? allTeam.filter(e=>e.full_name.toLowerCase().includes(q)||(e.job_title||'').toLowerCase().includes(q)) : allTeam);
+}
+
+async function loadTeam(){
+  const sb=document.getElementById('status-bar');
+  const dot=document.getElementById('status-dot');
+  const txt=document.getElementById('status-text');
+  sb.style.display='flex';
+  try{
+    const res=await fetch('/api/my-team');
+    if(!res.ok) throw new Error(`HTTP ${res.status}`);
+    allTeam=await res.json();
+    renderTeam(allTeam);
+    dot.className='status-dot';
+    txt.textContent=`${allTeam.length} direct report${allTeam.length!==1?'s':''} loaded`;
+    document.getElementById('team-subtitle').textContent=`${allTeam.length} direct report${allTeam.length!==1?'s':''}`;
+    document.getElementById('search').addEventListener('input',filterTeam);
+  }catch(err){
+    dot.className='status-dot error';
+    txt.textContent=`Failed: ${err.message}`;
+    document.getElementById('team-grid').innerHTML=`<p style="color:#ef4444">${err.message}</p>`;
+  }
+}
+loadTeam();
+</script>
+{% endblock %}

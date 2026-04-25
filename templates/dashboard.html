@@ -1,0 +1,201 @@
+{% extends 'base.html' %}
+{% block title %}Dashboard — HR Portal{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="page">
+
+  <!-- ── Admin / HR / Head stats ──────────────────────────── -->
+  {% if stats.total is defined %}
+  <div class="stats-grid">
+    <div class="stat-card blue">
+      <div class="stat-icon">
+        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+          <circle cx="9" cy="7" r="4"/>
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
+        </svg>
+      </div>
+      <div class="stat-value">{{ stats.total }}</div>
+      <div class="stat-label">Active Employees</div>
+    </div>
+
+    <div class="stat-card amber">
+      <div class="stat-icon">
+        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        </svg>
+      </div>
+      <div class="stat-value">{{ stats.pending_validations }}</div>
+      <div class="stat-label">Pending Skill Validations</div>
+    </div>
+
+    <div class="stat-card green">
+      <div class="stat-icon">
+        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <circle cx="12" cy="8" r="6"/>
+          <path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/>
+        </svg>
+      </div>
+      <div class="stat-value">{{ stats.certs_total }}</div>
+      <div class="stat-label">Certifications Held</div>
+    </div>
+
+    {% if stats.by_location %}
+    {% for loc in stats.by_location %}
+    <div class="stat-card purple">
+      <div class="stat-icon">
+        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
+          <circle cx="12" cy="9" r="2.5"/>
+        </svg>
+      </div>
+      <div class="stat-value">{{ loc.count }}</div>
+      <div class="stat-label">{{ loc.name }}</div>
+    </div>
+    {% endfor %}
+    {% endif %}
+  </div>
+
+  <div class="two-col" style="margin-bottom:20px">
+
+    <!-- By Business Unit -->
+    {% if stats.by_bu %}
+    <div class="card">
+      <div class="card-header"><h2>By Business Unit</h2></div>
+      <div class="card-body" style="padding:0">
+        {% for bu in stats.by_bu %}
+        <div style="display:flex;align-items:center;gap:12px;padding:12px 20px;border-bottom:1px solid #f1f5f9">
+          <div style="flex:1">
+            <div style="font-size:.83rem;font-weight:600">{{ bu.name }}</div>
+            <div style="font-size:.72rem;color:#64748b">{{ bu.code }}</div>
+          </div>
+          <div style="font-size:1.2rem;font-weight:700;color:#2563eb">{{ bu.count }}</div>
+          <div style="width:80px;height:6px;background:#e2e8f0;border-radius:999px;overflow:hidden">
+            <div style="height:100%;background:#3b82f6;border-radius:999px;width:{{ ((bu.count / stats.total) * 100)|int }}%"></div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Top skills -->
+    {% if stats.top_skills %}
+    <div class="card">
+      <div class="card-header"><h2>Top Skills by Coverage</h2></div>
+      <div class="card-body" style="padding:0">
+        {% for s in stats.top_skills %}
+        <div style="display:flex;align-items:center;gap:12px;padding:10px 20px;border-bottom:1px solid #f1f5f9">
+          <div style="flex:1">
+            <div style="font-size:.83rem;font-weight:600">{{ s.name }}</div>
+            <div style="font-size:.7rem;color:#64748b">{{ s.category }}</div>
+          </div>
+          <div style="font-size:.75rem;font-weight:600;color:#64748b">{{ s.emp_count }} people</div>
+          <div style="text-align:right;min-width:60px">
+            <div style="font-size:.75rem;font-weight:700;color:#2563eb">avg {{ s.avg_level }}/4</div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <!-- ── Manager stats ─────────────────────────────────────── -->
+  {% if stats.team_size is defined %}
+  <div class="stats-grid" style="margin-bottom:20px">
+    <div class="stat-card blue">
+      <div class="stat-icon">
+        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+          <circle cx="9" cy="7" r="4"/>
+        </svg>
+      </div>
+      <div class="stat-value">{{ stats.team_size }}</div>
+      <div class="stat-label">Direct Reports</div>
+    </div>
+    <div class="stat-card amber">
+      <div class="stat-icon">
+        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="8" x2="12" y2="12"/>
+          <line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+      </div>
+      <div class="stat-value">{{ stats.team_pending }}</div>
+      <div class="stat-label">Skills Awaiting Validation</div>
+    </div>
+    <div class="stat-card green">
+      <div class="stat-icon">
+        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <circle cx="12" cy="8" r="6"/>
+          <path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/>
+        </svg>
+      </div>
+      <div class="stat-value">{{ stats.team_certs }}</div>
+      <div class="stat-label">Team Certifications</div>
+    </div>
+  </div>
+
+  <div style="margin-bottom:20px">
+    <a href="{{ url_for('my_team') }}" class="btn btn-primary">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+      </svg>
+      View My Team
+    </a>
+  </div>
+  {% endif %}
+
+  <!-- ── Own profile card ───────────────────────────────────── -->
+  {% if stats.own %}
+  <div class="card" style="max-width:560px">
+    <div class="card-header"><h2>My Profile</h2></div>
+    <div class="card-body">
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px">
+        <div class="avatar lg" style="background:#2563eb">
+          {{ session.user_name[0] if session.user_name else 'U' }}
+        </div>
+        <div>
+          <div style="font-size:1rem;font-weight:700">{{ session.user_name }}</div>
+          <div style="font-size:.83rem;color:#64748b">{{ stats.own.job_title }}</div>
+          <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">
+            {% if stats.own.location %}<span class="badge badge-gray">📍 {{ stats.own.location }}</span>{% endif %}
+            {% if stats.own.bu %}<span class="badge badge-blue">{{ stats.own.bu }}</span>{% endif %}
+            {% if stats.own.fu %}<span class="badge badge-purple">{{ stats.own.fu }}</span>{% endif %}
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;gap:20px">
+        <div style="text-align:center">
+          <div style="font-size:1.4rem;font-weight:700;color:#2563eb">{{ stats.own.skill_count }}</div>
+          <div style="font-size:.72rem;color:#64748b">Skills</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-size:1.4rem;font-weight:700;color:#16a34a">{{ stats.own.cert_count }}</div>
+          <div style="font-size:.72rem;color:#64748b">Certifications</div>
+        </div>
+        {% if stats.own.years is defined %}
+        <div style="text-align:center">
+          <div style="font-size:1.4rem;font-weight:700;color:#7c3aed">{{ stats.own.years }}</div>
+          <div style="font-size:.72rem;color:#64748b">Years</div>
+        </div>
+        {% endif %}
+      </div>
+      <div style="margin-top:16px">
+        <a href="{{ url_for('profile') }}" class="btn btn-ghost btn-sm">View Full Profile →</a>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Make datetime.now() available in template
+</script>
+{% endblock %}

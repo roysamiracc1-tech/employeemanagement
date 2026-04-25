@@ -1,0 +1,372 @@
+{% extends 'base.html' %}
+{% block title %}Admin Panel — HR Portal{% endblock %}
+{% block page_title %}Admin Panel{% endblock %}
+
+{% block content %}
+<div class="page">
+
+  <div class="admin-tabs">
+    <button class="admin-tab active" onclick="switchTab('users',this)">Users &amp; Roles</button>
+    <button class="admin-tab" onclick="switchTab('employees',this)">Employees</button>
+    <button class="admin-tab" onclick="switchTab('org',this)">Organisation</button>
+  </div>
+
+  <!-- ── Users & Roles tab ───────────────────────────────────── -->
+  <div class="admin-panel" id="tab-users">
+    <div class="toolbar" style="margin-bottom:16px">
+      <div class="search-wrap">
+        <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+        </svg>
+        <input class="search-input" id="user-search" type="text" placeholder="Search users…">
+      </div>
+      <span id="user-count" style="font-size:.8rem;color:#64748b;align-self:center"></span>
+    </div>
+
+    <div class="table-card" style="margin:0">
+      <div class="table-wrap">
+        <table id="users-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Employee</th>
+              <th>Location</th>
+              <th>Roles</th>
+              <th>Status</th>
+              <th>Last Login</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="users-tbody">
+            <tr class="empty-row"><td colspan="7">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Employees tab ──────────────────────────────────────── -->
+  <div class="admin-panel" id="tab-employees" style="display:none">
+    <div class="toolbar" style="margin-bottom:16px">
+      <div class="search-wrap">
+        <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+        </svg>
+        <input class="search-input" id="emp-search" type="text" placeholder="Search employees…">
+      </div>
+    </div>
+    <div class="table-card" style="margin:0">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th><th>Employee</th><th>Location</th><th>Business Unit</th>
+              <th>Skills</th><th>Experience</th><th>Certifications</th>
+            </tr>
+          </thead>
+          <tbody id="emp-tbody">
+            <tr class="empty-row"><td colspan="7">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Organisation tab ───────────────────────────────────── -->
+  <div class="admin-panel" id="tab-org" style="display:none">
+    <div class="two-col">
+      <div class="card">
+        <div class="card-header"><h2>Business Units</h2></div>
+        <div class="card-body" style="padding:0" id="bu-list">
+          <p style="padding:16px;color:#94a3b8;font-size:.85rem">Loading…</p>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h2>Locations</h2></div>
+        <div class="card-body" style="padding:0" id="loc-list">
+          <p style="padding:16px;color:#94a3b8;font-size:.85rem">Loading…</p>
+        </div>
+      </div>
+    </div>
+    <div class="card" style="margin-top:16px">
+      <div class="card-header"><h2>Functional Units</h2></div>
+      <div class="card-body" style="padding:0" id="fu-list">
+        <p style="padding:16px;color:#94a3b8;font-size:.85rem">Loading…</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="status-bar" id="status-bar">
+    <span class="status-dot loading" id="status-dot"></span>
+    <span id="status-text">Loading…</span>
+  </div>
+</div>
+
+<!-- ── Role edit modal ─────────────────────────────────────── -->
+<div id="role-modal" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center" onclick="if(event.target===this)closeModal()">
+  <div class="modal-box" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title" id="modal-title">Edit Roles</div>
+        <div class="modal-sub" id="modal-sub"></div>
+      </div>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div id="role-checkboxes" style="display:flex;flex-direction:column;gap:10px">
+        {% for r in all_roles %}
+        <label class="role-check">
+          <input type="checkbox" value="{{ r.name }}" id="rc-{{ r.name }}">
+          <span>
+            <span class="role-badge role-{{ r.name|lower|replace('_','-') }}">{{ r.name.replace('_',' ') }}</span>
+            {% if r.description %}<span style="font-size:.72rem;color:#64748b;margin-left:6px">{{ r.description }}</span>{% endif %}
+          </span>
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary btn-sm" onclick="saveRoles()">Save Roles</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const ALL_ROLES = {{ all_roles | tojson }};
+let allUsers = [], allEmps = [], currentUserId = null, currentUserRoles = [];
+
+// ── Tab switching ──────────────────────────────────────────────────────────
+function switchTab(name, btn) {
+  document.querySelectorAll('.admin-tab').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.admin-panel').forEach(p => p.style.display = 'none');
+  btn.classList.add('active');
+  document.getElementById('tab-' + name).style.display = '';
+  if (name === 'org' && document.getElementById('bu-list').innerHTML.includes('Loading')) loadOrg();
+}
+
+// ── Users & Roles ──────────────────────────────────────────────────────────
+const ROLE_CHIP_COLORS = {
+  'SYSTEM_ADMIN':        '#7c3aed',
+  'HR_ADMIN':            '#0f766e',
+  'DEPARTMENT_HEAD':     '#1d4ed8',
+  'LOCATION_HEAD':       '#b45309',
+  'HIRING_MANAGER':      '#0369a1',
+  'SOLID_LINE_MANAGER':  '#1e40af',
+  'DOTTED_LINE_MANAGER': '#374151',
+  'EMPLOYEE':            '#64748b',
+};
+
+function roleChip(r) {
+  const c = ROLE_CHIP_COLORS[r] || '#64748b';
+  return `<span style="display:inline-block;padding:2px 7px;border-radius:4px;font-size:.65rem;font-weight:600;background:${c}18;color:${c};white-space:nowrap">${r.replace(/_/g,' ')}</span>`;
+}
+
+function fmtDate(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleDateString('en-GB', {day:'2-digit',month:'short',year:'numeric'});
+}
+
+function buildUserRow(u, idx) {
+  const rolesHtml = (u.roles || []).map(roleChip).join(' ');
+  const statusBadge = u.is_active
+    ? '<span style="color:#16a34a;font-size:.72rem;font-weight:600">● Active</span>'
+    : '<span style="color:#dc2626;font-size:.72rem;font-weight:600">● Inactive</span>';
+  return `<tr data-uid="${u.id}" data-active="${u.is_active}">
+    <td style="color:#94a3b8;font-size:.75rem">${u.employee_number||idx}</td>
+    <td>
+      <div class="name-cell">
+        <div class="avatar" style="background:${avatarColor(u.first_name+' '+u.last_name)};font-size:.7rem">${initials(u.first_name+' '+u.last_name)}</div>
+        <div>
+          <div class="name-text">${u.first_name} ${u.last_name}</div>
+          <div class="title-text">${u.email}</div>
+        </div>
+      </div>
+    </td>
+    <td>${u.location||'—'}</td>
+    <td style="max-width:260px"><div style="display:flex;flex-wrap:wrap;gap:3px">${rolesHtml||'<span style="color:#94a3b8;font-size:.75rem">—</span>'}</div></td>
+    <td>${statusBadge}</td>
+    <td style="font-size:.75rem;color:#64748b">${fmtDate(u.last_login_at)}</td>
+    <td>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-ghost btn-sm" onclick="openModal('${u.id}','${u.first_name} ${u.last_name}',${JSON.stringify(u.roles||[])})">Edit Roles</button>
+        <button class="btn btn-sm ${u.is_active?'btn-danger':'btn-success'}" onclick="toggleUser('${u.id}',this)">
+          ${u.is_active?'Disable':'Enable'}
+        </button>
+      </div>
+    </td>
+  </tr>`;
+}
+
+function renderUsers(data) {
+  const tbody = document.getElementById('users-tbody');
+  if (!data.length) { tbody.innerHTML = '<tr class="empty-row"><td colspan="7">No users found.</td></tr>'; return; }
+  tbody.innerHTML = data.map((u,i) => buildUserRow(u, i+1)).join('');
+  document.getElementById('user-count').textContent = `${data.length} users`;
+}
+
+function filterUsers() {
+  const q = document.getElementById('user-search').value.toLowerCase();
+  renderUsers(q ? allUsers.filter(u =>
+    `${u.first_name} ${u.last_name}`.toLowerCase().includes(q) ||
+    u.email.toLowerCase().includes(q) ||
+    (u.roles||[]).some(r => r.toLowerCase().includes(q))
+  ) : allUsers);
+}
+
+// ── Employee tab ────────────────────────────────────────────────────────────
+function buildEmpRow(emp, idx) {
+  const skills = Array.isArray(emp.skills) ? emp.skills : [];
+  const certs  = Array.isArray(emp.certifications) ? emp.certifications : [];
+  const yrs    = emp.join_date ? Math.floor((new Date() - new Date(emp.join_date)) / (365.25*24*3600*1000)) : 0;
+  return `<tr>
+    <td style="color:#94a3b8;font-size:.75rem">${emp.employee_number||idx}</td>
+    <td><a href="/profile/${emp.id}" style="text-decoration:none">
+      <div class="name-cell">
+        <div class="avatar" style="background:${avatarColor(emp.full_name)};font-size:.7rem">${initials(emp.full_name)}</div>
+        <div><div class="name-text">${emp.full_name}</div><div class="title-text">${emp.job_title||''}</div></div>
+      </div></a></td>
+    <td>${emp.location||'—'}</td>
+    <td>${emp.business_unit?`<span class="dept-badge" style="background:#eff6ff;color:#1d4ed8">${emp.business_unit}</span>`:'—'}</td>
+    <td>${skills.length
+      ? `<div style="display:flex;flex-wrap:wrap;gap:3px">${skills.slice(0,3).map(s=>`<span class="skill-tag">${s.skill}</span>`).join('')}${skills.length>3?`<span class="skill-tag">+${skills.length-3}</span>`:''}</div>`
+      : '—'}</td>
+    <td><span class="exp-badge">${yrs} yrs</span></td>
+    <td>${certs.filter(c=>c.status==='VERIFIED').length
+      ? `<span class="badge badge-green">🏅 ${certs.filter(c=>c.status==='VERIFIED').length}</span>` : '—'}</td>
+  </tr>`;
+}
+
+function renderEmps(data) {
+  const tbody = document.getElementById('emp-tbody');
+  if (!data.length) { tbody.innerHTML = '<tr class="empty-row"><td colspan="7">No employees.</td></tr>'; return; }
+  tbody.innerHTML = data.map((e,i) => buildEmpRow(e, i+1)).join('');
+}
+
+function filterEmps() {
+  const q = document.getElementById('emp-search').value.toLowerCase();
+  renderEmps(q ? allEmps.filter(e =>
+    e.full_name.toLowerCase().includes(q) ||
+    (e.job_title||'').toLowerCase().includes(q) ||
+    (e.location||'').toLowerCase().includes(q)
+  ) : allEmps);
+}
+
+// ── Org tab ─────────────────────────────────────────────────────────────────
+async function loadOrg() {
+  const [bus, locs, fus] = await Promise.all([
+    fetch('/api/admin/org/business-units').then(r=>r.json()),
+    fetch('/api/admin/org/locations').then(r=>r.json()),
+    fetch('/api/admin/org/functional-units').then(r=>r.json()),
+  ]);
+
+  document.getElementById('bu-list').innerHTML = bus.map(b => `
+    <div style="display:flex;align-items:center;gap:12px;padding:12px 20px;border-bottom:1px solid #f1f5f9">
+      <div style="flex:1">
+        <div style="font-size:.83rem;font-weight:600">${b.name}</div>
+        <div style="font-size:.72rem;color:#64748b">${b.code}</div>
+      </div>
+      <span style="font-size:1.1rem;font-weight:700;color:#2563eb">${b.emp_count}</span>
+    </div>`).join('') || '<p style="padding:16px;color:#94a3b8">No data.</p>';
+
+  document.getElementById('loc-list').innerHTML = locs.map(l => `
+    <div style="display:flex;align-items:center;gap:12px;padding:12px 20px;border-bottom:1px solid #f1f5f9">
+      <div style="flex:1">
+        <div style="font-size:.83rem;font-weight:600">${l.name}</div>
+        <div style="font-size:.72rem;color:#64748b">${l.office_code||''}</div>
+      </div>
+      <span style="font-size:1.1rem;font-weight:700;color:#2563eb">${l.emp_count}</span>
+    </div>`).join('') || '<p style="padding:16px;color:#94a3b8">No data.</p>';
+
+  document.getElementById('fu-list').innerHTML = fus.map(f => `
+    <div style="display:flex;align-items:center;gap:12px;padding:12px 20px;border-bottom:1px solid #f1f5f9">
+      <div style="flex:1">
+        <div style="font-size:.83rem;font-weight:600">${f.name}</div>
+        <div style="font-size:.72rem;color:#64748b">${f.code||''} · ${f.bu_name||''}</div>
+      </div>
+      <span style="font-size:1.1rem;font-weight:700;color:#2563eb">${f.emp_count}</span>
+    </div>`).join('') || '<p style="padding:16px;color:#94a3b8">No data.</p>';
+}
+
+// ── Modal ───────────────────────────────────────────────────────────────────
+function openModal(uid, name, roles) {
+  currentUserId    = uid;
+  currentUserRoles = roles;
+  document.getElementById('modal-title').textContent = 'Edit Roles — ' + name;
+  document.getElementById('modal-sub').textContent   = '';
+  ALL_ROLES.forEach(r => {
+    const cb = document.getElementById('rc-' + r.name);
+    if (cb) cb.checked = roles.includes(r.name);
+  });
+  document.getElementById('role-modal').style.display = 'flex';
+}
+
+function closeModal() {
+  document.getElementById('role-modal').style.display = 'none';
+}
+
+async function saveRoles() {
+  const chosen = ALL_ROLES.map(r => r.name).filter(n => {
+    const cb = document.getElementById('rc-' + n);
+    return cb && cb.checked;
+  });
+  const res = await fetch('/api/admin/update-roles', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({user_id: currentUserId, roles: chosen})
+  });
+  if (res.ok) {
+    const row = allUsers.find(u => u.id === currentUserId);
+    if (row) row.roles = chosen;
+    renderUsers(allUsers);
+    closeModal();
+  } else {
+    alert('Failed to save roles.');
+  }
+}
+
+async function toggleUser(uid, btn) {
+  const res = await fetch('/api/admin/toggle-user', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({user_id: uid})
+  });
+  if (res.ok) {
+    const data = await res.json();
+    const row = allUsers.find(u => u.id === uid);
+    if (row) row.is_active = data.is_active;
+    renderUsers(allUsers);
+  }
+}
+
+// ── Shared avatar helpers ───────────────────────────────────────────────────
+const AVATAR_COLORS = ['#3b82f6','#8b5cf6','#ec4899','#f59e0b','#10b981','#06b6d4','#ef4444','#6366f1'];
+function initials(n){ return n.split(' ').map(p=>p[0]).join('').slice(0,2).toUpperCase(); }
+function avatarColor(n){ let h=0; for(const c of n) h=(h*31+c.charCodeAt(0))&0xffffffff; return AVATAR_COLORS[Math.abs(h)%AVATAR_COLORS.length]; }
+
+// ── Bootstrap ───────────────────────────────────────────────────────────────
+async function init() {
+  const [uRes, eRes] = await Promise.all([
+    fetch('/api/admin/users'),
+    fetch('/api/employees'),
+  ]);
+  if (uRes.ok) {
+    allUsers = await uRes.json();
+    renderUsers(allUsers);
+    document.getElementById('user-search').addEventListener('input', filterUsers);
+  }
+  if (eRes.ok) {
+    allEmps = await eRes.json();
+    renderEmps(allEmps);
+    document.getElementById('emp-search').addEventListener('input', filterEmps);
+  }
+  const dot  = document.getElementById('status-dot');
+  const text = document.getElementById('status-text');
+  dot.className  = 'status-dot';
+  text.textContent = `${allUsers.length} users · ${allEmps.length} employees loaded`;
+}
+init();
+</script>
+{% endblock %}

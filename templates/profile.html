@@ -1,0 +1,212 @@
+{% extends 'base.html' %}
+{% block title %}{{ emp.full_name }} — HR Portal{% endblock %}
+{% block page_title %}Employee Profile{% endblock %}
+
+{% block content %}
+<div class="page" style="max-width:900px">
+
+  <!-- ── Profile header ─────────────────────────────────────── -->
+  <div class="profile-header">
+    <div class="profile-avatar-wrap">
+      <div class="avatar xl" id="profile-avatar">{{ emp.full_name[0] }}</div>
+    </div>
+    <div class="profile-header-info">
+      <h1 class="profile-name">{{ emp.full_name }}</h1>
+      <div class="profile-title">{{ emp.job_title or '—' }}</div>
+      <div class="profile-meta">
+        {% if emp.location %}<span class="badge badge-gray">📍 {{ emp.location }}</span>{% endif %}
+        {% if emp.business_unit %}<span class="badge badge-blue">{{ emp.business_unit }}</span>{% endif %}
+        {% if emp.functional_unit %}<span class="badge badge-purple">{{ emp.functional_unit }}</span>{% endif %}
+        {% if emp.employment_type == 'CONTRACTOR' %}<span class="badge badge-amber">Contractor</span>{% endif %}
+        {% if emp.employment_type == 'FULL_TIME' %}<span class="badge badge-green">Full-time</span>{% endif %}
+      </div>
+      <div style="display:flex;gap:24px;margin-top:16px">
+        <div style="text-align:center">
+          <div class="stat-num blue">{{ emp.skills | length if emp.skills else 0 }}</div>
+          <div class="stat-lbl">Skills</div>
+        </div>
+        <div style="text-align:center">
+          <div class="stat-num green">{{ emp.certifications | length if emp.certifications else 0 }}</div>
+          <div class="stat-lbl">Certifications</div>
+        </div>
+        <div style="text-align:center">
+          <div class="stat-num purple" id="exp-years">—</div>
+          <div class="stat-lbl">Years</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="two-col" style="margin-top:20px">
+
+    <!-- LEFT column ────────────────────────────────────────── -->
+    <div style="display:flex;flex-direction:column;gap:16px">
+
+      <!-- Personal info -->
+      <div class="card">
+        <div class="card-header"><h2>Personal Info</h2></div>
+        <div class="card-body">
+          <dl class="info-list">
+            <dt>Employee #</dt><dd>{{ emp.employee_number or '—' }}</dd>
+            <dt>Email</dt><dd><a href="mailto:{{ emp.email }}">{{ emp.email }}</a></dd>
+            {% if emp.phone_number %}<dt>Phone</dt><dd>{{ emp.phone_number }}</dd>{% endif %}
+            <dt>Joined</dt><dd id="joined-date">{{ emp.join_date or '—' }}</dd>
+            {% if emp.cost_center %}<dt>Cost Center</dt><dd>{{ emp.cost_center }}</dd>{% endif %}
+          </dl>
+        </div>
+      </div>
+
+      <!-- Reporting structure -->
+      <div class="card">
+        <div class="card-header"><h2>Reporting Structure</h2></div>
+        <div class="card-body">
+          {% if emp.solid_manager_name %}
+          <div style="margin-bottom:12px">
+            <div style="font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;font-weight:600;margin-bottom:6px">Solid-Line Manager</div>
+            <a href="/profile/{{ emp.solid_manager_id }}" style="text-decoration:none">
+              <div class="manager-pill">
+                <div class="avatar sm" style="background:{{ '#3b82f6' }}">{{ emp.solid_manager_name[0] }}</div>
+                <div>
+                  <div style="font-size:.85rem;font-weight:600">{{ emp.solid_manager_name }}</div>
+                  {% if emp.solid_manager_title %}<div style="font-size:.72rem;color:#64748b">{{ emp.solid_manager_title }}</div>{% endif %}
+                </div>
+              </div>
+            </a>
+          </div>
+          {% endif %}
+          {% if emp.dotted_manager_name %}
+          <div>
+            <div style="font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;font-weight:600;margin-bottom:6px">Dotted-Line Manager</div>
+            <div class="manager-pill" style="border-style:dashed">
+              <div class="avatar sm" style="background:#8b5cf6">{{ emp.dotted_manager_name[0] }}</div>
+              <div>
+                <div style="font-size:.85rem;font-weight:600">{{ emp.dotted_manager_name }}</div>
+                {% if emp.dotted_manager_title %}<div style="font-size:.72rem;color:#64748b">{{ emp.dotted_manager_title }}</div>{% endif %}
+              </div>
+            </div>
+          </div>
+          {% endif %}
+          {% if not emp.solid_manager_name and not emp.dotted_manager_name %}
+          <p style="color:#94a3b8;font-size:.83rem">No manager assigned.</p>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Direct reports (managers viewing own profile) -->
+      {% if team %}
+      <div class="card">
+        <div class="card-header"><h2>My Team ({{ team | length }})</h2></div>
+        <div class="card-body" style="padding:0">
+          {% for m in team %}
+          <a href="/profile/{{ m.id }}" style="text-decoration:none">
+            <div style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid #f1f5f9">
+              <div class="avatar sm" style="background:#3b82f6;font-size:.65rem">{{ m.full_name[0] }}</div>
+              <div>
+                <div style="font-size:.83rem;font-weight:600">{{ m.full_name }}</div>
+                <div style="font-size:.72rem;color:#64748b">{{ m.job_title }}</div>
+              </div>
+              {% if m.location %}<span class="badge badge-gray" style="margin-left:auto;font-size:.65rem">{{ m.location }}</span>{% endif %}
+            </div>
+          </a>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+    </div>
+
+    <!-- RIGHT column ───────────────────────────────────────── -->
+    <div style="display:flex;flex-direction:column;gap:16px">
+
+      <!-- Skills -->
+      {% if emp.skills %}
+      <div class="card">
+        <div class="card-header"><h2>Skills</h2></div>
+        <div class="card-body">
+          <div style="font-size:.7rem;color:#64748b;margin-bottom:10px;display:flex;gap:16px">
+            <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#3b82f6;margin-right:4px"></span>Self-assessed</span>
+            <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#16a34a;margin-right:4px"></span>Manager validated</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            {% for s in emp.skills %}
+            <div>
+              <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+                <span style="font-size:.78rem;font-weight:600">
+                  {{ s.skill }}
+                  {% if s.is_primary %}<span style="font-size:.6rem;background:#eff6ff;color:#1d4ed8;padding:1px 5px;border-radius:3px;margin-left:4px">Primary</span>{% endif %}
+                </span>
+                <span style="font-size:.72rem;color:#64748b">
+                  {% if s.val_order and s.val_order > 0 %}
+                    {{ s.val_level }} (validated)
+                  {% else %}
+                    {{ s.self_level }} (self)
+                  {% endif %}
+                </span>
+              </div>
+              <div class="skill-bar-track" style="height:7px">
+                <!-- self bar -->
+                <div style="position:absolute;height:100%;border-radius:999px;background:#3b82f620;width:{{ s.self_order * 25 }}%"></div>
+                <!-- validated bar -->
+                {% if s.val_order and s.val_order > 0 %}
+                <div class="skill-bar-fill validated" style="width:{{ s.val_order * 25 }}%;position:absolute;height:100%;border-radius:999px"></div>
+                {% else %}
+                <div class="skill-bar-fill" style="width:{{ s.self_order * 25 }}%;position:absolute;height:100%;border-radius:999px"></div>
+                {% endif %}
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Certifications -->
+      {% if emp.certifications %}
+      <div class="card">
+        <div class="card-header"><h2>Certifications</h2></div>
+        <div class="card-body" style="padding:0">
+          {% for c in emp.certifications %}
+          <div style="padding:12px 16px;border-bottom:1px solid #f1f5f9;display:flex;align-items:flex-start;gap:10px">
+            <div style="font-size:1.3rem;line-height:1">
+              {% if c.status == 'VERIFIED' %}🏅{% else %}📋{% endif %}
+            </div>
+            <div style="flex:1">
+              <div style="font-size:.83rem;font-weight:600">{{ c.name }}</div>
+              <div style="font-size:.72rem;color:#64748b">{{ c.provider or '' }}</div>
+              {% if c.issued %}<div style="font-size:.7rem;color:#94a3b8;margin-top:2px">Issued: {{ c.issued[:10] if c.issued else '' }}{% if c.expiry %} · Expires: {{ c.expiry[:10] }}{% endif %}</div>{% endif %}
+            </div>
+            <span class="badge {% if c.status == 'VERIFIED' %}badge-green{% elif c.status == 'EXPIRED' %}badge-red{% else %}badge-gray{% endif %}" style="font-size:.65rem">
+              {{ c.status or 'PENDING' }}
+            </span>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function(){
+  const AVATAR_COLORS=['#3b82f6','#8b5cf6','#ec4899','#f59e0b','#10b981','#06b6d4','#ef4444','#6366f1'];
+  function avatarColor(n){let h=0;for(const c of n)h=(h*31+c.charCodeAt(0))&0xffffffff;return AVATAR_COLORS[Math.abs(h)%AVATAR_COLORS.length];}
+
+  const name = {{ emp.full_name | tojson }};
+  document.getElementById('profile-avatar').style.background = avatarColor(name);
+
+  const joinDate = {{ emp.join_date | tojson }};
+  if (joinDate) {
+    const yrs = Math.floor((new Date() - new Date(joinDate)) / (365.25*24*3600*1000));
+    document.getElementById('exp-years').textContent = yrs;
+    document.getElementById('joined-date').textContent = new Date(joinDate).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
+  }
+
+  // fix skill bar track positioning
+  document.querySelectorAll('.skill-bar-track').forEach(t => t.style.position = 'relative');
+})();
+</script>
+{% endblock %}
