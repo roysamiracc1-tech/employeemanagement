@@ -1,3 +1,7 @@
 flask>=3.0
 psycopg2-binary>=2.9
 werkzeug>=3.0
+
+# Testing
+pytest>=9.0
+pytest-flask>=1.3
