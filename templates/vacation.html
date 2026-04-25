@@ -1,0 +1,217 @@
+{% extends 'base.html' %}
+{% block title %}My Vacation — HR Portal{% endblock %}
+{% block page_title %}Vacation{% endblock %}
+
+{% block content %}
+<div class="page" style="max-width:900px">
+
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px">
+    <div>
+      <h1 style="font-size:1.25rem;font-weight:700;margin-bottom:2px">My Vacation</h1>
+      <p style="font-size:.8rem;color:#64748b">{{ year }} · Showing all request types available to your location</p>
+    </div>
+    {% if has_manager %}
+    <button class="btn btn-primary" onclick="openReqModal()">
+      <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Request Vacation
+    </button>
+    {% else %}
+    <span style="font-size:.78rem;color:#f59e0b;background:#fffbeb;padding:6px 12px;border-radius:8px;border:1px solid #fde68a">⚠ No manager assigned — cannot submit requests</span>
+    {% endif %}
+  </div>
+
+  <!-- Vacation type cards -->
+  {% if vacation_types %}
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin-bottom:24px">
+    {% for t in vacation_types %}
+    <div style="background:#fff;border:1.5px solid #e2e8f0;border-radius:10px;padding:14px;border-top:4px solid {{ t.color }}">
+      <div style="font-size:.8rem;font-weight:700;color:#0f172a;margin-bottom:4px">{{ t.name }}</div>
+      <div style="font-size:.68rem;color:#64748b;margin-bottom:6px">
+        {% if t.is_paid %}<span style="color:#16a34a">Paid</span>{% else %}<span style="color:#dc2626">Unpaid</span>{% endif %}
+        · {{ t.scope }}
+      </div>
+      {% if t.rule_labels %}
+      <div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:8px">
+        {% for rl in t.rule_labels %}
+        <span style="font-size:.62rem;background:#faf5ff;color:#7c3aed;border:1px solid #e9d5ff;padding:1px 5px;border-radius:3px">{{ rl }}</span>
+        {% endfor %}
+      </div>
+      {% endif %}
+      {% if t.max_days_per_year %}
+      <div style="font-size:.72rem;color:#64748b;margin-bottom:6px">{{ t.used_days }} / {{ t.max_days_per_year }} days used</div>
+      <div style="background:#f1f5f9;border-radius:999px;height:5px;overflow:hidden">
+        <div style="height:100%;border-radius:999px;background:{{ t.color }};width:{{ [[(t.used_days / t.max_days_per_year * 100)|int, 0]|max, 100]|min }}%"></div>
+      </div>
+      {% else %}
+      <div style="font-size:.72rem;color:#94a3b8">No annual limit</div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="card" style="margin-bottom:24px">
+    <div class="card-body" style="text-align:center;padding:32px;color:#94a3b8;font-size:.85rem">
+      No vacation types configured for your company yet. Contact your admin.
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Request history -->
+  <div class="card">
+    <div class="card-header"><h2>Request History</h2></div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Type</th><th>From</th><th>To</th><th>Days</th>
+            <th>Status</th><th>Manager Note</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="requests-tbody">
+          {% if requests %}
+            {% for r in requests %}
+            <tr id="rrow-{{ r.id }}">
+              <td>
+                <span style="display:inline-flex;align-items:center;gap:5px">
+                  <span style="width:8px;height:8px;border-radius:50%;background:{{ r.color }};flex-shrink:0"></span>
+                  {{ r.type_name }}
+                </span>
+              </td>
+              <td style="font-size:.8rem">{{ r.start_date[:10] if r.start_date else '—' }}</td>
+              <td style="font-size:.8rem">{{ r.end_date[:10] if r.end_date else '—' }}</td>
+              <td style="font-weight:600">{{ r.working_days }}</td>
+              <td><span class="vr-badge vr-{{ r.status|lower }}">{{ r.status }}</span></td>
+              <td style="font-size:.75rem;color:#64748b;max-width:180px">{{ r.manager_note or '—' }}</td>
+              <td>
+                {% if r.status == 'PENDING' %}
+                <button onclick="cancelRequest('{{ r.id }}')"
+                        style="background:none;border:none;cursor:pointer;color:#94a3b8;font-size:.8rem"
+                        title="Cancel">✕ Cancel</button>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          {% else %}
+          <tr class="empty-row"><td colspan="7">No vacation requests yet.</td></tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Request modal -->
+<div id="req-modal" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.45);align-items:center;justify-content:center" onclick="if(event.target===this)closeReqModal()">
+  <div class="modal-box" style="width:440px" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-title">Request Vacation</div>
+      <button class="modal-close" onclick="closeReqModal()">×</button>
+    </div>
+    <div class="modal-body" style="display:flex;flex-direction:column;gap:14px">
+      <div class="form-group" style="margin:0">
+        <label>Type *</label>
+        <select id="rm-type" class="form-control" onchange="updateDayPreview()">
+          <option value="">— Select type —</option>
+          {% for t in vacation_types %}
+          <option value="{{ t.id }}"
+                  data-max="{{ t.max_days_per_year or '' }}"
+                  data-remaining="{{ t.remaining if t.remaining is not none else '' }}"
+                  data-color="{{ t.color }}">
+            {{ t.name }}{% if t.remaining is not none %} ({{ t.remaining }} days left){% endif %}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="form-group" style="margin:0">
+          <label>Start Date *</label>
+          <input type="date" id="rm-start" class="form-control" onchange="updateDayPreview()">
+        </div>
+        <div class="form-group" style="margin:0">
+          <label>End Date *</label>
+          <input type="date" id="rm-end" class="form-control" onchange="updateDayPreview()">
+        </div>
+      </div>
+      <div id="day-preview" style="display:none;padding:10px 14px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;font-size:.83rem;color:#166534"></div>
+      <div class="form-group" style="margin:0">
+        <label>Notes (optional)</label>
+        <textarea id="rm-notes" class="form-control" rows="2" placeholder="Reason or details…" style="resize:vertical"></textarea>
+      </div>
+      <div id="rm-error" style="display:none;color:#dc2626;font-size:.78rem;background:#fef2f2;padding:8px 12px;border-radius:6px"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost btn-sm" onclick="closeReqModal()">Cancel</button>
+      <button class="btn btn-primary btn-sm" id="rm-submit" onclick="submitRequest()">Submit Request</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function openReqModal() {
+  document.getElementById('rm-type').value  = '';
+  document.getElementById('rm-start').value = '';
+  document.getElementById('rm-end').value   = '';
+  document.getElementById('rm-notes').value = '';
+  document.getElementById('day-preview').style.display = 'none';
+  document.getElementById('rm-error').style.display    = 'none';
+  // Default start = today
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('rm-start').value = today;
+  document.getElementById('rm-end').value   = today;
+  document.getElementById('req-modal').style.display = 'flex';
+  updateDayPreview();
+}
+function closeReqModal() { document.getElementById('req-modal').style.display = 'none'; }
+
+function countWeekdays(start, end) {
+  let count = 0, d = new Date(start);
+  const e = new Date(end);
+  while (d <= e) { if (d.getDay() !== 0 && d.getDay() !== 6) count++; d.setDate(d.getDate()+1); }
+  return Math.max(count, 1);
+}
+
+function updateDayPreview() {
+  const s = document.getElementById('rm-start').value;
+  const e = document.getElementById('rm-end').value;
+  const preview = document.getElementById('day-preview');
+  if (!s || !e || e < s) { preview.style.display='none'; return; }
+  const days = countWeekdays(s, e);
+  preview.style.display = '';
+  preview.textContent   = `${days} working day${days!==1?'s':''} (weekends excluded)`;
+}
+
+async function submitRequest() {
+  const vt    = document.getElementById('rm-type').value;
+  const start = document.getElementById('rm-start').value;
+  const end   = document.getElementById('rm-end').value;
+  const notes = document.getElementById('rm-notes').value.trim();
+  const err   = document.getElementById('rm-error');
+  err.style.display = 'none';
+
+  if (!vt || !start || !end) { err.textContent='Please fill all required fields.'; err.style.display=''; return; }
+  if (end < start) { err.textContent='End date must be after start date.'; err.style.display=''; return; }
+
+  const btn = document.getElementById('rm-submit');
+  btn.disabled = true; btn.textContent = 'Submitting…';
+
+  const res = await fetch('/api/vacation/request', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({vacation_type_id:vt, start_date:start, end_date:end, notes:notes||null})
+  });
+  btn.disabled = false; btn.textContent = 'Submit Request';
+  const data = await res.json();
+  if (!res.ok) { err.textContent = data.error || 'Failed.'; err.style.display=''; return; }
+  closeReqModal();
+  location.reload();
+}
+
+async function cancelRequest(id) {
+  if (!confirm('Cancel this vacation request?')) return;
+  const res = await fetch('/api/vacation/request/'+id, {method:'DELETE'});
+  if (res.ok) location.reload();
+  else { const d=await res.json(); alert(d.error||'Failed.'); }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,103 @@
+{% extends 'base.html' %}
+{% block title %}Companies — HR Portal{% endblock %}
+{% block page_title %}Companies{% endblock %}
+
+{% block content %}
+<div class="page">
+
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px">
+    <div>
+      <h1 style="font-size:1.4rem;font-weight:700;margin-bottom:2px">Registered Companies</h1>
+      <p style="font-size:.8rem;color:#64748b">{{ companies|length }} company{% if companies|length != 1 %}ies{% endif %} registered</p>
+    </div>
+    <a href="{{ url_for('admin_company_new') }}" class="btn btn-primary">
+      <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+      </svg>
+      Register New Company
+    </a>
+  </div>
+
+  {% if not companies %}
+  <div class="card">
+    <div class="card-body" style="text-align:center;padding:60px">
+      <div style="font-size:3rem;margin-bottom:16px">🏢</div>
+      <div style="font-weight:600;font-size:1rem;margin-bottom:8px">No companies registered yet</div>
+      <div style="font-size:.83rem;color:#64748b;margin-bottom:20px">Register your first company to get started.</div>
+      <a href="{{ url_for('admin_company_new') }}" class="btn btn-primary">Register Company</a>
+    </div>
+  </div>
+  {% else %}
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px">
+    {% for co in companies %}
+    <div class="card" style="position:relative">
+      <!-- Status badge -->
+      <div style="position:absolute;top:14px;right:14px">
+        {% if co.is_active %}
+        <span class="badge badge-green" style="font-size:.65rem">● Active</span>
+        {% else %}
+        <span class="badge badge-red" style="font-size:.65rem">● Inactive</span>
+        {% endif %}
+      </div>
+
+      <div class="card-body" style="padding:20px">
+        <!-- Header -->
+        <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px">
+          <div style="width:48px;height:48px;border-radius:12px;background:linear-gradient(135deg,#3b82f6,#8b5cf6);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:1.2rem;flex-shrink:0">
+            {{ co.name[0].upper() }}
+          </div>
+          <div>
+            <div style="font-size:1rem;font-weight:700;color:#0f172a">{{ co.name }}</div>
+            {% if co.industry %}<div style="font-size:.75rem;color:#64748b">{{ co.industry }}</div>{% endif %}
+          </div>
+        </div>
+
+        <!-- Stats row -->
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px">
+          <div style="text-align:center;background:#f8fafc;border-radius:8px;padding:8px 4px">
+            <div style="font-size:1.3rem;font-weight:700;color:#2563eb">{{ co.emp_count }}</div>
+            <div style="font-size:.65rem;color:#64748b;text-transform:uppercase;letter-spacing:.04em">Employees</div>
+          </div>
+          {% if co.founded_year %}
+          <div style="text-align:center;background:#f8fafc;border-radius:8px;padding:8px 4px">
+            <div style="font-size:1.3rem;font-weight:700;color:#7c3aed">{{ co.founded_year }}</div>
+            <div style="font-size:.65rem;color:#64748b;text-transform:uppercase;letter-spacing:.04em">Founded</div>
+          </div>
+          {% endif %}
+          <div style="text-align:center;background:#f8fafc;border-radius:8px;padding:8px 4px">
+            <div style="font-size:.8rem;font-weight:700;color:#0f172a">{{ co.registered_label }}</div>
+            <div style="font-size:.65rem;color:#64748b;text-transform:uppercase;letter-spacing:.04em">Registered</div>
+          </div>
+        </div>
+
+        <!-- Meta -->
+        {% if co.hq_address %}
+        <div style="font-size:.75rem;color:#64748b;margin-bottom:6px;display:flex;align-items:center;gap:5px">
+          <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z"/><circle cx="12" cy="10" r="3"/></svg>
+          {{ co.hq_address }}
+        </div>
+        {% endif %}
+        {% if co.website %}
+        <div style="font-size:.75rem;margin-bottom:6px;display:flex;align-items:center;gap:5px">
+          <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          <a href="{{ co.website }}" target="_blank" rel="noopener" style="color:#3b82f6;text-decoration:none">{{ co.website }}</a>
+        </div>
+        {% endif %}
+
+        <!-- Actions -->
+        <div style="display:flex;gap:8px;margin-top:16px;padding-top:14px;border-top:1px solid #f1f5f9">
+          <a href="{{ url_for('company_view', company_id=co.id) }}" class="btn btn-ghost btn-sm" style="flex:1;justify-content:center">
+            View
+          </a>
+          <a href="{{ url_for('admin_company_edit', company_id=co.id) }}" class="btn btn-primary btn-sm" style="flex:1;justify-content:center">
+            Edit
+          </a>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

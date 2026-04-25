@@ -1,0 +1,232 @@
+{% extends 'base.html' %}
+{% block title %}Org Tree — HR Portal{% endblock %}
+{% block page_title %}Organisation Tree{% endblock %}
+
+{% block content %}
+<div class="page">
+
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px">
+    <div>
+      <h1 style="font-size:1.25rem;font-weight:700;margin-bottom:2px">Organisation Tree</h1>
+      <p id="tree-subtitle" style="font-size:.8rem;color:#64748b">Loading…</p>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      {% if is_admin %}
+      <div>
+        <label style="font-size:.72rem;font-weight:600;color:#64748b;display:block;margin-bottom:4px">View from</label>
+        <select id="root-select" class="org-root-select" onchange="loadTree(this.value)">
+          <option value="">— Full org (top-level) —</option>
+          {% for emp in all_employees %}
+          <option value="{{ emp.id }}">{{ emp.first_name }} {{ emp.last_name }}{% if emp.job_title %} · {{ emp.job_title }}{% endif %}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+
+      <div>
+        <label style="font-size:.72rem;font-weight:600;color:#64748b;display:block;margin-bottom:4px">Actions</label>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-ghost btn-sm" onclick="expandAll()">Expand All</button>
+          <button class="btn btn-ghost btn-sm" onclick="collapseAll()">Collapse All</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Legend -->
+  <div style="display:flex;gap:16px;margin-bottom:16px;flex-wrap:wrap">
+    <div style="display:flex;align-items:center;gap:6px;font-size:.72rem;color:#64748b">
+      <div style="width:12px;height:12px;border-radius:50%;background:#8b5cf6"></div> You
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;font-size:.72rem;color:#64748b">
+      <div style="width:20px;height:2px;background:#e2e8f0"></div> Solid-line report
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;font-size:.72rem;color:#64748b">
+      <svg width="14" height="14" fill="none" stroke="#94a3b8" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 8 12 12 14 14"/></svg>
+      Click a node to open profile
+    </div>
+  </div>
+
+  <div class="org-tree-wrap">
+    <div id="org-tree-root" style="padding:4px 0 4px 4px"></div>
+  </div>
+
+  <div class="status-bar" id="status-bar" style="display:none">
+    <span class="status-dot" id="status-dot"></span>
+    <span id="status-text"></span>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const OWN_ID       = {{ own_emp_id | tojson }};
+const IS_ADMIN     = {{ is_admin | tojson }};
+const AVATAR_COLORS= ['#3b82f6','#8b5cf6','#ec4899','#f59e0b','#10b981','#06b6d4','#ef4444','#6366f1'];
+
+function avatarColor(n){
+  let h=0; for(const c of n) h=(h*31+c.charCodeAt(0))&0xffffffff;
+  return AVATAR_COLORS[Math.abs(h)%AVATAR_COLORS.length];
+}
+function initials(fn,ln){ return ((fn||'')[0]+(ln||'')[0]).toUpperCase(); }
+
+// ── Build a single tree node element ────────────────────────────────────────
+function buildNode(data, depth) {
+  const wrap = document.createElement('div');
+  wrap.className = 'org-node';
+
+  const fullName = (data.first_name||'') + ' ' + (data.last_name||'');
+  const isSelf   = data.id === OWN_ID;
+
+  // Card — clicking navigates to profile
+  const card = document.createElement('a');
+  card.href      = '/profile/' + data.id;
+  card.className = 'org-card' + (isSelf ? ' is-self' : '');
+  card.title     = 'View profile';
+  card.onclick   = e => { e.stopPropagation(); };
+
+  // Avatar
+  const av = document.createElement('div');
+  av.className = 'org-card-avatar';
+  av.style.background = isSelf ? '#8b5cf6' : avatarColor(fullName);
+  av.textContent = initials(data.first_name, data.last_name);
+  card.appendChild(av);
+
+  // Info
+  const info = document.createElement('div');
+  info.className = 'org-card-info';
+  info.innerHTML = `
+    <div class="org-card-name">${fullName}</div>
+    <div class="org-card-title">${data.job_title || '—'}</div>
+    ${data.location ? `<span class="org-card-loc">📍 ${data.location}</span>` : ''}
+  `;
+  card.appendChild(info);
+
+  // Pending vacation badge
+  const pendingN = pendingCounts[data.id] || 0;
+  if (pendingN > 0) {
+    const pb = document.createElement('a');
+    pb.href  = '/vacation/team';
+    pb.title = `${pendingN} pending vacation request${pendingN>1?'s':''}`;
+    pb.style.cssText = 'flex-shrink:0;background:#fef2f2;border:1px solid #fecaca;border-radius:999px;padding:1px 7px;font-size:.62rem;font-weight:700;color:#dc2626;text-decoration:none;white-space:nowrap';
+    pb.textContent = `⏳ ${pendingN}`;
+    pb.onclick = e => e.stopPropagation();
+    card.appendChild(pb);
+  }
+
+  // Toggle button (only if has children)
+  let childrenDiv = null;
+  if (data.children && data.children.length > 0) {
+    const toggle = document.createElement('div');
+    toggle.className = 'org-toggle open';
+    toggle.textContent = `▾ ${data.children.length}`;
+    toggle.onclick = e => {
+      e.preventDefault(); e.stopPropagation();
+      const isOpen = !childrenDiv.classList.contains('collapsed');
+      childrenDiv.classList.toggle('collapsed', isOpen);
+      toggle.textContent = (isOpen ? '▸ ' : '▾ ') + data.children.length;
+      toggle.classList.toggle('open', !isOpen);
+    };
+    card.appendChild(toggle);
+  }
+
+  wrap.appendChild(card);
+
+  // Children
+  if (data.children && data.children.length > 0) {
+    childrenDiv = document.createElement('div');
+    childrenDiv.className = 'org-children';
+    data.children
+      .sort((a,b) => (a.last_name||'').localeCompare(b.last_name||''))
+      .forEach(child => childrenDiv.appendChild(buildNode(child, depth + 1)));
+    wrap.appendChild(childrenDiv);
+  }
+
+  return wrap;
+}
+
+// ── Load & render tree ───────────────────────────────────────────────────────
+let currentRoot = null, pendingCounts = {};
+
+async function loadPendingCounts() {
+  try {
+    const res = await fetch('/api/vacation/team-pending-counts');
+    if (res.ok) pendingCounts = await res.json();
+  } catch(_) {}
+}
+
+async function loadTree(rootId) {
+  const sb  = document.getElementById('status-bar');
+  const dot = document.getElementById('status-dot');
+  const txt = document.getElementById('status-text');
+  sb.style.display = 'flex';
+  dot.className = 'status-dot loading';
+  txt.textContent = 'Loading tree…';
+
+  const url = '/api/org-tree' + (rootId ? '?root=' + rootId : '');
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    currentRoot = data;
+
+    const container = document.getElementById('org-tree-root');
+    container.innerHTML = '';
+
+    const roots = Array.isArray(data) ? data : (data ? [data] : []);
+    if (!roots.length) {
+      container.innerHTML = '<p style="color:#94a3b8;font-size:.85rem">No reporting structure found for this selection.</p>';
+      dot.className = 'status-dot error';
+      txt.textContent = 'No data';
+      return;
+    }
+
+    roots.forEach(root => container.appendChild(buildNode(root, 0)));
+
+    // Stats
+    const total = roots.reduce((s, r) => s + countNodes(r), 0);
+    const depth = Math.max(...roots.map(maxDepth));
+    document.getElementById('tree-subtitle').textContent =
+      `${total} employee${total!==1?'s':''} · ${depth} level${depth!==1?'s':''}`;
+    dot.className = 'status-dot';
+    txt.textContent = `${total} nodes rendered`;
+  } catch(err) {
+    document.getElementById('org-tree-root').innerHTML =
+      `<p style="color:#ef4444">Failed to load: ${err.message}</p>`;
+    dot.className = 'status-dot error';
+    txt.textContent = err.message;
+  }
+}
+
+function countNodes(node) {
+  if (!node) return 0;
+  return 1 + (node.children||[]).reduce((s,c) => s + countNodes(c), 0);
+}
+function maxDepth(node) {
+  if (!node || !(node.children||[]).length) return 1;
+  return 1 + Math.max(...node.children.map(maxDepth));
+}
+
+// ── Expand / Collapse all ────────────────────────────────────────────────────
+function expandAll() {
+  document.querySelectorAll('.org-children').forEach(el => el.classList.remove('collapsed'));
+  document.querySelectorAll('.org-toggle').forEach(btn => {
+    const n = parseInt(btn.textContent.replace(/\D/g,''));
+    btn.textContent = '▾ ' + n;
+    btn.classList.add('open');
+  });
+}
+function collapseAll() {
+  document.querySelectorAll('.org-children').forEach(el => el.classList.add('collapsed'));
+  document.querySelectorAll('.org-toggle').forEach(btn => {
+    const n = parseInt(btn.textContent.replace(/\D/g,''));
+    btn.textContent = '▸ ' + n;
+    btn.classList.remove('open');
+  });
+}
+
+// ── Initial load ─────────────────────────────────────────────────────────────
+loadPendingCounts().then(() => loadTree(IS_ADMIN ? '' : OWN_ID));
+</script>
+{% endblock %}

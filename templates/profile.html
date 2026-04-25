@@ -18,15 +18,15 @@
         {% if emp.business_unit %}<span class="badge badge-blue">{{ emp.business_unit }}</span>{% endif %}
         {% if emp.functional_unit %}<span class="badge badge-purple">{{ emp.functional_unit }}</span>{% endif %}
         {% if emp.employment_type == 'CONTRACTOR' %}<span class="badge badge-amber">Contractor</span>{% endif %}
-        {% if emp.employment_type == 'FULL_TIME' %}<span class="badge badge-green">Full-time</span>{% endif %}
+        {% if emp.employment_type == 'PERMANENT' %}<span class="badge badge-green">Permanent</span>{% endif %}
       </div>
       <div style="display:flex;gap:24px;margin-top:16px">
         <div style="text-align:center">
-          <div class="stat-num blue">{{ emp.skills | length if emp.skills else 0 }}</div>
+          <div class="stat-num blue" id="skills-count">{{ emp.skills | length if emp.skills else 0 }}</div>
           <div class="stat-lbl">Skills</div>
         </div>
         <div style="text-align:center">
-          <div class="stat-num green">{{ emp.certifications | length if emp.certifications else 0 }}</div>
+          <div class="stat-num green" id="certs-count">{{ emp.certifications | length if emp.certifications else 0 }}</div>
           <div class="stat-lbl">Certifications</div>
         </div>
         <div style="text-align:center">
@@ -52,6 +52,20 @@
             {% if emp.phone_number %}<dt>Phone</dt><dd>{{ emp.phone_number }}</dd>{% endif %}
             <dt>Joined</dt><dd id="joined-date">{{ emp.join_date or '—' }}</dd>
             {% if emp.cost_center %}<dt>Cost Center</dt><dd>{{ emp.cost_center }}</dd>{% endif %}
+            <dt>Gender</dt>
+            <dd>
+              {% if is_own %}
+              <select id="gender-sel" class="form-control" style="padding:3px 8px;font-size:.78rem;height:auto"
+                      onchange="saveGender(this.value)">
+                <option value="">Prefer not to say</option>
+                <option value="MALE"   {% if emp.gender=='MALE'   %}selected{% endif %}>Male</option>
+                <option value="FEMALE" {% if emp.gender=='FEMALE' %}selected{% endif %}>Female</option>
+                <option value="OTHER"  {% if emp.gender=='OTHER'  %}selected{% endif %}>Other</option>
+              </select>
+              {% else %}
+                {{ {'MALE':'Male','FEMALE':'Female','OTHER':'Other'}.get(emp.gender, '—') }}
+              {% endif %}
+            </dd>
           </dl>
         </div>
       </div>
@@ -65,7 +79,7 @@
             <div style="font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;font-weight:600;margin-bottom:6px">Solid-Line Manager</div>
             <a href="/profile/{{ emp.solid_manager_id }}" style="text-decoration:none">
               <div class="manager-pill">
-                <div class="avatar sm" style="background:{{ '#3b82f6' }}">{{ emp.solid_manager_name[0] }}</div>
+                <div class="avatar sm" style="background:#3b82f6">{{ emp.solid_manager_name[0] }}</div>
                 <div>
                   <div style="font-size:.85rem;font-weight:600">{{ emp.solid_manager_name }}</div>
                   {% if emp.solid_manager_title %}<div style="font-size:.72rem;color:#64748b">{{ emp.solid_manager_title }}</div>{% endif %}
@@ -92,7 +106,7 @@
         </div>
       </div>
 
-      <!-- Direct reports (managers viewing own profile) -->
+      <!-- Direct reports -->
       {% if team %}
       <div class="card">
         <div class="card-header"><h2>My Team ({{ team | length }})</h2></div>
@@ -118,75 +132,190 @@
     <!-- RIGHT column ───────────────────────────────────────── -->
     <div style="display:flex;flex-direction:column;gap:16px">
 
-      <!-- Skills -->
-      {% if emp.skills %}
+      <!-- ── Skills ──────────────────────────────────────────── -->
       <div class="card">
-        <div class="card-header"><h2>Skills</h2></div>
-        <div class="card-body">
+        <div class="card-header" style="display:flex;align-items:center">
+          <h2>Skills</h2>
+          {% if is_own %}
+          <button class="btn btn-primary btn-sm" style="margin-left:auto"
+                  onclick="openSkillModal(null)">+ Add Skill</button>
+          {% endif %}
+        </div>
+        <div class="card-body" id="skills-body">
           <div style="font-size:.7rem;color:#64748b;margin-bottom:10px;display:flex;gap:16px">
             <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#3b82f6;margin-right:4px"></span>Self-assessed</span>
             <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#16a34a;margin-right:4px"></span>Manager validated</span>
           </div>
-          <div style="display:flex;flex-direction:column;gap:10px">
-            {% for s in emp.skills %}
-            <div>
-              <div style="display:flex;justify-content:space-between;margin-bottom:3px">
-                <span style="font-size:.78rem;font-weight:600">
-                  {{ s.skill }}
-                  {% if s.is_primary %}<span style="font-size:.6rem;background:#eff6ff;color:#1d4ed8;padding:1px 5px;border-radius:3px;margin-left:4px">Primary</span>{% endif %}
-                </span>
-                <span style="font-size:.72rem;color:#64748b">
+          <div id="skills-list">
+            {% if emp.skills %}
+              {% for s in emp.skills %}
+              <div class="skill-row" id="sr-{{ s.skill_id }}" data-skill-id="{{ s.skill_id }}"
+                   data-level-id="{{ s.self_level_id or '' }}" data-is-primary="{{ 'true' if s.is_primary else 'false' }}">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+                  <span style="font-size:.78rem;font-weight:600">
+                    {{ s.skill }}
+                    {% if s.is_primary %}<span style="font-size:.6rem;background:#eff6ff;color:#1d4ed8;padding:1px 5px;border-radius:3px;margin-left:4px">Primary</span>{% endif %}
+                  </span>
+                  <div style="display:flex;align-items:center;gap:8px">
+                    <span style="font-size:.72rem;color:#64748b">
+                      {% if s.val_order and s.val_order > 0 %}{{ s.val_level }} (validated)
+                      {% else %}{{ s.self_level or '—' }} (self){% endif %}
+                    </span>
+                    {% if is_own %}
+                    <button class="btn btn-ghost btn-sm" style="padding:1px 7px;font-size:.68rem"
+                            onclick="openSkillModal('{{ s.skill_id }}','{{ s.skill }}','{{ s.self_level_id or '' }}',{{ 'true' if s.is_primary else 'false' }})">Edit</button>
+                    <button onclick="deleteSkill('{{ s.skill_id }}')"
+                            style="background:none;border:none;cursor:pointer;color:#94a3b8;font-size:.9rem;padding:0 2px" title="Remove">×</button>
+                    {% endif %}
+                  </div>
+                </div>
+                <div class="skill-bar-track" style="position:relative;height:7px">
+                  <div style="position:absolute;height:100%;border-radius:999px;background:#3b82f620;width:{{ s.self_order * 25 }}%"></div>
                   {% if s.val_order and s.val_order > 0 %}
-                    {{ s.val_level }} (validated)
+                  <div class="skill-bar-fill validated" style="width:{{ s.val_order * 25 }}%;position:absolute;height:100%;border-radius:999px"></div>
                   {% else %}
-                    {{ s.self_level }} (self)
+                  <div class="skill-bar-fill" style="width:{{ s.self_order * 25 }}%;position:absolute;height:100%;border-radius:999px"></div>
                   {% endif %}
-                </span>
+                </div>
               </div>
-              <div class="skill-bar-track" style="height:7px">
-                <!-- self bar -->
-                <div style="position:absolute;height:100%;border-radius:999px;background:#3b82f620;width:{{ s.self_order * 25 }}%"></div>
-                <!-- validated bar -->
-                {% if s.val_order and s.val_order > 0 %}
-                <div class="skill-bar-fill validated" style="width:{{ s.val_order * 25 }}%;position:absolute;height:100%;border-radius:999px"></div>
-                {% else %}
-                <div class="skill-bar-fill" style="width:{{ s.self_order * 25 }}%;position:absolute;height:100%;border-radius:999px"></div>
+              {% endfor %}
+            {% else %}
+            <p id="no-skills-msg" style="color:#94a3b8;font-size:.83rem">No skills added yet.{% if is_own %} Click <strong>+ Add Skill</strong> to get started.{% endif %}</p>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Certifications ──────────────────────────────────── -->
+      <div class="card">
+        <div class="card-header" style="display:flex;align-items:center">
+          <h2>Certifications</h2>
+          {% if is_own %}
+          <button class="btn btn-primary btn-sm" style="margin-left:auto"
+                  onclick="openCertModal(null)">+ Add Cert</button>
+          {% endif %}
+        </div>
+        <div id="certs-list" style="padding:0">
+          {% if emp.certifications %}
+            {% for c in emp.certifications %}
+            <div class="cert-row" id="cr-{{ c.ec_id }}"
+                 style="padding:12px 16px;border-bottom:1px solid #f1f5f9;display:flex;align-items:flex-start;gap:10px">
+              <div style="font-size:1.3rem;line-height:1">{% if c.status == 'VERIFIED' %}🏅{% else %}📋{% endif %}</div>
+              <div style="flex:1">
+                <div style="font-size:.83rem;font-weight:600">{{ c.name }}</div>
+                <div style="font-size:.72rem;color:#64748b">{{ c.provider or '' }}</div>
+                {% if c.issued %}<div style="font-size:.7rem;color:#94a3b8;margin-top:2px">
+                  Issued: {{ c.issued[:10] if c.issued else '' }}{% if c.expiry %} · Expires: {{ c.expiry[:10] }}{% endif %}
+                </div>{% endif %}
+              </div>
+              <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+                <span class="badge {% if c.status == 'VERIFIED' %}badge-green{% elif c.status == 'EXPIRED' %}badge-red{% else %}badge-gray{% endif %}" style="font-size:.65rem">
+                  {{ c.status or 'UNVERIFIED' }}
+                </span>
+                {% if is_own %}
+                <div style="display:flex;gap:4px;margin-top:2px">
+                  <button class="btn btn-ghost btn-sm" style="padding:1px 7px;font-size:.68rem"
+                          onclick="openCertModal('{{ c.ec_id }}','{{ c.cert_id }}','{{ c.issued[:10] if c.issued else '' }}','{{ c.expiry[:10] if c.expiry else '' }}','{{ c.url or '' }}')">Edit</button>
+                  <button onclick="deleteCert('{{ c.ec_id }}')"
+                          style="background:none;border:none;cursor:pointer;color:#94a3b8;font-size:.9rem;padding:0 2px" title="Remove">×</button>
+                </div>
                 {% endif %}
               </div>
             </div>
             {% endfor %}
-          </div>
+          {% else %}
+          <p id="no-certs-msg" style="color:#94a3b8;font-size:.83rem;padding:16px">No certifications added yet.{% if is_own %} Click <strong>+ Add Cert</strong> to get started.{% endif %}</p>
+          {% endif %}
         </div>
       </div>
-      {% endif %}
-
-      <!-- Certifications -->
-      {% if emp.certifications %}
-      <div class="card">
-        <div class="card-header"><h2>Certifications</h2></div>
-        <div class="card-body" style="padding:0">
-          {% for c in emp.certifications %}
-          <div style="padding:12px 16px;border-bottom:1px solid #f1f5f9;display:flex;align-items:flex-start;gap:10px">
-            <div style="font-size:1.3rem;line-height:1">
-              {% if c.status == 'VERIFIED' %}🏅{% else %}📋{% endif %}
-            </div>
-            <div style="flex:1">
-              <div style="font-size:.83rem;font-weight:600">{{ c.name }}</div>
-              <div style="font-size:.72rem;color:#64748b">{{ c.provider or '' }}</div>
-              {% if c.issued %}<div style="font-size:.7rem;color:#94a3b8;margin-top:2px">Issued: {{ c.issued[:10] if c.issued else '' }}{% if c.expiry %} · Expires: {{ c.expiry[:10] }}{% endif %}</div>{% endif %}
-            </div>
-            <span class="badge {% if c.status == 'VERIFIED' %}badge-green{% elif c.status == 'EXPIRED' %}badge-red{% else %}badge-gray{% endif %}" style="font-size:.65rem">
-              {{ c.status or 'PENDING' }}
-            </span>
-          </div>
-          {% endfor %}
-        </div>
-      </div>
-      {% endif %}
 
     </div>
   </div>
 </div>
+
+{% if is_own %}
+<!-- ── Skill modal ─────────────────────────────────────────── -->
+<div id="skill-modal" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.45);align-items:center;justify-content:center" onclick="if(event.target===this)closeSkillModal()">
+  <div class="modal-box" style="width:380px" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-title" id="skill-modal-title">Add Skill</div>
+      <button class="modal-close" onclick="closeSkillModal()">×</button>
+    </div>
+    <div class="modal-body" style="display:flex;flex-direction:column;gap:14px">
+      <div class="form-group" style="margin:0" id="skill-pick-wrap">
+        <label>Skill *</label>
+        <select id="sm-skill" class="form-control">
+          <option value="">— Select skill —</option>
+          {% for s in all_skills %}
+          <option value="{{ s.id }}" data-name="{{ s.name }}">{{ s.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group" style="margin:0">
+        <label>Self-Rating *</label>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px" id="level-btns">
+          {% for l in prof_levels %}
+          <button type="button" class="level-btn" data-id="{{ l.id }}" data-order="{{ l.level_order }}"
+                  onclick="selectLevel(this)"
+                  style="padding:8px 4px;border:2px solid #e2e8f0;border-radius:8px;background:#fff;cursor:pointer;font-size:.75rem;font-weight:600;color:#374151;transition:all .15s">
+            <div style="font-size:1.1rem;margin-bottom:2px">{{ ['','🌱','💡','⚡','🏆'][l.level_order] }}</div>
+            {{ l.level_name }}
+          </button>
+          {% endfor %}
+        </div>
+        <input type="hidden" id="sm-level-id">
+      </div>
+      <label style="display:flex;align-items:center;gap:8px;font-size:.83rem;cursor:pointer">
+        <input type="checkbox" id="sm-primary" style="width:15px;height:15px">
+        Mark as primary skill
+      </label>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost btn-sm" onclick="closeSkillModal()">Cancel</button>
+      <button class="btn btn-primary btn-sm" onclick="saveSkill()">Save Skill</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Cert modal ──────────────────────────────────────────── -->
+<div id="cert-modal" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.45);align-items:center;justify-content:center" onclick="if(event.target===this)closeCertModal()">
+  <div class="modal-box" style="width:420px" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-title" id="cert-modal-title">Add Certification</div>
+      <button class="modal-close" onclick="closeCertModal()">×</button>
+    </div>
+    <div class="modal-body" style="display:flex;flex-direction:column;gap:14px">
+      <div class="form-group" style="margin:0" id="cert-pick-wrap">
+        <label>Certification *</label>
+        <select id="cm-cert" class="form-control">
+          <option value="">— Select certification —</option>
+          {% for c in all_certs %}
+          <option value="{{ c.id }}" data-name="{{ c.name }}" data-provider="{{ c.provider or '' }}">{{ c.name }}{% if c.provider %} ({{ c.provider }}){% endif %}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="form-group" style="margin:0">
+          <label>Issue Date</label>
+          <input type="date" id="cm-issued" class="form-control">
+        </div>
+        <div class="form-group" style="margin:0">
+          <label>Expiry Date</label>
+          <input type="date" id="cm-expiry" class="form-control">
+        </div>
+      </div>
+      <div class="form-group" style="margin:0">
+        <label>Certificate URL</label>
+        <input type="url" id="cm-url" class="form-control" placeholder="https://…">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost btn-sm" onclick="closeCertModal()">Cancel</button>
+      <button class="btn btn-primary btn-sm" onclick="saveCert()">Save</button>
+    </div>
+  </div>
+</div>
+{% endif %}
 {% endblock %}
 
 {% block scripts %}
@@ -194,19 +323,172 @@
 (function(){
   const AVATAR_COLORS=['#3b82f6','#8b5cf6','#ec4899','#f59e0b','#10b981','#06b6d4','#ef4444','#6366f1'];
   function avatarColor(n){let h=0;for(const c of n)h=(h*31+c.charCodeAt(0))&0xffffffff;return AVATAR_COLORS[Math.abs(h)%AVATAR_COLORS.length];}
-
-  const name = {{ emp.full_name | tojson }};
-  document.getElementById('profile-avatar').style.background = avatarColor(name);
+  document.getElementById('profile-avatar').style.background = avatarColor({{ emp.full_name | tojson }});
 
   const joinDate = {{ emp.join_date | tojson }};
   if (joinDate) {
     const yrs = Math.floor((new Date() - new Date(joinDate)) / (365.25*24*3600*1000));
     document.getElementById('exp-years').textContent = yrs;
-    document.getElementById('joined-date').textContent = new Date(joinDate).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
+    document.getElementById('joined-date').textContent =
+      new Date(joinDate).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
+  }
+})();
+
+{% if is_own %}
+async function saveGender(val) {
+  await fetch('/api/profile/gender', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({gender: val||null})
+  });
+}
+
+// ── Skill data (server-side snapshot; kept in sync by JS) ─────────────────────
+const PROF_LEVELS = {{ prof_levels | tojson }};
+const LEVEL_COLORS = {1:'#94a3b8',2:'#3b82f6',3:'#8b5cf6',4:'#10b981'};
+const LEVEL_EMOJI  = {1:'🌱',2:'💡',3:'⚡',4:'🏆'};
+
+let editingSkillId = null;  // null = add, string = edit
+
+function openSkillModal(skillId, skillName, levelId, isPrimary) {
+  editingSkillId = skillId || null;
+  document.getElementById('skill-modal-title').textContent = skillId ? 'Edit Skill Rating' : 'Add Skill';
+  document.getElementById('skill-pick-wrap').style.display = skillId ? 'none' : '';
+  if (!skillId) document.getElementById('sm-skill').value = '';
+  document.getElementById('sm-level-id').value = levelId || '';
+  document.getElementById('sm-primary').checked = isPrimary === true || isPrimary === 'true';
+
+  // Highlight current level button
+  document.querySelectorAll('.level-btn').forEach(btn => {
+    btn.style.borderColor = btn.dataset.id === (levelId||'') ? getLevelColor(parseInt(btn.dataset.order)) : '#e2e8f0';
+    btn.style.background  = btn.dataset.id === (levelId||'') ? getLevelColor(parseInt(btn.dataset.order)) + '18' : '#fff';
+  });
+
+  document.getElementById('skill-modal').style.display = 'flex';
+}
+
+function getLevelColor(order) { return LEVEL_COLORS[order] || '#64748b'; }
+
+function selectLevel(btn) {
+  document.querySelectorAll('.level-btn').forEach(b => {
+    b.style.borderColor = '#e2e8f0'; b.style.background = '#fff';
+  });
+  const color = getLevelColor(parseInt(btn.dataset.order));
+  btn.style.borderColor = color;
+  btn.style.background  = color + '18';
+  document.getElementById('sm-level-id').value = btn.dataset.id;
+}
+
+function closeSkillModal() { document.getElementById('skill-modal').style.display = 'none'; }
+
+async function saveSkill() {
+  const levelId  = document.getElementById('sm-level-id').value;
+  const isPrimary = document.getElementById('sm-primary').checked;
+
+  let skillId, skillName;
+  if (editingSkillId) {
+    skillId   = editingSkillId;
+    skillName = document.querySelector(`#sr-${skillId}`)?.dataset.skillName || '';
+  } else {
+    const sel = document.getElementById('sm-skill');
+    skillId   = sel.value;
+    skillName = sel.options[sel.selectedIndex]?.dataset.name || '';
+    if (!skillId) { sel.style.borderColor='#ef4444'; return; }
+    sel.style.borderColor = '';
+  }
+  if (!levelId) {
+    document.querySelectorAll('.level-btn').forEach(b => b.style.borderColor='#ef4444');
+    return;
   }
 
-  // fix skill bar track positioning
-  document.querySelectorAll('.skill-bar-track').forEach(t => t.style.position = 'relative');
-})();
+  const res = await fetch('/api/profile/skills', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({skill_id: skillId, level_id: levelId, is_primary: isPrimary})
+  });
+  if (!res.ok) { alert('Failed to save skill.'); return; }
+  closeSkillModal();
+  reloadSkills();
+}
+
+async function deleteSkill(skillId) {
+  if (!confirm('Remove this skill from your profile?')) return;
+  const res = await fetch('/api/profile/skills/' + skillId, {method:'DELETE'});
+  if (!res.ok) { alert('Failed to remove skill.'); return; }
+  reloadSkills();
+}
+
+async function reloadSkills() {
+  const res = await fetch(window.location.href);
+  const html = await res.text();
+  const parser = new DOMParser();
+  const doc    = parser.parseFromString(html, 'text/html');
+  document.getElementById('skills-list').innerHTML =
+    doc.getElementById('skills-list').innerHTML;
+  const cnt = doc.getElementById('skills-count');
+  if (cnt) document.getElementById('skills-count').textContent = cnt.textContent;
+}
+
+// ── Cert modal ────────────────────────────────────────────────────────────────
+let editingCertEcId = null;
+
+function openCertModal(ecId, certId, issued, expiry, url) {
+  editingCertEcId = ecId || null;
+  document.getElementById('cert-modal-title').textContent = ecId ? 'Edit Certification' : 'Add Certification';
+  document.getElementById('cert-pick-wrap').style.display = ecId ? 'none' : '';
+  if (!ecId) document.getElementById('cm-cert').value = '';
+  else if (certId) document.getElementById('cm-cert').value = certId;
+  document.getElementById('cm-issued').value = issued || '';
+  document.getElementById('cm-expiry').value = expiry || '';
+  document.getElementById('cm-url').value    = url    || '';
+  document.getElementById('cert-modal').style.display = 'flex';
+}
+
+function closeCertModal() { document.getElementById('cert-modal').style.display = 'none'; }
+
+async function saveCert() {
+  const issued = document.getElementById('cm-issued').value;
+  const expiry = document.getElementById('cm-expiry').value;
+  const url    = document.getElementById('cm-url').value.trim();
+
+  let res;
+  if (editingCertEcId) {
+    res = await fetch('/api/profile/certifications/' + editingCertEcId, {
+      method: 'PUT',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({issued_date: issued||null, expiry_date: expiry||null, certificate_url: url||null})
+    });
+  } else {
+    const certId = document.getElementById('cm-cert').value;
+    if (!certId) { document.getElementById('cm-cert').style.borderColor='#ef4444'; return; }
+    document.getElementById('cm-cert').style.borderColor = '';
+    res = await fetch('/api/profile/certifications', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({cert_id: certId, issued_date: issued||null, expiry_date: expiry||null, certificate_url: url||null})
+    });
+  }
+  if (!res.ok) { alert('Failed to save certification.'); return; }
+  closeCertModal();
+  reloadCerts();
+}
+
+async function deleteCert(ecId) {
+  if (!confirm('Remove this certification from your profile?')) return;
+  const res = await fetch('/api/profile/certifications/' + ecId, {method:'DELETE'});
+  if (!res.ok) { alert('Failed to remove certification.'); return; }
+  reloadCerts();
+}
+
+async function reloadCerts() {
+  const res = await fetch(window.location.href);
+  const html = await res.text();
+  const parser = new DOMParser();
+  const doc    = parser.parseFromString(html, 'text/html');
+  document.getElementById('certs-list').innerHTML =
+    doc.getElementById('certs-list').innerHTML;
+  const cnt = doc.getElementById('certs-count');
+  if (cnt) document.getElementById('certs-count').textContent = cnt.textContent;
+}
+{% endif %}
 </script>
 {% endblock %}

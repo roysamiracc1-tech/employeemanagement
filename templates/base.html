@@ -1,11 +1,20 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="{{ theme_pref }}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}HR Portal{% endblock %}</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  {% if branding.theme_color and branding.theme_color != '#2563eb' %}
+  <style>
+    :root {
+      --primary: {{ branding.theme_color }};
+      --primary-dark: {{ branding.theme_color }};
+      --sidebar-active: {{ branding.theme_color }};
+    }
+  </style>
+  {% endif %}
   {% block head %}{% endblock %}
 </head>
 <body>
@@ -13,8 +22,15 @@
 <!-- ── Sidebar ─────────────────────────────────────────── -->
 <aside class="sidebar" id="sidebar">
   <div class="sidebar-logo">
+    {% if branding.logo_url %}
+    <img src="{{ branding.logo_url }}" alt="Logo"
+         style="width:36px;height:36px;border-radius:10px;object-fit:cover;flex-shrink:0"
+         onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+    <div class="logo-icon" style="display:none">HR</div>
+    {% else %}
     <div class="logo-icon">HR</div>
-    <span class="logo-text">HR Portal</span>
+    {% endif %}
+    <span class="logo-text">{{ branding.company_name or 'HR Portal' }}</span>
   </div>
 
   <nav class="sidebar-nav">
@@ -52,6 +68,44 @@
     </a>
     {% endif %}
 
+    {% if has_role('SYSTEM_ADMIN','HR_ADMIN','DEPARTMENT_HEAD','LOCATION_HEAD','SOLID_LINE_MANAGER','DOTTED_LINE_MANAGER') %}
+    <a href="{{ url_for('org_tree') }}"
+       class="nav-link {% if request.endpoint == 'org_tree' %}active{% endif %}">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path d="M3 3h4v4H3z"/><path d="M17 3h4v4h-4z"/><path d="M10 17h4v4h-4z"/>
+        <path d="M5 7v4h14V7"/><path d="M12 11v6"/>
+      </svg>
+      <span class="nav-label">Org Tree</span>
+    </a>
+    {% endif %}
+
+    <a href="{{ url_for('vacation_page') }}"
+       class="nav-link {% if request.endpoint in ('vacation_page',) %}active{% endif %}">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path d="M3 17l4-8 4 4 4-6 4 10"/><path d="M3 21h18"/>
+      </svg>
+      <span class="nav-label">Vacation</span>
+    </a>
+
+    {% if has_role('SYSTEM_ADMIN','HR_ADMIN','SOLID_LINE_MANAGER','DOTTED_LINE_MANAGER') %}
+    <a href="{{ url_for('vacation_team') }}"
+       class="nav-link {% if request.endpoint == 'vacation_team' %}active{% endif %}">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>
+      </svg>
+      <span class="nav-label">Team Vacation</span>
+    </a>
+    {% endif %}
+
+    <a href="{{ url_for('company_view') }}"
+       class="nav-link {% if request.endpoint in ('company_view',) %}active{% endif %}">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+        <polyline points="9 22 9 12 15 12 15 22"/>
+      </svg>
+      <span class="nav-label">My Company</span>
+    </a>
+
     {% if has_role('SYSTEM_ADMIN') %}
     <span class="sidebar-section-title">Administration</span>
     <a href="{{ url_for('admin') }}"
@@ -61,6 +115,23 @@
         <path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/>
       </svg>
       <span class="nav-label">Admin Panel</span>
+    </a>
+    <a href="{{ url_for('admin_companies') }}"
+       class="nav-link {% if request.endpoint in ('admin_companies','admin_company_new','admin_company_edit') %}active{% endif %}">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <rect x="2" y="7" width="20" height="14" rx="2"/>
+        <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/>
+        <line x1="12" y1="12" x2="12" y2="16"/>
+        <line x1="10" y1="14" x2="14" y2="14"/>
+      </svg>
+      <span class="nav-label">Companies</span>
+    </a>
+    <a href="{{ url_for('admin_vacation_types') }}"
+       class="nav-link {% if request.endpoint in ('admin_vacation_types','admin_vacation_type_new','admin_vacation_type_edit') %}active{% endif %}">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path d="M3 17l4-8 4 4 4-6 4 10"/><path d="M3 21h18"/>
+      </svg>
+      <span class="nav-label">Vacation Types</span>
     </a>
     {% endif %}
   </nav>
@@ -95,6 +166,10 @@
 <!-- ── Main layout ──────────────────────────────────────── -->
 <div class="main-layout" id="main-layout">
 
+  {% if branding.header_html %}
+  <div class="co-header">{{ branding.header_html | safe }}</div>
+  {% endif %}
+
   <header class="topbar">
     <button class="topbar-toggle" onclick="toggleSidebar()" title="Toggle sidebar">
       <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -104,13 +179,25 @@
       </svg>
     </button>
     <div class="topbar-title">{% block page_title %}{% endblock %}</div>
-    <div class="topbar-user">
-      <div class="topbar-avatar">{{ session.user_name[0] if session.user_name else 'U' }}</div>
-      <div>
-        <div class="topbar-user-name">{{ session.user_name }}</div>
-        {% if session.roles %}
-          <span class="topbar-user-role">{{ session.roles[-1].replace('_',' ').title() }}</span>
-        {% endif %}
+    <div class="topbar-user" style="gap:12px">
+      <button class="theme-toggle" id="theme-toggle-btn" onclick="toggleTheme()" title="Switch light/dark mode">
+        <span id="theme-icon">
+          {% if theme_pref == 'dark' %}
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+          {% else %}
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+          {% endif %}
+        </span>
+        <span id="theme-label" style="font-size:.72rem">{{ 'Light' if theme_pref == 'dark' else 'Dark' }}</span>
+      </button>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div class="topbar-avatar">{{ session.user_name[0] if session.user_name else 'U' }}</div>
+        <div>
+          <div class="topbar-user-name">{{ session.user_name }}</div>
+          {% if session.roles %}
+            <span class="topbar-user-role">{{ session.roles[-1].replace('_',' ').title() }}</span>
+          {% endif %}
+        </div>
       </div>
     </div>
   </header>
@@ -124,6 +211,10 @@
   {% endwith %}
 
   <main>{% block content %}{% endblock %}</main>
+
+  {% if branding.footer_html %}
+  <div class="co-footer">{{ branding.footer_html | safe }}</div>
+  {% endif %}
 </div>
 
 <script>
@@ -137,6 +228,29 @@ function toggleSidebar() {
     document.getElementById('sidebar').classList.add('collapsed');
   }
 })();
+
+async function toggleTheme() {
+  const html = document.documentElement;
+  const current = html.getAttribute('data-theme') || 'light';
+  const next = current === 'dark' ? 'light' : 'dark';
+  html.setAttribute('data-theme', next);
+  // Update button icon + label
+  const icon = document.getElementById('theme-icon');
+  const label = document.getElementById('theme-label');
+  if (next === 'dark') {
+    icon.innerHTML = '<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>';
+    label.textContent = 'Light';
+  } else {
+    icon.innerHTML = '<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
+    label.textContent = 'Dark';
+  }
+  // Persist to server
+  await fetch('/api/user/theme', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({theme: next})
+  });
+}
 </script>
 {% block scripts %}{% endblock %}
 </body>

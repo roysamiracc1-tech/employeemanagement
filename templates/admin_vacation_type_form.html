@@ -1,0 +1,237 @@
+{% extends 'base.html' %}
+{% block title %}{% if action=='new' %}Add Vacation Type{% else %}Edit {{ vt.name }}{% endif %} — HR Portal{% endblock %}
+{% block page_title %}{% if action=='new' %}Add Vacation Type{% else %}Edit Vacation Type{% endif %}{% endblock %}
+
+{% block content %}
+<div class="page" style="max-width:680px">
+
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px">
+    <a href="{{ url_for('admin_vacation_types') }}" class="btn btn-ghost btn-sm">
+      <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+      Vacation Types
+    </a>
+    <div>
+      <div style="font-size:1.1rem;font-weight:700">{{ 'Add New Vacation Type' if action=='new' else 'Edit — '+vt.name }}</div>
+      <div style="font-size:.78rem;color:#64748b">Configure availability, limits and location scope</div>
+    </div>
+  </div>
+
+  <form method="POST" action="{{ url_for('admin_vacation_type_new') if action=='new' else url_for('admin_vacation_type_edit', vt_id=vt.id) }}">
+
+    <!-- ── Basic Info ─────────────────────────────────────────── -->
+    <div class="card reg-step" style="margin-bottom:16px">
+      <div class="card-header" style="display:flex;align-items:center;gap:10px">
+        <span class="step-badge">1</span><h2>Basic Info</h2>
+      </div>
+      <div class="card-body">
+        <div class="form-group">
+          <label>Company *</label>
+          <select name="company_id" class="form-control" {% if action=='edit' %}disabled{% endif %}>
+            {% for c in companies %}
+            <option value="{{ c.id }}" {% if vt and vt.company_id==c.id %}selected{% endif %}>{{ c.name }}</option>
+            {% endfor %}
+          </select>
+          {% if action=='edit' %}<input type="hidden" name="company_id" value="{{ vt.company_id }}">{% endif %}
+        </div>
+        <div class="two-col" style="gap:14px;margin-bottom:14px">
+          <div class="form-group" style="margin-bottom:0">
+            <label>Type Name *</label>
+            <input type="text" name="name" class="form-control" required
+                   value="{{ vt.name if vt else '' }}" placeholder="e.g. Annual Leave">
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label>Color</label>
+            <div style="display:flex;align-items:center;gap:10px">
+              <input type="color" name="color" id="color-pick"
+                     value="{{ vt.color if vt else '#3b82f6' }}"
+                     style="width:44px;height:36px;border:1.5px solid #e2e8f0;border-radius:6px;cursor:pointer;padding:2px">
+              <span id="color-label" style="font-size:.8rem;color:#64748b">{{ vt.color if vt else '#3b82f6' }}</span>
+            </div>
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label>Description</label>
+          <textarea name="description" class="form-control" rows="2" style="resize:vertical"
+                    placeholder="Short description visible to employees">{{ vt.description if vt and vt.description else '' }}</textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Policy ─────────────────────────────────────────────── -->
+    <div class="card reg-step" style="margin-bottom:16px">
+      <div class="card-header" style="display:flex;align-items:center;gap:10px">
+        <span class="step-badge">2</span><h2>Policy</h2>
+      </div>
+      <div class="card-body">
+        <div class="two-col" style="gap:14px;margin-bottom:14px">
+          <div class="form-group" style="margin-bottom:0">
+            <label>Max Days / Year</label>
+            <input type="number" name="max_days_per_year" class="form-control" min="1" max="365"
+                   value="{{ vt.max_days_per_year if vt and vt.max_days_per_year else '' }}"
+                   placeholder="Leave blank for unlimited">
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label>Payment</label>
+            <div style="display:flex;flex-direction:column;gap:8px;margin-top:6px">
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:.83rem">
+                <input type="radio" name="is_paid" value="1" {% if not vt or vt.is_paid %}checked{% endif %}>
+                Paid leave
+              </label>
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:.83rem">
+                <input type="radio" name="is_paid" value="0" {% if vt and not vt.is_paid %}checked{% endif %}>
+                Unpaid leave
+              </label>
+            </div>
+          </div>
+        </div>
+        {% if action=='edit' %}
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:.83rem">
+          <input type="checkbox" name="is_active" value="1" {% if vt.is_active %}checked{% endif %} style="width:15px;height:15px">
+          Type is <strong>active</strong> (visible to employees)
+        </label>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- ── Location Scope ─────────────────────────────────────── -->
+    <div class="card reg-step" style="margin-bottom:20px">
+      <div class="card-header" style="display:flex;align-items:center;gap:10px">
+        <span class="step-badge">3</span><h2>Location Scope</h2>
+      </div>
+      <div class="card-body">
+        <div style="font-size:.78rem;color:#64748b;margin-bottom:12px">
+          Leave <strong>all unchecked</strong> for company-wide availability.
+          Check specific locations to restrict this type to those offices only.
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px">
+          {% for loc in locations %}
+          <label style="display:flex;align-items:center;gap:8px;padding:10px 12px;border:1.5px solid #e2e8f0;border-radius:8px;cursor:pointer;font-size:.82rem;transition:border-color .12s"
+                 onmouseenter="this.style.borderColor='#93c5fd'" onmouseleave="this.style.borderColor=this.querySelector('input').checked?'#3b82f6':'#e2e8f0'">
+            <input type="checkbox" name="location_ids" value="{{ loc.id }}"
+                   style="width:15px;height:15px"
+                   {% if assigned_locs is defined and loc.id in assigned_locs %}checked{% endif %}
+                   onchange="this.closest('label').style.borderColor=this.checked?'#3b82f6':'#e2e8f0'">
+            <span>📍 {{ loc.name }}</span>
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Eligibility Rules ──────────────────────────────────── -->
+    <div class="card reg-step" style="margin-bottom:20px">
+      <div class="card-header" style="display:flex;align-items:center;gap:10px">
+        <span class="step-badge">4</span><h2>Eligibility Rules</h2>
+        <span style="font-size:.75rem;color:#64748b;margin-left:auto">All rules must pass · leave empty = everyone eligible</span>
+      </div>
+      <div class="card-body">
+        <div style="font-size:.78rem;color:#64748b;margin-bottom:14px">
+          Define who can see and apply for this vacation type. Each rule is an additional filter (AND logic).
+        </div>
+
+        <div id="rules-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px">
+          <!-- existing rules injected by JS -->
+        </div>
+
+        <button type="button" class="btn btn-ghost btn-sm" onclick="addRule()">
+          + Add Rule
+        </button>
+
+        <!-- hidden inputs written by JS -->
+        <div id="rules-inputs"></div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:12px;padding-bottom:32px">
+      <button type="submit" class="btn btn-primary" style="padding:10px 28px">
+        {{ 'Create Type' if action=='new' else 'Save Changes' }}
+      </button>
+      <a href="{{ url_for('admin_vacation_types') }}" class="btn btn-ghost">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('color-pick').addEventListener('input', function() {
+  document.getElementById('color-label').textContent = this.value;
+});
+
+// ── Eligibility Rules builder ────────────────────────────────────────────────
+const RULE_FIELDS = [
+  { value:'GENDER_EQ',          label:'Gender is',             type:'select',
+    options:[{v:'MALE',l:'Male'},{v:'FEMALE',l:'Female'},{v:'OTHER',l:'Other'}] },
+  { value:'MIN_TENURE_MONTHS',  label:'Minimum tenure (months)', type:'number', placeholder:'e.g. 6' },
+  { value:'MIN_TENURE_YEARS',   label:'Minimum tenure (years)',  type:'number', placeholder:'e.g. 1' },
+];
+
+let rules = [];
+
+function addRule(rt, rv) {
+  rules.push({ type: rt || '', value: rv || '' });
+  renderRules();
+}
+
+function removeRule(i) {
+  rules.splice(i, 1);
+  renderRules();
+}
+
+function renderRules() {
+  const list   = document.getElementById('rules-list');
+  const inputs = document.getElementById('rules-inputs');
+
+  list.innerHTML = rules.map((rule, i) => {
+    const fieldDef = RULE_FIELDS.find(f => f.value === rule.type);
+    const fieldSel = RULE_FIELDS.map(f =>
+      `<option value="${f.value}" ${rule.type===f.value?'selected':''}>${f.label}</option>`
+    ).join('');
+
+    let valInput = '';
+    if (!rule.type || !fieldDef) {
+      valInput = `<input type="text" placeholder="Pick a field first" disabled
+                         style="flex:1;padding:7px 10px;border:1.5px solid #e2e8f0;border-radius:7px;font-size:.82rem;color:#94a3b8">`;
+    } else if (fieldDef.type === 'select') {
+      const opts = fieldDef.options.map(o =>
+        `<option value="${o.v}" ${rule.value===o.v?'selected':''}>${o.l}</option>`
+      ).join('');
+      valInput = `<select onchange="rules[${i}].value=this.value;syncInputs()"
+                          style="flex:1;padding:7px 10px;border:1.5px solid #e2e8f0;border-radius:7px;font-size:.82rem">
+                    <option value="">— Select —</option>${opts}</select>`;
+    } else {
+      valInput = `<input type="number" min="0" step="0.5" value="${rule.value}"
+                         placeholder="${fieldDef.placeholder||''}"
+                         oninput="rules[${i}].value=this.value;syncInputs()"
+                         style="flex:1;padding:7px 10px;border:1.5px solid #e2e8f0;border-radius:7px;font-size:.82rem">`;
+    }
+
+    return `<div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:8px">
+      <select onchange="rules[${i}].type=this.value;rules[${i}].value='';renderRules()"
+              style="width:220px;padding:7px 10px;border:1.5px solid #e2e8f0;border-radius:7px;font-size:.82rem">
+        <option value="">— Select field —</option>${fieldSel}
+      </select>
+      ${valInput}
+      <button type="button" onclick="removeRule(${i})"
+              style="background:none;border:none;cursor:pointer;color:#94a3b8;font-size:1.1rem;padding:0 4px" title="Remove">×</button>
+    </div>`;
+  }).join('');
+
+  syncInputs();
+}
+
+function syncInputs() {
+  document.getElementById('rules-inputs').innerHTML = rules.map(r =>
+    r.type && r.value
+      ? `<input type="hidden" name="rule_type"  value="${r.type}">
+         <input type="hidden" name="rule_value" value="${r.value}">`
+      : ''
+  ).join('');
+}
+
+// Pre-load existing rules (edit mode)
+const EXISTING_RULES = {{ existing_rules | tojson if existing_rules is defined else '[]' }};
+EXISTING_RULES.forEach(r => addRule(r.rule_type, r.rule_value));
+if (!rules.length) renderRules(); // show empty state
+</script>
+{% endblock %}

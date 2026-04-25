@@ -1,0 +1,233 @@
+{% extends 'base.html' %}
+{% block title %}Team Vacation — HR Portal{% endblock %}
+{% block page_title %}Team Vacation{% endblock %}
+
+{% block content %}
+<div class="page">
+
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px">
+    <div>
+      <h1 style="font-size:1.25rem;font-weight:700;margin-bottom:2px">Team Vacation</h1>
+      <p id="tv-subtitle" style="font-size:.8rem;color:#64748b">Loading…</p>
+    </div>
+  </div>
+
+  <div class="admin-tabs">
+    <button class="admin-tab active" onclick="switchTab('pending',this)">
+      Pending Requests <span id="pending-badge" style="display:none;margin-left:5px;background:#ef4444;color:#fff;border-radius:999px;padding:1px 6px;font-size:.65rem"></span>
+    </button>
+    <button class="admin-tab" onclick="switchTab('upcoming',this)">Upcoming Schedule</button>
+  </div>
+
+  <!-- Pending tab -->
+  <div class="admin-panel" id="tab-pending">
+    <div class="table-card" style="margin:0">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Employee</th><th>Type</th><th>From</th><th>To</th><th>Days</th><th>Notes</th><th>Submitted</th><th style="min-width:160px">Actions</th></tr>
+          </thead>
+          <tbody id="pending-tbody">
+            <tr class="empty-row"><td colspan="8">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Upcoming tab -->
+  <div class="admin-panel" id="tab-upcoming" style="display:none">
+    <div id="upcoming-list" style="display:flex;flex-direction:column;gap:8px">
+      <p style="color:#94a3b8;font-size:.85rem">Loading…</p>
+    </div>
+  </div>
+
+  <!-- Review modal -->
+  <div id="review-modal" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.45);align-items:center;justify-content:center" onclick="if(event.target===this)closeReview()">
+    <div class="modal-box" style="width:400px" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <div class="modal-title" id="rv-title">Review Request</div>
+          <div class="modal-sub" id="rv-sub"></div>
+        </div>
+        <button class="modal-close" onclick="closeReview()">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group" style="margin:0">
+          <label>Note to employee (optional)</label>
+          <textarea id="rv-note" class="form-control" rows="2" placeholder="Reason for decision…" style="resize:vertical"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost btn-sm" onclick="closeReview()">Cancel</button>
+        <button class="btn btn-danger btn-sm" onclick="submitReview('reject')">Reject</button>
+        <button class="btn btn-primary btn-sm" onclick="submitReview('approve')">Approve</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="status-bar" id="status-bar" style="display:none">
+    <span class="status-dot" id="status-dot"></span>
+    <span id="status-text"></span>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const AVATAR_COLORS=['#3b82f6','#8b5cf6','#ec4899','#f59e0b','#10b981','#06b6d4','#ef4444','#6366f1'];
+function avatarColor(n){let h=0;for(const c of n)h=(h*31+c.charCodeAt(0))&0xffffffff;return AVATAR_COLORS[Math.abs(h)%AVATAR_COLORS.length];}
+function initials(n){return n.split(' ').map(p=>p[0]).join('').slice(0,2).toUpperCase();}
+function fmt(d){return d?new Date(d).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}):'—';}
+function fmtShort(d){return d?new Date(d).toLocaleDateString('en-GB',{day:'2-digit',month:'short'}):'—';}
+
+let currentReviewId = null;
+let pendingData = [], upcomingData = [];
+
+function switchTab(name, btn) {
+  document.querySelectorAll('.admin-tab').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.admin-panel').forEach(p=>p.style.display='none');
+  btn.classList.add('active');
+  document.getElementById('tab-'+name).style.display='';
+}
+
+// ── Pending ──────────────────────────────────────────────────────────────────
+function buildPendingRow(r) {
+  return `<tr id="pr-${r.id}">
+    <td>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div class="avatar" style="background:${avatarColor(r.employee_name)};font-size:.65rem;width:28px;height:28px">${initials(r.employee_name)}</div>
+        <div>
+          <a href="/profile/${r.employee_id}" style="font-size:.82rem;font-weight:600;color:#0f172a;text-decoration:none">${r.employee_name}</a>
+          <div style="font-size:.68rem;color:#64748b">${r.job_title||''}${r.location?' · '+r.location:''}</div>
+        </div>
+      </div>
+    </td>
+    <td><span style="display:inline-flex;align-items:center;gap:4px;font-size:.78rem">
+      <span style="width:8px;height:8px;border-radius:50%;background:${r.color}"></span>${r.type_name}
+    </span></td>
+    <td style="font-size:.8rem;white-space:nowrap">${fmtShort(r.start_date)}</td>
+    <td style="font-size:.8rem;white-space:nowrap">${fmtShort(r.end_date)}</td>
+    <td style="font-weight:600;text-align:center">${r.working_days}</td>
+    <td style="font-size:.75rem;color:#64748b;max-width:160px">${r.notes||'—'}</td>
+    <td style="font-size:.72rem;color:#94a3b8;white-space:nowrap">${fmt(r.created_at)}</td>
+    <td>
+      <div style="display:flex;gap:5px">
+        <button class="btn btn-sm btn-success" onclick="openReview('${r.id}','${r.employee_name}','${r.type_name}','${r.start_date?.slice(0,10)||''}','${r.end_date?.slice(0,10)||''}',${r.working_days})">✓ Approve</button>
+        <button class="btn btn-sm btn-danger"  onclick="openReview('${r.id}','${r.employee_name}','${r.type_name}','${r.start_date?.slice(0,10)||''}','${r.end_date?.slice(0,10)||''}',${r.working_days},'reject')">✕ Reject</button>
+      </div>
+    </td>
+  </tr>`;
+}
+
+async function loadPending() {
+  const res = await fetch('/api/vacation/team-pending');
+  if (!res.ok) return;
+  pendingData = await res.json();
+  const tbody = document.getElementById('pending-tbody');
+  tbody.innerHTML = pendingData.length
+    ? pendingData.map(buildPendingRow).join('')
+    : '<tr class="empty-row"><td colspan="8">No pending requests.</td></tr>';
+  const badge = document.getElementById('pending-badge');
+  if (pendingData.length) { badge.textContent=pendingData.length; badge.style.display=''; }
+  else badge.style.display='none';
+}
+
+// ── Review modal ─────────────────────────────────────────────────────────────
+let pendingAction = null;
+function openReview(id, name, type, start, end, days, action) {
+  currentReviewId = id;
+  pendingAction   = action || null;
+  document.getElementById('rv-title').textContent = 'Review: '+type;
+  document.getElementById('rv-sub').textContent   = `${name} · ${fmtShort(start)} → ${fmtShort(end)} (${days} day${days!==1?'s':''})`;
+  document.getElementById('rv-note').value = '';
+  document.getElementById('review-modal').style.display = 'flex';
+  if (action === 'reject') {
+    document.querySelector('#review-modal .btn-danger').style.background='#dc2626';
+  }
+}
+function closeReview() { document.getElementById('review-modal').style.display='none'; }
+
+async function submitReview(action) {
+  const note = document.getElementById('rv-note').value.trim();
+  const res  = await fetch('/api/vacation/review/'+currentReviewId, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({action, note: note||null})
+  });
+  if (!res.ok) { const d=await res.json(); alert(d.error||'Failed'); return; }
+  closeReview();
+  const row = document.getElementById('pr-'+currentReviewId);
+  if (row) row.remove();
+  loadPending();
+}
+
+// ── Upcoming ─────────────────────────────────────────────────────────────────
+function buildUpcomingCard(r) {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const start = new Date(r.start_date);
+  const isActive = start <= today && new Date(r.end_date) >= today;
+  return `<div style="display:flex;align-items:center;gap:12px;padding:12px 16px;background:#fff;border:1.5px solid #e2e8f0;border-radius:10px;border-left:4px solid ${r.color}">
+    <div class="avatar" style="background:${avatarColor(r.employee_name)};font-size:.65rem;width:32px;height:32px;flex-shrink:0">${initials(r.employee_name)}</div>
+    <div style="flex:1;min-width:0">
+      <div style="font-size:.83rem;font-weight:700"><a href="/profile/${r.employee_id}" style="text-decoration:none;color:#0f172a">${r.employee_name}</a></div>
+      <div style="font-size:.72rem;color:#64748b">${r.job_title||''}</div>
+    </div>
+    <div style="text-align:center;min-width:90px">
+      <div style="font-size:.72rem;color:#64748b;margin-bottom:2px">${fmtShort(r.start_date)} → ${fmtShort(r.end_date)}</div>
+      <span style="display:inline-flex;align-items:center;gap:4px;font-size:.72rem;padding:2px 8px;border-radius:4px;background:${r.color}18;color:${r.color}">
+        <span style="width:7px;height:7px;border-radius:50%;background:${r.color}"></span>${r.type_name}
+      </span>
+    </div>
+    <div style="text-align:right;min-width:60px">
+      <div style="font-size:1.1rem;font-weight:700;color:${r.color}">${r.working_days}</div>
+      <div style="font-size:.65rem;color:#64748b">day${r.working_days!==1?'s':''}</div>
+    </div>
+    ${isActive?'<span class="badge badge-green" style="font-size:.65rem">● On leave</span>':''}
+  </div>`;
+}
+
+async function loadUpcoming() {
+  const res = await fetch('/api/vacation/team-upcoming');
+  if (!res.ok) return;
+  upcomingData = await res.json();
+  const list = document.getElementById('upcoming-list');
+  if (!upcomingData.length) {
+    list.innerHTML = '<p style="color:#94a3b8;font-size:.85rem">No upcoming approved vacations.</p>';
+    return;
+  }
+
+  // Group by month
+  const byMonth = {};
+  upcomingData.forEach(r => {
+    const m = r.start_date?.slice(0,7) || 'Unknown';
+    if (!byMonth[m]) byMonth[m]=[];
+    byMonth[m].push(r);
+  });
+  list.innerHTML = Object.entries(byMonth).map(([m, items]) => `
+    <div>
+      <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#94a3b8;margin-bottom:6px">
+        ${new Date(m+'-01').toLocaleDateString('en-GB',{month:'long',year:'numeric'})}
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        ${items.map(buildUpcomingCard).join('')}
+      </div>
+    </div>
+  `).join('<div style="height:12px"></div>');
+}
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+async function init() {
+  const sb = document.getElementById('status-bar');
+  sb.style.display='flex';
+  document.getElementById('status-dot').className='status-dot loading';
+  document.getElementById('status-text').textContent='Loading…';
+  await Promise.all([loadPending(), loadUpcoming()]);
+  const total = pendingData.length + upcomingData.length;
+  document.getElementById('tv-subtitle').textContent=`${pendingData.length} pending · ${upcomingData.length} upcoming approved`;
+  document.getElementById('status-dot').className='status-dot';
+  document.getElementById('status-text').textContent='Loaded';
+  sb.style.display='none';
+}
+init();
+</script>
+{% endblock %}

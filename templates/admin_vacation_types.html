@@ -1,0 +1,109 @@
+{% extends 'base.html' %}
+{% block title %}Vacation Types — HR Portal{% endblock %}
+{% block page_title %}Vacation Types{% endblock %}
+
+{% block content %}
+<div class="page">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+    <div>
+      <h1 style="font-size:1.25rem;font-weight:700;margin-bottom:2px">Vacation Types</h1>
+      <p style="font-size:.8rem;color:#64748b">{{ types|length }} type{{ 's' if types|length != 1 }} configured</p>
+    </div>
+    <a href="{{ url_for('admin_vacation_type_new') }}" class="btn btn-primary">
+      <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Add Vacation Type
+    </a>
+  </div>
+
+  {% if not types %}
+  <div class="card">
+    <div class="card-body" style="text-align:center;padding:60px">
+      <div style="font-size:2.5rem;margin-bottom:16px">🏖️</div>
+      <div style="font-weight:600;margin-bottom:8px">No vacation types yet</div>
+      <div style="font-size:.83rem;color:#64748b;margin-bottom:20px">Add types for each company and configure which are location-specific.</div>
+      <a href="{{ url_for('admin_vacation_type_new') }}" class="btn btn-primary">Add First Type</a>
+    </div>
+  </div>
+  {% else %}
+  <div class="table-card">
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Type</th><th>Company</th><th>Scope</th><th>Eligibility Rules</th><th>Max Days/Year</th>
+            <th>Paid</th><th>Status</th><th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in types %}
+          <tr>
+            <td>
+              <div style="display:flex;align-items:center;gap:8px">
+                <div style="width:12px;height:12px;border-radius:3px;background:{{ t.color }};flex-shrink:0"></div>
+                <div>
+                  <div style="font-weight:600;font-size:.83rem">{{ t.name }}</div>
+                  {% if t.description %}<div style="font-size:.7rem;color:#64748b">{{ t.description[:60] }}{% if t.description|length > 60 %}…{% endif %}</div>{% endif %}
+                </div>
+              </div>
+            </td>
+            <td style="font-size:.8rem">{{ t.company_name }}</td>
+            <td>
+              {% if t.locations %}
+              <div style="display:flex;flex-wrap:wrap;gap:3px">
+                {% for loc in t.locations %}
+                <span style="font-size:.65rem;background:#eff6ff;color:#1d4ed8;padding:1px 6px;border-radius:4px">📍 {{ loc }}</span>
+                {% endfor %}
+              </div>
+              {% else %}
+              <span style="font-size:.72rem;color:#64748b">🌐 Company-wide</span>
+              {% endif %}
+            </td>
+            <td id="rules-{{ t.id }}" style="font-size:.72rem;color:#64748b">—</td>
+            <td style="text-align:center;font-weight:600">{{ t.max_days_per_year or '∞' }}</td>
+            <td style="text-align:center">
+              {% if t.is_paid %}<span style="color:#16a34a;font-size:.75rem">✓ Paid</span>
+              {% else %}<span style="color:#dc2626;font-size:.75rem">Unpaid</span>{% endif %}
+            </td>
+            <td>
+              {% if t.is_active %}<span class="badge badge-green" style="font-size:.65rem">Active</span>
+              {% else %}<span class="badge badge-red" style="font-size:.65rem">Inactive</span>{% endif %}
+            </td>
+            <td>
+              <a href="{{ url_for('admin_vacation_type_edit', vt_id=t.id) }}" class="btn btn-ghost btn-sm">Edit</a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const RULE_LABELS = {
+  'GENDER_EQ':         v => `Gender: ${v.charAt(0)+v.slice(1).toLowerCase()}`,
+  'MIN_TENURE_MONTHS': v => `Min ${v}m tenure`,
+  'MIN_TENURE_YEARS':  v => `Min ${v}y tenure`,
+};
+(async () => {
+  const ids = [...document.querySelectorAll('[id^="rules-"]')].map(el=>el.id.replace('rules-',''));
+  if (!ids.length) return;
+  const res = await fetch('/api/admin/vacation-rules?ids='+ids.join(','));
+  if (!res.ok) return;
+  const data = await res.json();
+  Object.entries(data).forEach(([tid, rules]) => {
+    const el = document.getElementById('rules-'+tid);
+    if (!el) return;
+    if (!rules.length) { el.innerHTML='<span style="color:#94a3b8">Everyone</span>'; return; }
+    el.innerHTML = rules.map(r => {
+      const fn = RULE_LABELS[r.rule_type];
+      const label = fn ? fn(r.rule_value) : r.rule_type;
+      return `<span style="display:inline-block;margin:1px 2px;padding:1px 6px;background:#f1f5f9;border-radius:4px;font-size:.68rem;color:#374151">${label}</span>`;
+    }).join('');
+  });
+})();
+</script>
+{% endblock %}

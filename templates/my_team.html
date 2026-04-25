@@ -124,17 +124,18 @@ function buildCard(emp){
     </div>` : ''}
 
     <div class="team-card-footer">
-      <div style="display:flex;gap:10px">
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
         <span class="exp-badge">${yrs} yrs</span>
         ${validatedCerts>0?`<span class="badge badge-green">🏅 ${validatedCerts} cert${validatedCerts>1?'s':''}</span>`:''}
         ${emp.employment_type==='CONTRACTOR'?'<span class="badge badge-amber">Contractor</span>':''}
+        ${(pendingCounts[emp.id]||0)>0?`<a href="/vacation/team" style="text-decoration:none"><span class="badge" style="background:#fef2f2;color:#dc2626;border:1px solid #fecaca;cursor:pointer">⏳ ${pendingCounts[emp.id]} vacation req${pendingCounts[emp.id]>1?'s':''}</span></a>`:''}
       </div>
       <a href="/profile/${emp.id}">View Profile →</a>
     </div>
   </div>`;
 }
 
-let allTeam=[], activeUrlFilter=null;
+let allTeam=[], activeUrlFilter=null, pendingCounts={};
 
 function renderTeam(data){
   const grid=document.getElementById('team-grid');
@@ -177,9 +178,10 @@ async function loadTeam(){
   const txt=document.getElementById('status-text');
   sb.style.display='flex';
   try{
-    const res=await fetch('/api/my-team');
+    const [res, pcRes]=await Promise.all([fetch('/api/my-team'),fetch('/api/vacation/team-pending-counts')]);
     if(!res.ok) throw new Error(`HTTP ${res.status}`);
     allTeam=await res.json();
+    if(pcRes.ok) pendingCounts=await pcRes.json();
 
     // Apply URL-param filter from dashboard drill-down
     const params=new URLSearchParams(window.location.search);

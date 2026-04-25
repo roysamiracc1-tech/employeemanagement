@@ -1,0 +1,389 @@
+{% extends 'base.html' %}
+{% block title %}{% if action == 'new' %}Register Company{% else %}Edit {{ co.name }}{% endif %} — HR Portal{% endblock %}
+{% block page_title %}{% if action == 'new' %}Register Company{% else %}Edit Company{% endif %}{% endblock %}
+
+{% block content %}
+<div class="page" style="max-width:680px">
+
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px">
+    <a href="{{ url_for('admin_companies') }}" class="btn btn-ghost btn-sm">
+      <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+      Companies
+    </a>
+    <div>
+      <div style="font-size:1.1rem;font-weight:700">
+        {% if action == 'new' %}Register New Company{% else %}Edit — {{ co.name }}{% endif %}
+      </div>
+      <div style="font-size:.78rem;color:#64748b">
+        {% if action == 'new' %}Add a new company to the portal{% else %}Update company details{% endif %}
+      </div>
+    </div>
+  </div>
+
+  <form method="POST" enctype="multipart/form-data"
+        action="{{ url_for('admin_company_new') if action == 'new' else url_for('admin_company_edit', company_id=co.id) }}">
+
+    <!-- ── Identity ───────────────────────────────────────────── -->
+    <div class="card reg-step" style="margin-bottom:16px">
+      <div class="card-header" style="display:flex;align-items:center;gap:10px">
+        <span class="step-badge">1</span>
+        <h2>Company Identity</h2>
+      </div>
+      <div class="card-body">
+        <div class="form-group">
+          <label for="name">Company Name *</label>
+          <input type="text" id="name" name="name" class="form-control"
+                 value="{{ co.name if co else '' }}" placeholder="Acme Corporation" required>
+        </div>
+        <div class="two-col" style="gap:14px">
+          <div class="form-group" style="margin-bottom:0">
+            <label for="industry">Industry</label>
+            <select id="industry" name="industry" class="form-control">
+              <option value="">— Select —</option>
+              {% set industries = ['Technology','Finance','Healthcare','Retail','Manufacturing',
+                                   'Consulting','Education','Media','Telecommunications','Other'] %}
+              {% for ind in industries %}
+              <option value="{{ ind }}" {% if co and co.industry == ind %}selected{% endif %}>{{ ind }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label for="founded_year">Founded Year</label>
+            <input type="number" id="founded_year" name="founded_year" class="form-control"
+                   min="1800" max="2100" placeholder="e.g. 2010"
+                   value="{{ co.founded_year if co and co.founded_year else '' }}">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Contact & Web ──────────────────────────────────────── -->
+    <div class="card reg-step" style="margin-bottom:16px">
+      <div class="card-header" style="display:flex;align-items:center;gap:10px">
+        <span class="step-badge">2</span>
+        <h2>Contact &amp; Web</h2>
+      </div>
+      <div class="card-body">
+        <div class="form-group">
+          <label for="hq_address">Headquarters Address</label>
+          <input type="text" id="hq_address" name="hq_address" class="form-control"
+                 placeholder="123 Main St, San Francisco, CA"
+                 value="{{ co.hq_address if co and co.hq_address else '' }}">
+        </div>
+        <div class="two-col" style="gap:14px">
+          <div class="form-group" style="margin-bottom:0">
+            <label for="website">Website</label>
+            <input type="url" id="website" name="website" class="form-control"
+                   placeholder="https://example.com"
+                   value="{{ co.website if co and co.website else '' }}">
+          </div>
+          <!-- Logo field moved to Branding step -->
+        </div>
+      </div>
+    </div>
+
+    <!-- ── About ──────────────────────────────────────────────── -->
+    <div class="card reg-step" style="margin-bottom:16px">
+      <div class="card-header" style="display:flex;align-items:center;gap:10px">
+        <span class="step-badge">3</span>
+        <h2>About</h2>
+      </div>
+      <div class="card-body">
+        <div class="form-group" style="margin-bottom:0">
+          <label for="description">Company Description</label>
+          <textarea id="description" name="description" class="form-control"
+                    rows="4" placeholder="Briefly describe what the company does…"
+                    style="resize:vertical">{{ co.description if co and co.description else '' }}</textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Branding ──────────────────────────────────────────── -->
+    <div class="card reg-step" style="margin-bottom:16px">
+      <div class="card-header" style="display:flex;align-items:center;gap:10px">
+        <span class="step-badge">4</span>
+        <h2>Branding &amp; Theme</h2>
+      </div>
+      <div class="card-body">
+        <p style="font-size:.78rem;color:#64748b;margin-bottom:14px">These settings are visible to all employees of this company across the portal.</p>
+
+        <div class="two-col" style="gap:14px;margin-bottom:14px">
+          <!-- ── Logo upload ───────────────────────────────────── -->
+          <div class="form-group" style="margin-bottom:0">
+            <label>Company Logo</label>
+
+            <!-- Tab switcher -->
+            <div style="display:flex;gap:0;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;margin-bottom:10px;width:fit-content">
+              <button type="button" id="tab-upload" onclick="switchLogoTab('upload')"
+                      style="padding:5px 14px;font-size:.75rem;font-weight:600;border:none;cursor:pointer;background:#2563eb;color:#fff;transition:background .15s">
+                Upload File
+              </button>
+              <button type="button" id="tab-url" onclick="switchLogoTab('url')"
+                      style="padding:5px 14px;font-size:.75rem;font-weight:600;border:none;cursor:pointer;background:#f8fafc;color:#64748b;transition:background .15s">
+                External URL
+              </button>
+            </div>
+
+            <!-- Upload panel -->
+            <div id="panel-upload">
+              <label id="drop-zone"
+                     style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;
+                            border:2px dashed #cbd5e1;border-radius:10px;padding:20px 16px;cursor:pointer;
+                            background:#f8fafc;transition:border-color .15s,background .15s"
+                     ondragover="event.preventDefault();this.style.borderColor='#2563eb';this.style.background='#eff6ff'"
+                     ondragleave="this.style.borderColor='#cbd5e1';this.style.background='#f8fafc'"
+                     ondrop="handleDrop(event)">
+                <input type="file" id="logo_file" name="logo_file" accept="image/*"
+                       style="display:none" onchange="handleFile(this.files[0])">
+                <div id="drop-icon" style="color:#94a3b8">
+                  <svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+                  </svg>
+                </div>
+                <span id="drop-label" style="font-size:.78rem;color:#64748b;text-align:center">
+                  <strong style="color:#2563eb">Click to choose</strong> or drag &amp; drop<br>
+                  <span style="font-size:.7rem;color:#94a3b8">PNG, JPG, SVG, WebP · max 2 MB</span>
+                </span>
+              </label>
+            </div>
+
+            <!-- URL panel (hidden by default) -->
+            <div id="panel-url" style="display:none">
+              <input type="url" id="logo_url" name="logo_url" class="form-control"
+                     placeholder="https://example.com/logo.png"
+                     oninput="previewLogo(this.value)"
+                     value="{{ co.logo_url if co and co.logo_url and not (co.logo_url.startswith('/static/uploads/')) else '' }}">
+            </div>
+
+            <!-- Current / preview -->
+            <div style="margin-top:10px;display:flex;align-items:center;gap:10px">
+              <img id="logo-preview"
+                   src="{{ co.logo_url if co and co.logo_url else '' }}"
+                   alt="Logo preview"
+                   style="width:52px;height:52px;border-radius:10px;object-fit:cover;border:1.5px solid #e2e8f0;{% if not (co and co.logo_url) %}display:none{% endif %}"
+                   onerror="this.style.display='none'">
+              <div>
+                <span id="logo-name" style="font-size:.78rem;font-weight:600;color:#0f172a;display:{% if co and co.logo_url %}block{% else %}none{% endif %}">
+                  {% if co and co.logo_url %}
+                    {% if co.logo_url.startswith('/static/uploads/') %}Uploaded file{% else %}External URL{% endif %}
+                  {% endif %}
+                </span>
+                <span id="logo-none" style="font-size:.75rem;color:#94a3b8;{% if co and co.logo_url %}display:none{% else %}display:block{% endif %}">No logo — sidebar shows "HR" initials</span>
+                {% if action == 'edit' and co and co.logo_url %}
+                <button type="button" onclick="clearLogo()"
+                        style="margin-top:3px;font-size:.7rem;color:#ef4444;background:none;border:none;cursor:pointer;padding:0">
+                  Remove logo
+                </button>
+                <input type="hidden" id="logo_clear" name="logo_clear" value="0">
+                {% endif %}
+              </div>
+            </div>
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label for="theme_color">Primary Theme Color</label>
+            <div style="display:flex;align-items:center;gap:10px">
+              <input type="color" id="theme_color" name="theme_color"
+                     value="{{ co.theme_color if co and co.theme_color else '#2563eb' }}"
+                     style="width:48px;height:40px;border:1.5px solid #e2e8f0;border-radius:8px;padding:2px;cursor:pointer;background:none">
+              <input type="text" id="theme_color_hex" class="form-control" style="font-family:monospace;font-size:.85rem"
+                     value="{{ co.theme_color if co and co.theme_color else '#2563eb' }}"
+                     placeholder="#2563eb" maxlength="7"
+                     oninput="syncColor('hex')">
+            </div>
+            <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap" id="color-presets">
+              {% for c in ['#2563eb','#7c3aed','#dc2626','#16a34a','#d97706','#0891b2','#be185d','#0f172a'] %}
+              <div onclick="setColor('{{ c }}')" title="{{ c }}"
+                   style="width:22px;height:22px;border-radius:5px;background:{{ c }};cursor:pointer;border:2px solid transparent;transition:border-color .1s"
+                   onmouseover="this.style.borderColor='#0f172a'" onmouseout="this.style.borderColor='transparent'"></div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom:14px">
+          <label for="header_html">Company Header <span style="font-weight:400;color:#94a3b8">(HTML — shown above all pages for company employees)</span></label>
+          <textarea id="header_html" name="header_html" class="form-control"
+                    rows="3" placeholder="e.g. <span style='color:#d97706'>🏖️ Summer Hours: Fridays off in July</span>"
+                    style="resize:vertical;font-family:monospace;font-size:.82rem">{{ co.header_html if co and co.header_html else '' }}</textarea>
+          <div style="margin-top:6px;display:flex;gap:8px">
+            <button type="button" class="btn btn-ghost btn-sm" onclick="previewBanner('header')">Preview</button>
+            <button type="button" class="btn btn-ghost btn-sm" onclick="clearField('header_html')">Clear</button>
+          </div>
+          <div id="header-preview" style="display:none;margin-top:8px;padding:8px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;font-size:.83rem"></div>
+        </div>
+
+        <div class="form-group" style="margin-bottom:0">
+          <label for="footer_html">Company Footer <span style="font-weight:400;color:#94a3b8">(HTML — shown at the bottom of all pages)</span></label>
+          <textarea id="footer_html" name="footer_html" class="form-control"
+                    rows="3" placeholder="e.g. © 2026 Acme Corp · <a href='#'>Privacy Policy</a> · <a href='#'>IT Helpdesk</a>"
+                    style="resize:vertical;font-family:monospace;font-size:.82rem">{{ co.footer_html if co and co.footer_html else '' }}</textarea>
+          <div style="margin-top:6px;display:flex;gap:8px">
+            <button type="button" class="btn btn-ghost btn-sm" onclick="previewBanner('footer')">Preview</button>
+            <button type="button" class="btn btn-ghost btn-sm" onclick="clearField('footer_html')">Clear</button>
+          </div>
+          <div id="footer-preview" style="display:none;margin-top:8px;padding:8px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;font-size:.83rem"></div>
+        </div>
+      </div>
+    </div>
+
+    {% if action == 'edit' %}
+    <!-- ── Status ────────────────────────────────────────────── -->
+    <div class="card reg-step" style="margin-bottom:20px">
+      <div class="card-header" style="display:flex;align-items:center;gap:10px">
+        <span class="step-badge">5</span>
+        <h2>Status</h2>
+      </div>
+      <div class="card-body">
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:.87rem">
+          <input type="checkbox" name="is_active" value="1" style="width:16px;height:16px"
+                 {% if co.is_active %}checked{% endif %}>
+          <span>Company is <strong>active</strong> — employees can be linked to it</span>
+        </label>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Submit -->
+    <div style="display:flex;align-items:center;gap:12px;padding-bottom:32px">
+      <button type="submit" class="btn btn-primary" style="padding:10px 28px;font-size:.9rem">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+          <polyline points="17 21 17 13 7 13 7 21"/>
+          <polyline points="7 3 7 8 15 8"/>
+        </svg>
+        {% if action == 'new' %}Register Company{% else %}Save Changes{% endif %}
+      </button>
+      <a href="{{ url_for('admin_companies') }}" class="btn btn-ghost">Cancel</a>
+    </div>
+
+  </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+/* ── Color picker ─────────────────────────────────────────── */
+const colorPicker = document.getElementById('theme_color');
+const colorHex    = document.getElementById('theme_color_hex');
+colorPicker.addEventListener('input', () => syncColor('picker'));
+
+function syncColor(source) {
+  if (source === 'picker') { colorHex.value = colorPicker.value; }
+  else { const v = colorHex.value.trim(); if (/^#[0-9a-fA-F]{6}$/.test(v)) colorPicker.value = v; }
+}
+function setColor(hex) { colorPicker.value = hex; colorHex.value = hex; }
+
+/* ── Logo tab switcher ────────────────────────────────────── */
+function switchLogoTab(tab) {
+  const isUpload = tab === 'upload';
+  document.getElementById('panel-upload').style.display = isUpload ? '' : 'none';
+  document.getElementById('panel-url').style.display    = isUpload ? 'none' : '';
+  document.getElementById('tab-upload').style.background = isUpload ? 'var(--primary,#2563eb)' : '#f8fafc';
+  document.getElementById('tab-upload').style.color      = isUpload ? '#fff' : '#64748b';
+  document.getElementById('tab-url').style.background    = isUpload ? '#f8fafc' : 'var(--primary,#2563eb)';
+  document.getElementById('tab-url').style.color         = isUpload ? '#64748b' : '#fff';
+  // Clear the inactive field so it doesn't accidentally override
+  if (isUpload) document.getElementById('logo_url').value = '';
+  else          document.getElementById('logo_file').value = '';
+}
+
+/* ── Auto-switch to URL tab if existing logo is external URL ─ */
+(function() {
+  const existing = document.getElementById('logo-preview').src;
+  if (existing && !existing.includes('/static/uploads/') && !existing.endsWith('/')) {
+    const urlInput = document.getElementById('logo_url');
+    if (!urlInput.value) urlInput.value = ''; // keep blank; user sees current preview
+  }
+  // If current logo is uploaded file, stay on upload tab (default)
+})();
+
+/* ── File input & drag-drop ───────────────────────────────── */
+function handleFile(file) {
+  if (!file) return;
+  const maxMB = 2;
+  if (file.size > maxMB * 1024 * 1024) {
+    alert(`File too large (max ${maxMB} MB).`);
+    document.getElementById('logo_file').value = '';
+    return;
+  }
+  const allowed = ['image/png','image/jpeg','image/gif','image/svg+xml','image/webp'];
+  if (!allowed.includes(file.type)) {
+    alert('Unsupported format. Use PNG, JPG, GIF, SVG, or WebP.');
+    document.getElementById('logo_file').value = '';
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = e => showLogoPreview(e.target.result, file.name);
+  reader.readAsDataURL(file);
+}
+
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('drop-zone').style.borderColor = '#cbd5e1';
+  document.getElementById('drop-zone').style.background  = '#f8fafc';
+  const file = e.dataTransfer.files[0];
+  if (!file) return;
+  // Assign to file input
+  const dt = new DataTransfer();
+  dt.items.add(file);
+  document.getElementById('logo_file').files = dt.files;
+  handleFile(file);
+}
+
+function showLogoPreview(src, name) {
+  const img  = document.getElementById('logo-preview');
+  const none = document.getElementById('logo-none');
+  const nm   = document.getElementById('logo-name');
+  img.src = src;
+  img.style.display = '';
+  none.style.display = 'none';
+  if (nm) { nm.textContent = name; nm.style.display = 'block'; }
+  // Update drop zone to show file name
+  document.getElementById('drop-label').innerHTML =
+    `<strong style="color:#16a34a">✓ ${name}</strong><br><span style="font-size:.7rem;color:#94a3b8">Click to change</span>`;
+}
+
+function previewLogo(url) {
+  const img  = document.getElementById('logo-preview');
+  const none = document.getElementById('logo-none');
+  const nm   = document.getElementById('logo-name');
+  if (url) {
+    img.src = url; img.style.display = '';
+    none.style.display = 'none';
+    if (nm) { nm.textContent = 'External URL'; nm.style.display = 'block'; }
+  } else {
+    img.style.display = 'none'; none.style.display = '';
+    if (nm) nm.style.display = 'none';
+  }
+}
+
+function clearLogo() {
+  document.getElementById('logo-preview').style.display = 'none';
+  document.getElementById('logo-none').style.display    = '';
+  const nm = document.getElementById('logo-name');
+  if (nm) nm.style.display = 'none';
+  document.getElementById('logo_file').value = '';
+  document.getElementById('logo_url').value  = '';
+  const cl = document.getElementById('logo_clear');
+  if (cl) cl.value = '1';
+  document.getElementById('drop-label').innerHTML =
+    '<strong style="color:#2563eb">Click to choose</strong> or drag &amp; drop<br>' +
+    '<span style="font-size:.7rem;color:#94a3b8">PNG, JPG, SVG, WebP · max 2 MB</span>';
+}
+
+/* ── Banner preview ──────────────────────────────────────── */
+function previewBanner(which) {
+  const ta  = document.getElementById(which + '_html');
+  const box = document.getElementById(which + '-preview');
+  box.innerHTML = ta.value || '<em style="color:#94a3b8">Nothing to preview</em>';
+  box.style.display = '';
+}
+
+function clearField(id) {
+  document.getElementById(id).value = '';
+  const box = document.getElementById(id.replace('_html','') + '-preview');
+  if (box) box.style.display = 'none';
+}
+</script>
+{% endblock %}

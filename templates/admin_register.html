@@ -1,9 +1,9 @@
 {% extends 'base.html' %}
-{% block title %}Register User — HR Portal{% endblock %}
-{% block page_title %}Register New User{% endblock %}
+{% block title %}Add New Employee — HR Portal{% endblock %}
+{% block page_title %}Add New Employee{% endblock %}
 
 {% block content %}
-<div class="page" style="max-width:720px">
+<div class="page" style="max-width:800px">
 
   <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px">
     <a href="{{ url_for('admin') }}" class="btn btn-ghost btn-sm">
@@ -11,120 +11,250 @@
       Back to Admin
     </a>
     <div>
-      <div style="font-size:1.1rem;font-weight:700">Register New User</div>
-      <div style="font-size:.78rem;color:#64748b">Create a portal account for an employee</div>
+      <div style="font-size:1.1rem;font-weight:700">Add New Employee</div>
+      <div style="font-size:.78rem;color:#64748b">Creates employee record, org assignment, reporting lines &amp; portal access</div>
     </div>
   </div>
 
-  {% if not unregistered %}
-  <div class="card">
-    <div class="card-body" style="text-align:center;padding:40px">
-      <div style="font-size:2rem;margin-bottom:12px">🎉</div>
-      <div style="font-weight:600;margin-bottom:6px">All employees have accounts</div>
-      <div style="font-size:.83rem;color:#64748b">Every active employee already has a portal login.</div>
-      <a href="{{ url_for('admin') }}" class="btn btn-ghost btn-sm" style="margin-top:16px">Back to Admin</a>
-    </div>
-  </div>
-  {% else %}
+  <form method="POST" action="{{ url_for('admin_register_user') }}" id="add-emp-form">
 
-  <form method="POST" action="{{ url_for('admin_register_user') }}" id="reg-form">
-
-    <!-- ── Step 1: Pick employee ──────────────────────────── -->
+    <!-- ── 1. Personal Info ──────────────────────────────────── -->
     <div class="card reg-step" style="margin-bottom:16px">
       <div class="card-header" style="display:flex;align-items:center;gap:10px">
         <span class="step-badge">1</span>
-        <h2>Select Employee</h2>
-        <span style="font-size:.75rem;color:#64748b;margin-left:auto">{{ unregistered|length }} without account</span>
+        <h2>Personal Information</h2>
       </div>
-      <div class="card-body" style="padding-top:12px">
-
-        <!-- Search filter -->
-        <div class="search-wrap" style="margin-bottom:10px">
-          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"
-               style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#94a3b8">
-            <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
-          </svg>
-          <input class="search-input" type="text" id="emp-search" placeholder="Search by name, title or location…">
-        </div>
-
-        <!-- Employee list -->
-        <div id="emp-list" style="max-height:280px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:10px">
-          {% for emp in unregistered %}
-          <label class="emp-row" id="er-{{ emp.id }}"
-                 data-name="{{ (emp.first_name + ' ' + emp.last_name)|lower }}"
-                 data-title="{{ (emp.job_title or '')|lower }}"
-                 data-loc="{{ (emp.location or '')|lower }}">
-            <input type="radio" name="employee_id" value="{{ emp.id }}"
-                   data-email="{{ emp.email }}"
-                   data-fname="{{ emp.first_name }}"
-                   data-lname="{{ emp.last_name }}"
-                   data-title="{{ emp.job_title or '' }}"
-                   data-loc="{{ emp.location or '' }}"
-                   data-bu="{{ emp.business_unit or '' }}"
-                   data-num="{{ emp.employee_number }}"
-                   onchange="onEmployeeSelect(this)">
-            <div class="emp-row-avatar" id="era-{{ emp.id }}">{{ emp.first_name[0] }}</div>
-            <div class="emp-row-info">
-              <div class="emp-row-name">{{ emp.first_name }} {{ emp.last_name }}</div>
-              <div class="emp-row-meta">
-                {{ emp.job_title or '—' }}
-                {% if emp.location %} · {{ emp.location }}{% endif %}
-                {% if emp.business_unit %} · {{ emp.business_unit }}{% endif %}
-              </div>
-            </div>
-            <span class="emp-row-num">{{ emp.employee_number }}</span>
-          </label>
-          {% endfor %}
-        </div>
-
-        <!-- Selected preview -->
-        <div id="selected-preview" style="display:none;margin-top:12px;padding:12px 14px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;display:none;align-items:center;gap:12px">
-          <div class="avatar sm" id="preview-avatar" style="flex-shrink:0"></div>
-          <div>
-            <div style="font-weight:600;font-size:.88rem" id="preview-name"></div>
-            <div style="font-size:.75rem;color:#15803d" id="preview-meta"></div>
+      <div class="card-body">
+        <div class="two-col" style="gap:14px;margin-bottom:14px">
+          <div class="form-group" style="margin-bottom:0">
+            <label for="first_name">First Name *</label>
+            <input type="text" id="first_name" name="first_name" class="form-control"
+                   placeholder="Jane" required autocomplete="off"
+                   oninput="autoFillDerived()">
           </div>
-          <span class="badge badge-green" style="margin-left:auto" id="preview-num"></span>
+          <div class="form-group" style="margin-bottom:0">
+            <label for="last_name">Last Name *</label>
+            <input type="text" id="last_name" name="last_name" class="form-control"
+                   placeholder="Smith" required autocomplete="off"
+                   oninput="autoFillDerived()">
+          </div>
+        </div>
+        <div class="two-col" style="gap:14px">
+          <div class="form-group" style="margin-bottom:0">
+            <label for="emp_email">Work Email *</label>
+            <input type="email" id="emp_email" name="emp_email" class="form-control"
+                   placeholder="jane.smith@company.com" required autocomplete="off">
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label for="phone">Phone Number</label>
+            <input type="tel" id="phone" name="phone" class="form-control"
+                   placeholder="+1 555 000 1234" autocomplete="off">
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label for="gender">Gender</label>
+            <select id="gender" name="gender" class="form-control">
+              <option value="">— Prefer not to say —</option>
+              <option value="MALE">Male</option>
+              <option value="FEMALE">Female</option>
+              <option value="OTHER">Other</option>
+            </select>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- ── Step 2: Account details ─────────────────────────── -->
+    <!-- ── 2. Employment Details ─────────────────────────────── -->
     <div class="card reg-step" style="margin-bottom:16px">
       <div class="card-header" style="display:flex;align-items:center;gap:10px">
         <span class="step-badge">2</span>
-        <h2>Account Details</h2>
+        <h2>Employment Details</h2>
+      </div>
+      <div class="card-body">
+        <div class="two-col" style="gap:14px;margin-bottom:14px">
+          <div class="form-group" style="margin-bottom:0">
+            <label for="employee_number">Employee Number *</label>
+            <input type="text" id="employee_number" name="employee_number" class="form-control"
+                   value="{{ next_emp_num }}" required autocomplete="off">
+            <div style="font-size:.7rem;color:#94a3b8;margin-top:3px">Auto-generated · editable</div>
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label for="job_title">Job Title</label>
+            <input type="text" id="job_title" name="job_title" class="form-control"
+                   placeholder="Software Engineer" autocomplete="off">
+          </div>
+        </div>
+        <div class="two-col" style="gap:14px">
+          <div class="form-group" style="margin-bottom:0">
+            <label for="employment_type">Employment Type</label>
+            <select id="employment_type" name="employment_type" class="form-control">
+              <option value="">— Select —</option>
+              <option value="PERMANENT">Permanent</option>
+              <option value="CONTRACTOR">Contractor</option>
+              <option value="INTERN">Intern</option>
+              <option value="PART_TIME">Part-Time</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label for="join_date">Join Date</label>
+            <input type="date" id="join_date" name="join_date" class="form-control">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 3. Organisation ───────────────────────────────────── -->
+    <div class="card reg-step" style="margin-bottom:16px">
+      <div class="card-header" style="display:flex;align-items:center;gap:10px">
+        <span class="step-badge">3</span>
+        <h2>Organisation</h2>
+      </div>
+      <div class="card-body">
+        <div class="two-col" style="gap:14px;margin-bottom:14px">
+          <div class="form-group" style="margin-bottom:0">
+            <label for="location_id">Location</label>
+            <select id="location_id" name="location_id" class="form-control">
+              <option value="">— Select location —</option>
+              {% for loc in locations %}
+              <option value="{{ loc.id }}">{{ loc.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label for="business_unit_id">Business Unit</label>
+            <select id="business_unit_id" name="business_unit_id" class="form-control"
+                    onchange="filterFUs()">
+              <option value="">— Select BU —</option>
+              {% for bu in bus %}
+              <option value="{{ bu.id }}">{{ bu.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="two-col" style="gap:14px">
+          <div class="form-group" style="margin-bottom:0">
+            <label for="functional_unit_id">Functional Unit</label>
+            <select id="functional_unit_id" name="functional_unit_id" class="form-control">
+              <option value="">— Select BU first —</option>
+              {% for fu in fus %}
+              <option value="{{ fu.id }}" data-bu="{{ fu.business_unit_id }}" style="display:none">
+                {{ fu.name }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label for="cost_center_id">Cost Center</label>
+            <select id="cost_center_id" name="cost_center_id" class="form-control">
+              <option value="">— Select —</option>
+              {% for cc in cost_centers %}
+              <option value="{{ cc.id }}">{{ cc.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 4. Reporting Structure ────────────────────────────── -->
+    <div class="card reg-step" style="margin-bottom:16px">
+      <div class="card-header" style="display:flex;align-items:center;gap:10px">
+        <span class="step-badge">4</span>
+        <h2>Reporting Structure</h2>
       </div>
       <div class="card-body">
         <div class="two-col" style="gap:14px">
           <div class="form-group" style="margin-bottom:0">
-            <label for="email">Work Email *</label>
-            <input type="email" id="email" name="email" class="form-control"
-                   placeholder="user@company.com" required autocomplete="off">
-            <div style="font-size:.7rem;color:#94a3b8;margin-top:4px">Used to log in. Must be unique.</div>
+            <label for="solid_manager_id">Solid-Line Manager</label>
+            <select id="solid_manager_id" name="solid_manager_id" class="form-control">
+              <option value="">— None —</option>
+              {% for emp in all_employees %}
+              <option value="{{ emp.id }}">{{ emp.first_name }} {{ emp.last_name }}{% if emp.job_title %} · {{ emp.job_title }}{% endif %}</option>
+              {% endfor %}
+            </select>
+            <div style="font-size:.7rem;color:#94a3b8;margin-top:3px">Direct line manager (solid line)</div>
           </div>
           <div class="form-group" style="margin-bottom:0">
-            <label for="username">Username *</label>
-            <input type="text" id="username" name="username" class="form-control"
-                   placeholder="firstname.lastname" required autocomplete="off">
-            <div style="font-size:.7rem;color:#94a3b8;margin-top:4px">Auto-filled from name. Must be unique.</div>
+            <label for="dotted_manager_id">Dotted-Line Manager</label>
+            <select id="dotted_manager_id" name="dotted_manager_id" class="form-control">
+              <option value="">— None —</option>
+              {% for emp in all_employees %}
+              <option value="{{ emp.id }}">{{ emp.first_name }} {{ emp.last_name }}{% if emp.job_title %} · {{ emp.job_title }}{% endif %}</option>
+              {% endfor %}
+            </select>
+            <div style="font-size:.7rem;color:#94a3b8;margin-top:3px">Matrix / indirect manager (optional)</div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- ── Step 3: Assign roles ────────────────────────────── -->
-    <div class="card reg-step" style="margin-bottom:20px">
+    <!-- ── 5. Skills ────────────────────────────────────────── -->
+    <div class="card reg-step" style="margin-bottom:16px">
       <div class="card-header" style="display:flex;align-items:center;gap:10px">
-        <span class="step-badge">3</span>
-        <h2>Assign Roles</h2>
+        <span class="step-badge">5</span>
+        <h2>Skills</h2>
+        <span style="font-size:.75rem;color:#64748b;margin-left:auto">Optional · add as many as needed</span>
       </div>
       <div class="card-body">
-        <div style="font-size:.78rem;color:#64748b;margin-bottom:14px">
+
+        <!-- Skill picker row -->
+        <div style="display:grid;grid-template-columns:1fr 160px 140px auto;gap:10px;align-items:end;margin-bottom:12px">
+          <div>
+            <label style="font-size:.75rem;font-weight:600;color:#374151;display:block;margin-bottom:4px">Skill</label>
+            <select id="skill-pick" class="form-control">
+              <option value="">— Select skill —</option>
+              {% for s in all_skills %}
+              <option value="{{ s.id }}" data-name="{{ s.name }}">{{ s.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label style="font-size:.75rem;font-weight:600;color:#374151;display:block;margin-bottom:4px">Proficiency</label>
+            <select id="level-pick" class="form-control">
+              <option value="">— Level —</option>
+              {% for l in prof_levels %}
+              <option value="{{ l.id }}" data-order="{{ l.level_order }}">{{ l.level_name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div style="display:flex;flex-direction:column">
+            <label style="font-size:.75rem;font-weight:600;color:#374151;margin-bottom:4px">Primary?</label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:.8rem;cursor:pointer;margin-top:7px">
+              <input type="checkbox" id="primary-pick" style="width:14px;height:14px"> Mark as primary
+            </label>
+          </div>
+          <div>
+            <label style="font-size:.75rem;color:transparent;display:block;margin-bottom:4px">.</label>
+            <button type="button" class="btn btn-primary btn-sm" onclick="addSkill()">+ Add</button>
+          </div>
+        </div>
+
+        <!-- Added skills list -->
+        <div id="skills-list" style="display:flex;flex-direction:column;gap:6px"></div>
+        <div id="no-skills-hint" style="font-size:.78rem;color:#94a3b8">No skills added yet.</div>
+
+        <!-- Hidden inputs submitted with form -->
+        <div id="skills-inputs"></div>
+      </div>
+    </div>
+
+    <!-- ── 6. Portal Access ──────────────────────────────────── -->
+    <div class="card reg-step" style="margin-bottom:20px">
+      <div class="card-header" style="display:flex;align-items:center;gap:10px">
+        <span class="step-badge">6</span>
+        <h2>Portal Access</h2>
+      </div>
+      <div class="card-body">
+        <div class="form-group" style="margin-bottom:16px;max-width:320px">
+          <label for="username">Username *</label>
+          <input type="text" id="username" name="username" class="form-control"
+                 placeholder="jane.smith" required autocomplete="off">
+          <div style="font-size:.7rem;color:#94a3b8;margin-top:3px">Auto-filled from name · must be unique</div>
+        </div>
+
+        <div style="font-size:.78rem;color:#64748b;margin-bottom:12px">
           <strong>EMPLOYEE</strong> is always assigned. Add additional roles as needed.
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-          <!-- EMPLOYEE always on, shown as locked -->
           <label class="role-check" style="opacity:.6;pointer-events:none">
             <input type="checkbox" checked disabled>
             <span>
@@ -151,89 +281,130 @@
     </div>
 
     <!-- Submit -->
-    <div style="display:flex;align-items:center;gap:12px">
-      <button type="submit" class="btn btn-primary" id="submit-btn" disabled
-              style="padding:10px 24px;font-size:.9rem">
+    <div style="display:flex;align-items:center;gap:12px;padding-bottom:32px">
+      <button type="submit" class="btn btn-primary" style="padding:10px 24px;font-size:.9rem">
         <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
           <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
           <circle cx="9" cy="7" r="4"/>
-          <path d="M19 8l2 2 4-4"/>
+          <path d="M22 11v6m-3-3h6"/>
         </svg>
-        Create Account
+        Add Employee
       </button>
       <a href="{{ url_for('admin') }}" class="btn btn-ghost">Cancel</a>
-      <span id="no-emp-hint" style="font-size:.78rem;color:#f59e0b">
-        ← Select an employee to continue
-      </span>
     </div>
+
   </form>
-  {% endif %}
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-const AVATAR_COLORS = ['#3b82f6','#8b5cf6','#ec4899','#f59e0b','#10b981','#06b6d4','#ef4444','#6366f1'];
-function avatarColor(n){let h=0;for(const c of n)h=(h*31+c.charCodeAt(0))&0xffffffff;return AVATAR_COLORS[Math.abs(h)%AVATAR_COLORS.length];}
-
-// Colour the employee row avatars
-document.querySelectorAll('[id^="era-"]').forEach(av => {
-  const label = av.closest('label');
-  const name  = (label.dataset.name || '');
-  av.style.background = avatarColor(name);
-});
-
-// ── Employee selection ───────────────────────────────────────
-function onEmployeeSelect(radio) {
-  const fname = radio.dataset.fname;
-  const lname = radio.dataset.lname;
-  const full  = fname + ' ' + lname;
-  const email = radio.dataset.email;
-  const num   = radio.dataset.num;
-
-  // Auto-fill account fields
-  document.getElementById('email').value    = email || '';
-  document.getElementById('username').value = (fname + '.' + lname).toLowerCase().replace(/\s+/g,'').replace(/[^a-z0-9_.]/g,'');
-
-  // Show preview card
-  const preview = document.getElementById('selected-preview');
-  document.getElementById('preview-name').textContent = full;
-  document.getElementById('preview-meta').textContent =
-    [radio.dataset.title, radio.dataset.loc, radio.dataset.bu].filter(Boolean).join(' · ');
-  document.getElementById('preview-num').textContent = num;
-  const av = document.getElementById('preview-avatar');
-  av.textContent  = fname[0];
-  av.style.background = avatarColor(full);
-  preview.style.display = 'flex';
-
-  // Highlight selected row
-  document.querySelectorAll('.emp-row').forEach(r => r.classList.remove('selected'));
-  radio.closest('.emp-row').classList.add('selected');
-
-  // Enable submit
-  document.getElementById('submit-btn').disabled = false;
-  document.getElementById('no-emp-hint').style.display = 'none';
+// ── FU filtering by BU ───────────────────────────────────────────────────────
+function filterFUs() {
+  const buId = document.getElementById('business_unit_id').value;
+  const fuSel = document.getElementById('functional_unit_id');
+  fuSel.innerHTML = '<option value="">— Select FU —</option>';
+  document.querySelectorAll('#functional_unit_id option[data-bu]').forEach(opt => {
+    if (!buId || opt.dataset.bu === buId) {
+      const clone = opt.cloneNode(true);
+      clone.style.display = '';
+      fuSel.appendChild(clone);
+    }
+  });
 }
 
-// ── Employee search filter ───────────────────────────────────
-document.getElementById('emp-search')?.addEventListener('input', function() {
-  const q = this.value.toLowerCase();
-  document.querySelectorAll('.emp-row').forEach(row => {
-    const match = !q ||
-      row.dataset.name.includes(q) ||
-      row.dataset.title.includes(q) ||
-      row.dataset.loc.includes(q);
-    row.style.display = match ? '' : 'none';
-  });
+// Re-attach hidden FU options into a shadow store so filterFUs can use them
+const FU_STORE = [];
+document.querySelectorAll('#functional_unit_id option[data-bu]').forEach(o => {
+  FU_STORE.push({value: o.value, text: o.text, bu: o.dataset.bu});
 });
+document.getElementById('functional_unit_id').innerHTML = '<option value="">— Select BU first —</option>';
 
-// ── Form validation before submit ───────────────────────────
-document.getElementById('reg-form')?.addEventListener('submit', function(e) {
-  const emp = document.querySelector('input[name="employee_id"]:checked');
-  if (!emp) { e.preventDefault(); alert('Please select an employee.'); return; }
-  const email = document.getElementById('email').value.trim();
-  const uname = document.getElementById('username').value.trim();
-  if (!email || !uname) { e.preventDefault(); alert('Email and username are required.'); }
-});
+function filterFUs() {
+  const buId = document.getElementById('business_unit_id').value;
+  const fuSel = document.getElementById('functional_unit_id');
+  const prev  = fuSel.value;
+  fuSel.innerHTML = '<option value="">— Select FU —</option>';
+  FU_STORE.filter(f => !buId || f.bu === buId).forEach(f => {
+    const o = document.createElement('option');
+    o.value = f.value; o.textContent = f.text;
+    if (f.value === prev) o.selected = true;
+    fuSel.appendChild(o);
+  });
+  if (!buId) fuSel.options[0].textContent = '— Select BU first —';
+}
+
+// ── Skills picker ────────────────────────────────────────────────────────────
+const LEVEL_COLORS = {1:'#94a3b8', 2:'#3b82f6', 3:'#8b5cf6', 4:'#10b981'};
+let addedSkills = []; // [{id, name, levelId, levelName, levelOrder, isPrimary}]
+
+function addSkill() {
+  const skillSel = document.getElementById('skill-pick');
+  const levelSel = document.getElementById('level-pick');
+  const primaryCb = document.getElementById('primary-pick');
+
+  const skillId   = skillSel.value;
+  const skillName = skillSel.options[skillSel.selectedIndex]?.dataset.name || '';
+  const levelId   = levelSel.value;
+  const levelName = levelSel.options[levelSel.selectedIndex]?.textContent?.trim() || '';
+  const levelOrder = parseInt(levelSel.options[levelSel.selectedIndex]?.dataset.order || '0');
+  const isPrimary = primaryCb.checked;
+
+  if (!skillId) { skillSel.style.borderColor='#ef4444'; return; }
+  skillSel.style.borderColor = '';
+
+  if (addedSkills.find(s => s.id === skillId)) {
+    skillSel.style.borderColor = '#f59e0b';
+    return;
+  }
+
+  addedSkills.push({id: skillId, name: skillName, levelId, levelName, levelOrder, isPrimary});
+  skillSel.value = '';
+  levelSel.value = '';
+  primaryCb.checked = false;
+  renderSkills();
+}
+
+function removeSkill(skillId) {
+  addedSkills = addedSkills.filter(s => s.id !== skillId);
+  renderSkills();
+}
+
+function renderSkills() {
+  const list   = document.getElementById('skills-list');
+  const hint   = document.getElementById('no-skills-hint');
+  const inputs = document.getElementById('skills-inputs');
+  hint.style.display = addedSkills.length ? 'none' : '';
+
+  list.innerHTML = addedSkills.map((s, i) => {
+    const color = LEVEL_COLORS[s.levelOrder] || '#64748b';
+    return `<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px">
+      <span style="font-weight:600;font-size:.83rem;flex:1">${s.name}</span>
+      ${s.levelName ? `<span style="padding:2px 8px;border-radius:4px;font-size:.7rem;font-weight:600;background:${color}18;color:${color}">${s.levelName}</span>` : ''}
+      ${s.isPrimary ? `<span style="padding:2px 7px;border-radius:4px;font-size:.68rem;font-weight:600;background:#fef9c3;color:#854d0e">Primary</span>` : ''}
+      <button type="button" onclick="removeSkill('${s.id}')"
+              style="background:none;border:none;cursor:pointer;color:#94a3b8;font-size:1rem;line-height:1;padding:0 2px"
+              title="Remove">×</button>
+    </div>`;
+  }).join('');
+
+  // Sync hidden inputs
+  inputs.innerHTML = addedSkills.map((s, i) => `
+    <input type="hidden" name="skill_id" value="${s.id}">
+    <input type="hidden" name="skill_level_id" value="${s.levelId || ''}">
+    ${s.isPrimary ? `<input type="hidden" name="skill_primary" value="${i}">` : ''}
+  `).join('');
+}
+
+// ── Auto-fill username from name ─────────────────────────────────────────────
+function autoFillDerived() {
+  const fn = document.getElementById('first_name').value.trim().toLowerCase();
+  const ln = document.getElementById('last_name').value.trim().toLowerCase();
+  const usernameField = document.getElementById('username');
+  if (fn || ln) {
+    usernameField.value = (fn + (fn && ln ? '.' : '') + ln)
+      .replace(/\s+/g, '').replace(/[^a-z0-9_.]/g, '');
+  }
+}
 </script>
 {% endblock %}
