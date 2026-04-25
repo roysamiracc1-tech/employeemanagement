@@ -25,6 +25,13 @@
       <div class="pagination-controls" id="pagination-controls-top"></div>
     </div>
 
+    <!-- Active filter banner -->
+    <div id="filter-banner" style="display:none;align-items:center;gap:10px;padding:10px 16px;background:#eff6ff;border-bottom:1px solid #bfdbfe;font-size:.8rem;color:#1d4ed8">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 4h18M7 8h10M10 12h4"/></svg>
+      <span id="filter-banner-text"></span>
+      <button onclick="clearBannerFilter()" style="margin-left:auto;background:none;border:none;cursor:pointer;color:#1d4ed8;font-size:.8rem;font-weight:600;padding:0">✕ Clear filter</button>
+    </div>
+
     <!-- Toolbar -->
     <div class="toolbar">
       <div class="search-wrap">
@@ -122,6 +129,7 @@ function avatarColor(n){ let h=0; for(const c of n) h=(h*31+c.charCodeAt(0))&0xf
 function deptStyle(d){ const s=DEPT_COLORS[d]; return s?`background:${s.bg};color:${s.color}`:'background:#f1f5f9;color:#334155'; }
 
 let all=[], filtered=[], currentPage=1, rowsPerPage=20;
+let activeUrlFilter = null; // tracks filter applied from URL param
 
 function buildRow(emp) {
   const skills = Array.isArray(emp.skills) ? emp.skills : [];
@@ -222,12 +230,36 @@ function applyFilters(){
   const dept=document.getElementById('dept-filter').value;
   const loc=document.getElementById('loc-filter').value;
   filtered=all.filter(e=>{
-    const mq=!q||e.full_name.toLowerCase().includes(q)||(e.job_title||'').toLowerCase().includes(q)||(e.location||'').toLowerCase().includes(q)||(e.designation||'').toLowerCase().includes(q);
+    const mq=!q||e.full_name.toLowerCase().includes(q)||(e.job_title||'').toLowerCase().includes(q)||(e.location||'').toLowerCase().includes(q)||(e.designation||'').toLowerCase().includes(q)
+      ||(Array.isArray(e.skills)&&e.skills.some(s=>s.skill.toLowerCase().includes(q)));
     const md=!dept||e.business_unit===dept;
     const ml=!loc||e.location===loc;
-    return mq&&md&&ml;
+    const mf=applyUrlFilter(e);
+    return mq&&md&&ml&&mf;
   });
   currentPage=1; renderPage();
+}
+
+function applyUrlFilter(e){
+  if(!activeUrlFilter) return true;
+  if(activeUrlFilter.type==='pending_skills')
+    return Array.isArray(e.skills)&&e.skills.some(s=>!s.val_order||s.val_order===0);
+  if(activeUrlFilter.type==='has_certs')
+    return Array.isArray(e.certifications)&&e.certifications.length>0;
+  if(activeUrlFilter.type==='skill')
+    return Array.isArray(e.skills)&&e.skills.some(s=>s.skill.toLowerCase()===activeUrlFilter.value.toLowerCase());
+  return true;
+}
+
+function clearBannerFilter(){
+  activeUrlFilter=null;
+  document.getElementById('filter-banner').style.display='none';
+  // strip param from URL without reload
+  const url=new URL(window.location);
+  url.searchParams.delete('filter');url.searchParams.delete('loc');
+  url.searchParams.delete('bu');url.searchParams.delete('skill');
+  window.history.replaceState({},'',url);
+  applyFilters();
 }
 
 function onRowsChange(e){
@@ -240,8 +272,40 @@ async function loadEmployees(){
   try{
     const res=await fetch('/api/employees');
     if(!res.ok) throw new Error(`HTTP ${res.status}`);
-    all=await res.json(); filtered=all;
-    renderPage();
+    all=await res.json();
+
+    // Apply URL-param filters from dashboard drill-down
+    const params=new URLSearchParams(window.location.search);
+    const filterParam=params.get('filter');
+    const locParam=params.get('loc');
+    const buParam=params.get('bu');
+    const skillParam=params.get('skill');
+    const banner=document.getElementById('filter-banner');
+    const bannerText=document.getElementById('filter-banner-text');
+
+    if(filterParam==='pending_skills'){
+      activeUrlFilter={type:'pending_skills'};
+      bannerText.textContent='Showing employees with unvalidated (self-assessed) skills';
+      banner.style.display='flex';
+    } else if(filterParam==='has_certs'){
+      activeUrlFilter={type:'has_certs'};
+      bannerText.textContent='Showing employees with certifications';
+      banner.style.display='flex';
+    } else if(locParam){
+      document.getElementById('loc-filter').value=locParam;
+      bannerText.textContent=`Filtered by location: ${locParam}`;
+      banner.style.display='flex';
+    } else if(buParam){
+      document.getElementById('dept-filter').value=buParam;
+      bannerText.textContent=`Filtered by business unit: ${buParam}`;
+      banner.style.display='flex';
+    } else if(skillParam){
+      activeUrlFilter={type:'skill',value:skillParam};
+      bannerText.textContent=`Showing employees with skill: ${skillParam}`;
+      banner.style.display='flex';
+    }
+
+    applyFilters();
     document.getElementById('status-dot').className='status-dot';
     document.getElementById('status-text').textContent=`${all.length} employees loaded`;
     document.getElementById('search').addEventListener('input',applyFilters);

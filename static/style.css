@@ -666,6 +666,22 @@ select.filter-sel:focus { border-color: var(--primary); }
 /* ── Section title ───────────────────────────────────────── */
 .section-title { font-size: .7rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .07em; margin-bottom: 10px; }
 
+/* ── Clickable stat cards ────────────────────────────────── */
+.stat-card.clickable {
+  display: block; text-decoration: none; color: inherit;
+  cursor: pointer; position: relative;
+  transition: transform .15s, box-shadow .15s;
+}
+.stat-card.clickable:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 28px rgba(0,0,0,.12);
+}
+.stat-hint {
+  font-size: .7rem; font-weight: 600; margin-top: 10px;
+  opacity: .6; letter-spacing: .03em;
+}
+.stat-card.clickable:hover .stat-hint { opacity: 1; }
+
 /* ── Avatar sizes ────────────────────────────────────────── */
 .avatar.xl { width: 72px; height: 72px; font-size: 1.8rem; flex-shrink: 0; }
 .avatar.lg { width: 52px; height: 52px; font-size: 1.2rem; flex-shrink: 0; }

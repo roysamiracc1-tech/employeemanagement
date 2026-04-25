@@ -8,7 +8,8 @@
   <!-- ── Admin / HR / Head stats ──────────────────────────── -->
   {% if stats.total is defined %}
   <div class="stats-grid">
-    <div class="stat-card blue">
+
+    <a href="{{ url_for('directory') }}" class="stat-card blue clickable">
       <div class="stat-icon">
         <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
           <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
@@ -18,9 +19,10 @@
       </div>
       <div class="stat-value">{{ stats.total }}</div>
       <div class="stat-label">Active Employees</div>
-    </div>
+      <div class="stat-hint">View all →</div>
+    </a>
 
-    <div class="stat-card amber">
+    <a href="{{ url_for('directory') }}?filter=pending_skills" class="stat-card amber clickable">
       <div class="stat-icon">
         <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
           <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
@@ -28,9 +30,10 @@
       </div>
       <div class="stat-value">{{ stats.pending_validations }}</div>
       <div class="stat-label">Pending Skill Validations</div>
-    </div>
+      <div class="stat-hint">View employees →</div>
+    </a>
 
-    <div class="stat-card green">
+    <a href="{{ url_for('directory') }}?filter=has_certs" class="stat-card green clickable">
       <div class="stat-icon">
         <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
           <circle cx="12" cy="8" r="6"/>
@@ -39,11 +42,12 @@
       </div>
       <div class="stat-value">{{ stats.certs_total }}</div>
       <div class="stat-label">Certifications Held</div>
-    </div>
+      <div class="stat-hint">View employees →</div>
+    </a>
 
     {% if stats.by_location %}
     {% for loc in stats.by_location %}
-    <div class="stat-card purple">
+    <a href="{{ url_for('directory') }}?loc={{ loc.name | urlencode }}" class="stat-card purple clickable">
       <div class="stat-icon">
         <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
           <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
@@ -52,7 +56,8 @@
       </div>
       <div class="stat-value">{{ loc.count }}</div>
       <div class="stat-label">{{ loc.name }}</div>
-    </div>
+      <div class="stat-hint">View team →</div>
+    </a>
     {% endfor %}
     {% endif %}
   </div>
@@ -65,7 +70,9 @@
       <div class="card-header"><h2>By Business Unit</h2></div>
       <div class="card-body" style="padding:0">
         {% for bu in stats.by_bu %}
-        <div style="display:flex;align-items:center;gap:12px;padding:12px 20px;border-bottom:1px solid #f1f5f9">
+        <a href="{{ url_for('directory') }}?bu={{ bu.name | urlencode }}"
+           style="display:flex;align-items:center;gap:12px;padding:12px 20px;border-bottom:1px solid #f1f5f9;text-decoration:none;color:inherit;transition:background .12s"
+           onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background=''">
           <div style="flex:1">
             <div style="font-size:.83rem;font-weight:600">{{ bu.name }}</div>
             <div style="font-size:.72rem;color:#64748b">{{ bu.code }}</div>
@@ -74,7 +81,8 @@
           <div style="width:80px;height:6px;background:#e2e8f0;border-radius:999px;overflow:hidden">
             <div style="height:100%;background:#3b82f6;border-radius:999px;width:{{ ((bu.count / stats.total) * 100)|int }}%"></div>
           </div>
-        </div>
+          <svg width="12" height="12" fill="none" stroke="#94a3b8" stroke-width="2" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+        </a>
         {% endfor %}
       </div>
     </div>
@@ -86,7 +94,9 @@
       <div class="card-header"><h2>Top Skills by Coverage</h2></div>
       <div class="card-body" style="padding:0">
         {% for s in stats.top_skills %}
-        <div style="display:flex;align-items:center;gap:12px;padding:10px 20px;border-bottom:1px solid #f1f5f9">
+        <a href="{{ url_for('directory') }}?skill={{ s.name | urlencode }}"
+           style="display:flex;align-items:center;gap:12px;padding:10px 20px;border-bottom:1px solid #f1f5f9;text-decoration:none;color:inherit;transition:background .12s"
+           onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background=''">
           <div style="flex:1">
             <div style="font-size:.83rem;font-weight:600">{{ s.name }}</div>
             <div style="font-size:.7rem;color:#64748b">{{ s.category }}</div>
@@ -95,7 +105,8 @@
           <div style="text-align:right;min-width:60px">
             <div style="font-size:.75rem;font-weight:700;color:#2563eb">avg {{ s.avg_level }}/4</div>
           </div>
-        </div>
+          <svg width="12" height="12" fill="none" stroke="#94a3b8" stroke-width="2" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+        </a>
         {% endfor %}
       </div>
     </div>
@@ -106,7 +117,8 @@
   <!-- ── Manager stats ─────────────────────────────────────── -->
   {% if stats.team_size is defined %}
   <div class="stats-grid" style="margin-bottom:20px">
-    <div class="stat-card blue">
+
+    <a href="{{ url_for('my_team') }}" class="stat-card blue clickable">
       <div class="stat-icon">
         <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
           <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
@@ -115,8 +127,10 @@
       </div>
       <div class="stat-value">{{ stats.team_size }}</div>
       <div class="stat-label">Direct Reports</div>
-    </div>
-    <div class="stat-card amber">
+      <div class="stat-hint">View team →</div>
+    </a>
+
+    <a href="{{ url_for('my_team') }}?filter=pending_skills" class="stat-card amber clickable">
       <div class="stat-icon">
         <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
           <circle cx="12" cy="12" r="10"/>
@@ -126,8 +140,10 @@
       </div>
       <div class="stat-value">{{ stats.team_pending }}</div>
       <div class="stat-label">Skills Awaiting Validation</div>
-    </div>
-    <div class="stat-card green">
+      <div class="stat-hint">View employees →</div>
+    </a>
+
+    <a href="{{ url_for('my_team') }}?filter=has_certs" class="stat-card green clickable">
       <div class="stat-icon">
         <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
           <circle cx="12" cy="8" r="6"/>
@@ -136,15 +152,7 @@
       </div>
       <div class="stat-value">{{ stats.team_certs }}</div>
       <div class="stat-label">Team Certifications</div>
-    </div>
-  </div>
-
-  <div style="margin-bottom:20px">
-    <a href="{{ url_for('my_team') }}" class="btn btn-primary">
-      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
-      </svg>
-      View My Team
+      <div class="stat-hint">View employees →</div>
     </a>
   </div>
   {% endif %}
@@ -192,10 +200,4 @@
   {% endif %}
 
 </div>
-{% endblock %}
-
-{% block scripts %}
-<script>
-// Make datetime.now() available in template
-</script>
 {% endblock %}

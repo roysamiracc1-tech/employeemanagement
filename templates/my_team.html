@@ -19,6 +19,13 @@
     </div>
   </div>
 
+  <!-- Active filter banner -->
+  <div id="filter-banner" style="display:none;align-items:center;gap:10px;margin-bottom:16px;padding:10px 16px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;font-size:.8rem;color:#1d4ed8">
+    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 4h18M7 8h10M10 12h4"/></svg>
+    <span id="filter-banner-text"></span>
+    <button onclick="clearBannerFilter()" style="margin-left:auto;background:none;border:none;cursor:pointer;color:#1d4ed8;font-size:.8rem;font-weight:600;padding:0">✕ Clear filter</button>
+  </div>
+
   <div class="team-grid" id="team-grid">
     <!-- skeleton -->
     {% for _ in range(3) %}
@@ -106,7 +113,7 @@ function buildCard(emp){
   </div>`;
 }
 
-let allTeam=[];
+let allTeam=[], activeUrlFilter=null;
 
 function renderTeam(data){
   const grid=document.getElementById('team-grid');
@@ -117,9 +124,30 @@ function renderTeam(data){
   grid.innerHTML=data.map(buildCard).join('');
 }
 
+function applyUrlFilter(e){
+  if(!activeUrlFilter) return true;
+  if(activeUrlFilter.type==='pending_skills')
+    return Array.isArray(e.skills)&&e.skills.some(s=>!s.val_order||s.val_order===0);
+  if(activeUrlFilter.type==='has_certs')
+    return Array.isArray(e.certifications)&&e.certifications.length>0;
+  return true;
+}
+
 function filterTeam(){
   const q=document.getElementById('search').value.toLowerCase();
-  renderTeam(q ? allTeam.filter(e=>e.full_name.toLowerCase().includes(q)||(e.job_title||'').toLowerCase().includes(q)) : allTeam);
+  let data=allTeam;
+  if(q) data=data.filter(e=>e.full_name.toLowerCase().includes(q)||(e.job_title||'').toLowerCase().includes(q));
+  data=data.filter(applyUrlFilter);
+  renderTeam(data);
+}
+
+function clearBannerFilter(){
+  activeUrlFilter=null;
+  document.getElementById('filter-banner').style.display='none';
+  const url=new URL(window.location);
+  url.searchParams.delete('filter');
+  window.history.replaceState({},'',url);
+  filterTeam();
 }
 
 async function loadTeam(){
@@ -131,10 +159,27 @@ async function loadTeam(){
     const res=await fetch('/api/my-team');
     if(!res.ok) throw new Error(`HTTP ${res.status}`);
     allTeam=await res.json();
-    renderTeam(allTeam);
+
+    // Apply URL-param filter from dashboard drill-down
+    const params=new URLSearchParams(window.location.search);
+    const filterParam=params.get('filter');
+    const banner=document.getElementById('filter-banner');
+    const bannerText=document.getElementById('filter-banner-text');
+    if(filterParam==='pending_skills'){
+      activeUrlFilter={type:'pending_skills'};
+      bannerText.textContent='Showing team members with unvalidated (self-assessed) skills';
+      banner.style.display='flex';
+    } else if(filterParam==='has_certs'){
+      activeUrlFilter={type:'has_certs'};
+      bannerText.textContent='Showing team members with certifications';
+      banner.style.display='flex';
+    }
+
+    filterTeam();
+    const shown=allTeam.filter(applyUrlFilter).length;
     dot.className='status-dot';
-    txt.textContent=`${allTeam.length} direct report${allTeam.length!==1?'s':''} loaded`;
-    document.getElementById('team-subtitle').textContent=`${allTeam.length} direct report${allTeam.length!==1?'s':''}`;
+    txt.textContent=`${shown} of ${allTeam.length} direct report${allTeam.length!==1?'s':''} shown`;
+    document.getElementById('team-subtitle').textContent=`${shown} of ${allTeam.length} direct report${allTeam.length!==1?'s':''}`;
     document.getElementById('search').addEventListener('input',filterTeam);
   }catch(err){
     dot.className='status-dot error';
