@@ -385,9 +385,8 @@ PGPASSWORD=<db-password>
 
 ### Running the Server
 ```bash
-python app.py          # dev mode, port 8000
-# production:
-gunicorn -w 4 -b 0.0.0.0:8000 app:app
+python run.py                               # dev mode, port 8000
+gunicorn -w 4 -b 0.0.0.0:8000 "app:app"   # production
 ```
 
 ### Required PostgreSQL Extensions
@@ -396,5 +395,62 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 ```
 
 ### Uploads Directory
-The `static/uploads/logos/` directory must be writable by the application process. It is committed empty (with a `.gitkeep` recommended). In production, point to a persistent volume or S3-backed mount.
+The `static/uploads/logos/` directory must be writable by the application process. It is committed with a `.gitkeep`. In production, point to a persistent volume or S3-backed mount.
+
+---
+
+## 11. Testing
+
+### Overview
+The test suite uses **pytest** and **pytest-flask**. All DB calls are mocked with `unittest.mock` — no live PostgreSQL connection is required to run tests.
+
+```bash
+pip install pytest pytest-flask
+python -m pytest           # run all tests
+python -m pytest -v        # verbose output
+python -m pytest tests/test_helpers.py   # single file
+```
+
+### Test Structure
+
+```
+tests/
+├── conftest.py                  # Fixtures: app, client, auth/admin/manager sessions, sample data
+├── test_db.py                   # serialize() and to_dict() helpers
+├── test_helpers.py              # Business logic and pure functions
+├── test_auth.py                 # Auth decorators and login/logout routes
+├── test_routes_employees.py     # Employee directory, profile, self-edit APIs
+├── test_routes_vacation.py      # Vacation submit, cancel, review workflow
+└── test_routes_admin.py         # Admin panel, user/role management, company admin
+```
+
+### Test Coverage Summary
+
+| File | Tests | What is covered |
+|------|-------|----------------|
+| `test_db.py` | 13 | `serialize()` — date, datetime, Decimal, primitives; `to_dict()` — type conversion |
+| `test_helpers.py` | 39 | `rule_label`, `build_nested` (tree construction, orphan nodes, multi-root), `next_employee_number`, `employee_solid_manager`, `used_days`, `is_direct_report`, vacation eligibility engine (gender rules, tenure rules, AND logic, no-rules case, rule_labels attached), `save_logo` (extension validation, file save, old file cleanup) |
+| `test_auth.py` | 18 | `@login_required` redirect, `@require_roles` per-role access, login form, unknown email error, logout session clear |
+| `test_routes_employees.py` | 24 | Directory (role gating), profile (own / other / not-found), my-team, `/api/employees` role-filtered responses, profile self-edit APIs (skills, certs, gender, theme toggle) |
+| `test_routes_vacation.py` | 20 | Vacation page load, submit (no manager, missing fields, ineligible type, end-before-start, annual limit exceeded, success), cancel (not-found, non-pending, success), review (invalid action, not-found, already-actioned, approve, reject) |
+| `test_routes_admin.py` | 16 | Admin panel access, register user (form load, missing name, duplicate email), user list, update roles, toggle user, validate skill, company list/new |
+| **Total** | **130** | |
+
+### Key Fixtures (conftest.py)
+
+| Fixture | Description |
+|---------|-------------|
+| `client` | Unauthenticated Flask test client |
+| `auth_client` | Client with `EMPLOYEE` session |
+| `admin_client` | Client with `SYSTEM_ADMIN` + `EMPLOYEE` session |
+| `manager_client` | Client with `SOLID_LINE_MANAGER` + `EMPLOYEE` session |
+| `SAMPLE_EMPLOYEE` | Reusable employee dict for mocking `fetch_employees` |
+| `SAMPLE_VACATION_TYPE` | Reusable vacation type dict for mocking |
+
+### Testing Strategy
+
+- **Pure functions** (`rule_label`, `build_nested`, `serialize`, `to_dict`) — called directly, no mocking needed.
+- **DB-dependent helpers** — `app.helpers.query` / `app.db.query` patched via `unittest.mock.patch`.
+- **Flask routes** — tested via `app.test_client()` with session pre-seeded; all DB calls in route modules patched individually.
+- **Auth enforcement** — verified by checking 302 redirect for unauthenticated / unauthorised requests, 200 for authorised ones.
 
