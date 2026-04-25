@@ -9,6 +9,7 @@
     <button class="admin-tab active" onclick="switchTab('users',this)">Users &amp; Roles</button>
     <button class="admin-tab" onclick="switchTab('employees',this)">Employees</button>
     <button class="admin-tab" onclick="switchTab('org',this)">Organisation</button>
+    <button class="admin-tab" onclick="switchTab('settings',this)">⚙ Widget Settings</button>
   </div>
 
   <!-- ── Users & Roles tab ───────────────────────────────────── -->
@@ -96,6 +97,34 @@
     </div>
   </div>
 
+  <!-- ── Widget Settings tab ────────────────────────────────── -->
+  <div class="admin-panel" id="tab-settings" style="display:none">
+    <div class="card" style="max-width:640px">
+      <div class="card-header">
+        <h2>Dashboard Widget Refresh Intervals</h2>
+      </div>
+      <div class="card-body" style="padding:0">
+        <div style="padding:14px 20px;background:#fffbeb;border-bottom:1px solid #fde68a;font-size:.78rem;color:#92400e">
+          ⚡ Controls how often each role's dashboard widgets auto-refresh live data.
+          Lower values = more frequent DB queries. Minimum 2 seconds.
+          Changes take effect on the user's next dashboard page load.
+        </div>
+        <table style="width:100%;border-collapse:collapse" id="refresh-settings-table">
+          <thead>
+            <tr style="border-bottom:2px solid #f1f5f9">
+              <th style="padding:10px 20px;text-align:left;font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:#64748b">Role</th>
+              <th style="padding:10px 20px;text-align:center;font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:#64748b">Refresh Interval</th>
+              <th style="padding:10px 20px;text-align:right;font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:#64748b">Action</th>
+            </tr>
+          </thead>
+          <tbody id="refresh-tbody">
+            <tr><td colspan="3" style="padding:24px;text-align:center;color:#94a3b8;font-size:.85rem">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
   <div class="status-bar" id="status-bar">
     <span class="status-dot loading" id="status-dot"></span>
     <span id="status-text">Loading…</span>
@@ -144,7 +173,8 @@ function switchTab(name, btn) {
   document.querySelectorAll('.admin-panel').forEach(p => p.style.display = 'none');
   btn.classList.add('active');
   document.getElementById('tab-' + name).style.display = '';
-  if (name === 'org' && document.getElementById('bu-list').innerHTML.includes('Loading')) loadOrg();
+  if (name === 'org'      && document.getElementById('bu-list').innerHTML.includes('Loading')) loadOrg();
+  if (name === 'settings' && document.getElementById('refresh-tbody').innerHTML.includes('Loading')) loadRefreshSettings();
 }
 
 // ── Users & Roles ──────────────────────────────────────────────────────────
@@ -345,6 +375,75 @@ async function toggleUser(uid, btn) {
 const AVATAR_COLORS = ['#3b82f6','#8b5cf6','#ec4899','#f59e0b','#10b981','#06b6d4','#ef4444','#6366f1'];
 function initials(n){ return n.split(' ').map(p=>p[0]).join('').slice(0,2).toUpperCase(); }
 function avatarColor(n){ let h=0; for(const c of n) h=(h*31+c.charCodeAt(0))&0xffffffff; return AVATAR_COLORS[Math.abs(h)%AVATAR_COLORS.length]; }
+
+// ── Refresh Settings tab ────────────────────────────────────────────────────
+const ROLE_ORDER = ['SYSTEM_ADMIN','HR_ADMIN','DEPARTMENT_HEAD','LOCATION_HEAD',
+                    'HIRING_MANAGER','SOLID_LINE_MANAGER','DOTTED_LINE_MANAGER','EMPLOYEE'];
+
+function buildRefreshRow(r) {
+  const secs = r.interval_ms / 1000;
+  const label = secs < 60 ? secs + 's' : Math.round(secs/60) + 'm';
+  return `<tr id="rr-${r.role_name}" style="border-bottom:1px solid #f1f5f9">
+    <td style="padding:12px 20px">
+      <span style="display:inline-block;padding:3px 10px;border-radius:5px;font-size:.72rem;font-weight:600;background:#f1f5f9;color:#334155">
+        ${r.role_name.replace(/_/g,' ')}
+      </span>
+    </td>
+    <td style="padding:12px 20px;text-align:center">
+      <div style="display:flex;align-items:center;justify-content:center;gap:8px">
+        <input type="number" id="ri-${r.role_name}" value="${secs}" min="2" max="3600" step="1"
+               style="width:80px;padding:5px 8px;border:1px solid #e2e8f0;border-radius:6px;font-size:.85rem;text-align:center;font-family:inherit"
+               onchange="markDirty('${r.role_name}')">
+        <span style="font-size:.78rem;color:#64748b">seconds</span>
+        <span style="font-size:.72rem;color:#94a3b8;min-width:28px" id="rl-${r.role_name}">(${label})</span>
+      </div>
+    </td>
+    <td style="padding:12px 20px;text-align:right">
+      <button class="btn btn-primary btn-sm" id="rb-${r.role_name}"
+              onclick="saveRefreshSetting('${r.role_name}')">Save</button>
+      <span id="rs-${r.role_name}" style="display:none;font-size:.72rem;color:#16a34a;margin-left:6px">✓ Saved</span>
+    </td>
+  </tr>`;
+}
+
+function markDirty(roleName) {
+  const secs = parseFloat(document.getElementById('ri-' + roleName).value) || 0;
+  const label = secs < 60 ? secs + 's' : Math.round(secs/60) + 'm';
+  const lbl = document.getElementById('rl-' + roleName);
+  if (lbl) lbl.textContent = '(' + label + ')';
+  document.getElementById('rs-' + roleName).style.display = 'none';
+}
+
+async function saveRefreshSetting(roleName) {
+  const inp = document.getElementById('ri-' + roleName);
+  const secs = parseFloat(inp.value);
+  const btn  = document.getElementById('rb-' + roleName);
+  const saved = document.getElementById('rs-' + roleName);
+  if (!secs || secs < 2) { inp.style.borderColor='#ef4444'; return; }
+  inp.style.borderColor = '';
+  btn.disabled = true; btn.textContent = 'Saving…';
+  const res = await fetch('/api/admin/refresh-settings', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({role_name: roleName, interval_ms: Math.round(secs * 1000)})
+  });
+  btn.disabled = false; btn.textContent = 'Save';
+  if (res.ok) {
+    saved.style.display = '';
+    setTimeout(() => saved.style.display = 'none', 3000);
+  } else {
+    alert('Failed to save. Check the value and try again.');
+  }
+}
+
+async function loadRefreshSettings() {
+  const res = await fetch('/api/admin/refresh-settings');
+  if (!res.ok) return;
+  const data = await res.json();
+  // Sort by ROLE_ORDER
+  data.sort((a,b) => ROLE_ORDER.indexOf(a.role_name) - ROLE_ORDER.indexOf(b.role_name));
+  document.getElementById('refresh-tbody').innerHTML = data.map(buildRefreshRow).join('');
+}
 
 // ── Bootstrap ───────────────────────────────────────────────────────────────
 async function init() {

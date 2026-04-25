@@ -5,6 +5,14 @@
 {% block content %}
 <div class="page">
 
+  <!-- ── Live refresh indicator ────────────────────────────── -->
+  <div class="refresh-bar" id="refresh-bar">
+    <span class="refresh-dot ok" id="refresh-dot"></span>
+    <span id="refresh-text" style="font-weight:600"></span>
+    <span id="last-updated" style="margin-left:6px;opacity:.65"></span>
+    <span id="refresh-error" style="display:none;color:#ef4444;font-size:.72rem;margin-left:6px">⚠ Failed to refresh</span>
+  </div>
+
   <!-- ── Admin / HR / Head stats ──────────────────────────── -->
   {% if stats.total is defined %}
   <div class="stats-grid">
@@ -17,7 +25,7 @@
           <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
         </svg>
       </div>
-      <div class="stat-value">{{ stats.total }}</div>
+      <div class="stat-value" id="sv-total">{{ stats.total }}</div>
       <div class="stat-label">Active Employees</div>
       <div class="stat-hint">View all →</div>
     </a>
@@ -28,7 +36,7 @@
           <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
         </svg>
       </div>
-      <div class="stat-value">{{ stats.pending_validations }}</div>
+      <div class="stat-value" id="sv-pending">{{ stats.pending_validations }}</div>
       <div class="stat-label">Pending Skill Validations</div>
       <div class="stat-hint">View employees →</div>
     </a>
@@ -40,7 +48,7 @@
           <path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/>
         </svg>
       </div>
-      <div class="stat-value">{{ stats.certs_total }}</div>
+      <div class="stat-value" id="sv-certs">{{ stats.certs_total }}</div>
       <div class="stat-label">Certifications Held</div>
       <div class="stat-hint">View employees →</div>
     </a>
@@ -54,7 +62,7 @@
           <circle cx="12" cy="9" r="2.5"/>
         </svg>
       </div>
-      <div class="stat-value">{{ loc.count }}</div>
+      <div class="stat-value" data-loc-name="{{ loc.name }}">{{ loc.count }}</div>
       <div class="stat-label">{{ loc.name }}</div>
       <div class="stat-hint">View team →</div>
     </a>
@@ -77,9 +85,10 @@
             <div style="font-size:.83rem;font-weight:600">{{ bu.name }}</div>
             <div style="font-size:.72rem;color:#64748b">{{ bu.code }}</div>
           </div>
-          <div style="font-size:1.2rem;font-weight:700;color:#2563eb">{{ bu.count }}</div>
+          <div style="font-size:1.2rem;font-weight:700;color:#2563eb" data-bu-count="{{ bu.name }}">{{ bu.count }}</div>
           <div style="width:80px;height:6px;background:#e2e8f0;border-radius:999px;overflow:hidden">
-            <div style="height:100%;background:#3b82f6;border-radius:999px;width:{{ ((bu.count / stats.total) * 100)|int }}%"></div>
+            <div style="height:100%;background:#3b82f6;border-radius:999px;width:{{ ((bu.count / stats.total) * 100)|int }}%"
+                 data-bu-bar="{{ bu.name }}"></div>
           </div>
           <svg width="12" height="12" fill="none" stroke="#94a3b8" stroke-width="2" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
         </a>
@@ -101,9 +110,9 @@
             <div style="font-size:.83rem;font-weight:600">{{ s.name }}</div>
             <div style="font-size:.7rem;color:#64748b">{{ s.category }}</div>
           </div>
-          <div style="font-size:.75rem;font-weight:600;color:#64748b">{{ s.emp_count }} people</div>
+          <div style="font-size:.75rem;font-weight:600;color:#64748b" data-skill-count="{{ s.name }}">{{ s.emp_count }} people</div>
           <div style="text-align:right;min-width:60px">
-            <div style="font-size:.75rem;font-weight:700;color:#2563eb">avg {{ s.avg_level }}/4</div>
+            <div style="font-size:.75rem;font-weight:700;color:#2563eb" data-skill-avg="{{ s.name }}">avg {{ s.avg_level }}/4</div>
           </div>
           <svg width="12" height="12" fill="none" stroke="#94a3b8" stroke-width="2" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
         </a>
@@ -125,7 +134,7 @@
           <circle cx="9" cy="7" r="4"/>
         </svg>
       </div>
-      <div class="stat-value">{{ stats.team_size }}</div>
+      <div class="stat-value" id="sv-team-size">{{ stats.team_size }}</div>
       <div class="stat-label">Direct Reports</div>
       <div class="stat-hint">View team →</div>
     </a>
@@ -138,7 +147,7 @@
           <line x1="12" y1="16" x2="12.01" y2="16"/>
         </svg>
       </div>
-      <div class="stat-value">{{ stats.team_pending }}</div>
+      <div class="stat-value" id="sv-team-pending">{{ stats.team_pending }}</div>
       <div class="stat-label">Skills Awaiting Validation</div>
       <div class="stat-hint">View employees →</div>
     </a>
@@ -150,7 +159,7 @@
           <path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/>
         </svg>
       </div>
-      <div class="stat-value">{{ stats.team_certs }}</div>
+      <div class="stat-value" id="sv-team-certs">{{ stats.team_certs }}</div>
       <div class="stat-label">Team Certifications</div>
       <div class="stat-hint">View employees →</div>
     </a>
@@ -178,16 +187,16 @@
       </div>
       <div style="display:flex;gap:20px">
         <div style="text-align:center">
-          <div style="font-size:1.4rem;font-weight:700;color:#2563eb">{{ stats.own.skill_count }}</div>
+          <div style="font-size:1.4rem;font-weight:700;color:#2563eb" id="sv-own-skills">{{ stats.own.skill_count }}</div>
           <div style="font-size:.72rem;color:#64748b">Skills</div>
         </div>
         <div style="text-align:center">
-          <div style="font-size:1.4rem;font-weight:700;color:#16a34a">{{ stats.own.cert_count }}</div>
+          <div style="font-size:1.4rem;font-weight:700;color:#16a34a" id="sv-own-certs">{{ stats.own.cert_count }}</div>
           <div style="font-size:.72rem;color:#64748b">Certifications</div>
         </div>
         {% if stats.own.years is defined %}
         <div style="text-align:center">
-          <div style="font-size:1.4rem;font-weight:700;color:#7c3aed">{{ stats.own.years }}</div>
+          <div style="font-size:1.4rem;font-weight:700;color:#7c3aed" id="sv-own-years">{{ stats.own.years }}</div>
           <div style="font-size:.72rem;color:#64748b">Years</div>
         </div>
         {% endif %}
@@ -200,4 +209,115 @@
   {% endif %}
 
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const REFRESH_MS = {{ refresh_interval }};
+let lastRefreshed = null;
+
+// ── DOM helpers ─────────────────────────────────────────────
+function setVal(id, v) {
+  const el = document.getElementById(id);
+  if (!el || v === undefined || v === null) return;
+  if (String(el.textContent).trim() === String(v)) return;
+  el.textContent = v;
+  el.classList.remove('stat-flash');
+  void el.offsetWidth;
+  el.classList.add('stat-flash');
+}
+
+function setAttrVal(selector, attr, val, v) {
+  document.querySelectorAll(`[${attr}]`).forEach(el => {
+    if (el.getAttribute(attr) === val) {
+      if (el.textContent.trim() !== String(v)) {
+        el.textContent = v;
+        el.classList.remove('stat-flash');
+        void el.offsetWidth;
+        el.classList.add('stat-flash');
+      }
+    }
+  });
+}
+
+// ── Refresh logic ───────────────────────────────────────────
+async function refreshStats() {
+  const dot   = document.getElementById('refresh-dot');
+  const errEl = document.getElementById('refresh-error');
+  dot.className = 'refresh-dot loading';
+  try {
+    const res = await fetch('/api/dashboard/stats');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const s = await res.json();
+
+    // Scalar stat cards
+    setVal('sv-total',        s.total);
+    setVal('sv-pending',      s.pending_validations);
+    setVal('sv-certs',        s.certs_total);
+    setVal('sv-team-size',    s.team_size);
+    setVal('sv-team-pending', s.team_pending);
+    setVal('sv-team-certs',   s.team_certs);
+
+    // Own profile mini-stats
+    if (s.own) {
+      setVal('sv-own-skills', s.own.skill_count);
+      setVal('sv-own-certs',  s.own.cert_count);
+      setVal('sv-own-years',  s.own.years);
+    }
+
+    // Location cards (matched by data attribute)
+    if (s.by_location) {
+      s.by_location.forEach(loc => {
+        setAttrVal('[data-loc-name]', 'data-loc-name', loc.name, loc.count);
+      });
+    }
+
+    // BU rows: count + progress bar width
+    if (s.by_bu && s.total) {
+      s.by_bu.forEach(bu => {
+        setAttrVal('[data-bu-count]', 'data-bu-count', bu.name, bu.count);
+        document.querySelectorAll('[data-bu-bar]').forEach(el => {
+          if (el.getAttribute('data-bu-bar') === bu.name)
+            el.style.width = Math.round((bu.count / s.total) * 100) + '%';
+        });
+      });
+    }
+
+    // Top skills rows
+    if (s.top_skills) {
+      s.top_skills.forEach(sk => {
+        setAttrVal('[data-skill-count]', 'data-skill-count', sk.name, sk.emp_count + ' people');
+        setAttrVal('[data-skill-avg]',   'data-skill-avg',   sk.name, 'avg ' + sk.avg_level + '/4');
+      });
+    }
+
+    lastRefreshed = Date.now();
+    dot.className = 'refresh-dot ok';
+    errEl.style.display = 'none';
+  } catch(e) {
+    dot.className = 'refresh-dot error';
+    errEl.style.display = '';
+  }
+}
+
+// ── "Last updated X ago" ticker ─────────────────────────────
+function tickLastUpdated() {
+  if (!lastRefreshed) return;
+  const secs = Math.round((Date.now() - lastRefreshed) / 1000);
+  const el   = document.getElementById('last-updated');
+  if (el) el.textContent = secs < 5 ? '· updated just now' : `· updated ${secs}s ago`;
+}
+
+// ── Refresh interval label ──────────────────────────────────
+(function initLabel() {
+  const secs = REFRESH_MS / 1000;
+  const label = secs < 60 ? secs + 's' : Math.round(secs / 60) + 'm';
+  document.getElementById('refresh-text').textContent = 'Live · refreshes every ' + label;
+})();
+
+// Kick off
+refreshStats();
+setInterval(refreshStats,       REFRESH_MS);
+setInterval(tickLastUpdated,    1000);
+</script>
 {% endblock %}
