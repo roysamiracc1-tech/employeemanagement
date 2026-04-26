@@ -13,10 +13,21 @@ MGMT_VACATION_ROLES = ['SYSTEM_ADMIN', 'HR_ADMIN', 'SOLID_LINE_MANAGER', 'DOTTED
 
 # ── Admin: vacation type management ──────────────────────────────────────────
 
+_ADMIN_ROLES = ('SYSTEM_ADMIN', 'PORTAL_ADMIN')
+
+
+def _vac_company_scope():
+    if 'SYSTEM_ADMIN' in session.get('roles', []):
+        return None
+    return session.get('company_id') or None
+
+
 @app.route('/admin/vacation-types')
-@require_roles('SYSTEM_ADMIN')
+@require_roles(*_ADMIN_ROLES)
 def admin_vacation_types():
-    rows = query("""
+    co_id = _vac_company_scope()
+    co_filter = "WHERE vt.company_id = %s::uuid" if co_id else ""
+    rows = query(f"""
         SELECT vt.id::text, vt.name, vt.description, vt.max_days_per_year,
                vt.is_paid, vt.color, vt.is_active,
                c.name AS company_name,
@@ -25,21 +36,23 @@ def admin_vacation_types():
         JOIN companies c ON c.id = vt.company_id
         LEFT JOIN vacation_type_locations vtl ON vtl.vacation_type_id = vt.id
         LEFT JOIN locations l ON l.id = vtl.location_id
+        {co_filter}
         GROUP BY vt.id, c.name
         ORDER BY c.name, vt.name
-    """)
+    """, (co_id,) if co_id else ())
     return render_template('admin/vacation_types.html',
                            types=[to_dict(r) for r in rows])
 
 
 @app.route('/admin/vacation-types/new', methods=['GET', 'POST'])
-@require_roles('SYSTEM_ADMIN')
+@require_roles(*_ADMIN_ROLES)
 def admin_vacation_type_new():
-    companies = [to_dict(r) for r in query("SELECT id::text, name FROM companies WHERE is_active ORDER BY name")]
+    co_id     = _vac_company_scope()
+    companies = [] if co_id else [to_dict(r) for r in query("SELECT id::text, name FROM companies WHERE is_active ORDER BY name")]
     locations = [to_dict(r) for r in query("SELECT id::text, name FROM locations ORDER BY name")]
 
     if request.method == 'POST':
-        company_id = request.form.get('company_id')
+        company_id = co_id or request.form.get('company_id')
         name       = request.form.get('name', '').strip()
         desc       = request.form.get('description', '').strip() or None
         max_days   = request.form.get('max_days_per_year', '').strip() or None
@@ -69,13 +82,15 @@ def admin_vacation_type_new():
 
     return render_template('admin/vacation_type_form.html',
                            vt=None, action='new',
-                           companies=companies, locations=locations)
+                           companies=companies, locations=locations,
+                           locked_company_id=co_id)
 
 
 @app.route('/admin/vacation-types/<vt_id>/edit', methods=['GET', 'POST'])
-@require_roles('SYSTEM_ADMIN')
+@require_roles(*_ADMIN_ROLES)
 def admin_vacation_type_edit(vt_id):
-    companies = [to_dict(r) for r in query("SELECT id::text, name FROM companies WHERE is_active ORDER BY name")]
+    co_id     = _vac_company_scope()
+    companies = [] if co_id else [to_dict(r) for r in query("SELECT id::text, name FROM companies WHERE is_active ORDER BY name")]
     locations = [to_dict(r) for r in query("SELECT id::text, name FROM locations ORDER BY name")]
     vt_row = query(
         "SELECT id::text,company_id::text,name,description,max_days_per_year,"
@@ -84,6 +99,9 @@ def admin_vacation_type_edit(vt_id):
     )
     if not vt_row:
         flash('Not found.', 'error')
+        return redirect(url_for('admin_vacation_types'))
+    if co_id and to_dict(vt_row).get('company_id') != co_id:
+        flash('That vacation type does not belong to your company.', 'error')
         return redirect(url_for('admin_vacation_types'))
 
     assigned_locs  = [r['location_id'] for r in query(

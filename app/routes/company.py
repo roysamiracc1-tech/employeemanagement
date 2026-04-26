@@ -107,9 +107,25 @@ def admin_company_new():
     return render_template('admin/company_form.html', co=None, action='new')
 
 
+@app.route('/admin/company-settings', methods=['GET', 'POST'])
+@require_roles('PORTAL_ADMIN')
+def admin_company_settings():
+    company_id = session.get('company_id')
+    if not company_id:
+        flash('No company linked to your account.', 'error')
+        return redirect(url_for('dashboard'))
+    return admin_company_edit(company_id)
+
+
 @app.route('/admin/companies/<company_id>/edit', methods=['GET', 'POST'])
-@require_roles('SYSTEM_ADMIN')
+@require_roles('SYSTEM_ADMIN', 'PORTAL_ADMIN')
 def admin_company_edit(company_id):
+    # Portal Admin can only edit their own company
+    if 'PORTAL_ADMIN' in session.get('roles', []) and 'SYSTEM_ADMIN' not in session.get('roles', []):
+        if company_id != session.get('company_id'):
+            flash('You can only edit your own company.', 'error')
+            return redirect(url_for('dashboard'))
+
     co = query(
         "SELECT id::text,name,industry,website,logo_url,hq_address,founded_year,"
         "description,is_active,theme_color,header_html,footer_html "
@@ -118,7 +134,7 @@ def admin_company_edit(company_id):
     )
     if not co:
         flash('Company not found.', 'error')
-        return redirect(url_for('admin_companies'))
+        return redirect(url_for('dashboard'))
 
     if request.method == 'POST':
         name         = request.form.get('name', '').strip()
@@ -170,6 +186,8 @@ def admin_company_edit(company_id):
             session['branding'] = to_dict(brand)
 
         flash(f'Company "{name}" updated.', 'success')
-        return redirect(url_for('admin_companies'))
+        if 'SYSTEM_ADMIN' in session.get('roles', []):
+            return redirect(url_for('admin_companies'))
+        return redirect(url_for('admin_company_settings'))
 
     return render_template('admin/company_form.html', co=to_dict(co), action='edit')

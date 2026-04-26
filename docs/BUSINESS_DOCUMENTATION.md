@@ -10,16 +10,17 @@ The HR Portal is an internal web application that centralises employee managemen
 
 ## 2. User Roles & Responsibilities
 
-| Role | Who holds it | What they can do |
-|------|-------------|-----------------|
-| **SYSTEM_ADMIN** | IT / Platform admin | Full access; registers companies and vacation types; manages all users and roles; configures branding and refresh settings |
-| **HR_ADMIN** | HR Manager / HR BP | Registers employees; manages directory; validates skills; runs reports |
-| **SOLID_LINE_MANAGER** | Direct line manager | Views own team; approves/rejects vacation requests; sees org tree below them |
-| **DOTTED_LINE_MANAGER** | Matrix / project manager | Same team views as solid-line manager |
-| **DEPARTMENT_HEAD** | Head of a department | Views all employees in their department; directory access |
-| **LOCATION_HEAD** | Office / site lead | Views employees at their location |
-| **HIRING_MANAGER** | Recruiter / hiring lead | Directory access for headcount context |
-| **EMPLOYEE** | All portal users | Views own profile; self-maintains skills and certifications; submits vacation requests |
+| Role | Who holds it | Scope | What they can do |
+|------|-------------|-------|-----------------|
+| **SYSTEM_ADMIN** (Tech Admin) | Platform / IT owner | **All companies** | Full access across every company; manages companies, all users, all roles; configures global settings; not affiliated with any company |
+| **PORTAL_ADMIN** | HR Director / CTO of a company | **Own company only** | Full admin rights scoped to their company: manages employees, users, org structure, vacation types, branding; cannot see other companies' data |
+| **HR_ADMIN** | HR Manager / HR BP | Own company | Registers employees; manages directory; validates skills; runs reports |
+| **SOLID_LINE_MANAGER** | Direct line manager | Own team | Views own team; approves/rejects vacation requests; sees org tree below them |
+| **DOTTED_LINE_MANAGER** | Matrix / project manager | Dotted-line team | Same team views as solid-line manager |
+| **DEPARTMENT_HEAD** | Head of a department | Own department | Views all employees in their department; directory access |
+| **LOCATION_HEAD** | Office / site lead | Own location | Views employees at their location |
+| **HIRING_MANAGER** | Recruiter / hiring lead | Assigned centre | Directory access for headcount context |
+| **EMPLOYEE** | All portal users | Own profile | Views own profile; self-maintains skills and certifications; submits vacation requests |
 
 A user may hold multiple roles simultaneously. Permissions are cumulative.
 
@@ -152,6 +153,62 @@ Each company can customise how the portal appears for their employees:
 | Footer | HTML content | Links bar below all pages |
 
 Individual employees can also choose **light or dark mode** independently of company branding. This preference is saved to their account.
+
+---
+
+### 3.7 Two-Tier Administration Model
+
+The portal distinguishes between **platform administration** and **company administration**:
+
+**Tech Admin (SYSTEM_ADMIN)** — the person or team who owns the portal installation:
+- Has no company affiliation. They are a super-user above the company layer.
+- Can create and manage multiple companies on the same portal instance.
+- Can switch company context in the Admin Panel to view and manage any specific company's data without logging out.
+- When no company is selected ("All Companies"), they see data across every company simultaneously.
+- Manages platform-wide settings: widget refresh intervals, global role permissions, company creation.
+
+**Portal Admin (PORTAL_ADMIN)** — the HR Director, HRBP Director, or CTO of a specific company:
+- Belongs to exactly one company.
+- Administers that company autonomously: adds/removes employees, manages org structure, configures vacation types, sets company branding.
+- Has no visibility into other companies registered on the same portal.
+- Can assign any role *except* SYSTEM_ADMIN and PORTAL_ADMIN to employees within their company.
+
+This model supports a **SaaS-style multi-tenancy** use case where one IT team operates the portal on behalf of multiple subsidiary companies, each of which manages its own HR data independently.
+
+---
+
+### 3.8 Organisation Structure Administration
+
+Portal Admins and Tech Admins can manage the three-level org structure directly from the Admin Panel without writing SQL:
+
+**Business Units** — top-level organisational units (e.g. Technology & Innovation, Finance). Each has a name, optional code, and description.
+
+**Locations** — physical or virtual offices (e.g. Stockholm HQ, Helsinki). Each has a name, city, country, and an office code.
+
+**Functional Units** — sub-teams within a Business Unit (e.g. Software Engineering within Technology). Each links to a parent BU.
+
+**Safety rule:** An entry cannot be deleted while employees are assigned to it. The system shows a 409 error with the count of currently assigned employees.
+
+**Ownership rule:** Portal Admin can only add, edit, and delete entries belonging to their own company. Attempting to modify another company's record returns HTTP 403.
+
+---
+
+### 3.9 Feature-Level Permission Control
+
+A **Roles & Permissions matrix** in the Admin Panel (Tech Admin only) allows fine-grained control over what each role can do per feature area:
+
+| Feature Area | Read | Write | Delete |
+|--------------|------|-------|--------|
+| Employee Profiles | Can view | Can update records | Can remove records |
+| Organisation Structure | Can view BU/loc/FU | Can add/edit | Can delete |
+| User Accounts | Can view | Can create/disable | Can remove |
+| Skills & Certifications | Can view | Can validate/edit | Can remove |
+| Vacations & Leave | Can view requests | Can approve/configure | Can cancel/delete |
+| Reports & Analytics | Can view dashboards | — | — |
+| Company Settings | Can view branding | Can update branding | — |
+| System Configuration | Can view settings | Can update settings | — |
+
+Changes take effect immediately without a restart. The `SYSTEM_ADMIN` row is always locked to full access and cannot be reduced.
 
 ---
 

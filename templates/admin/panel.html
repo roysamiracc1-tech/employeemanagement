@@ -5,11 +5,54 @@
 {% block content %}
 <div class="page">
 
+  {% if is_tech_admin %}
+  <!-- ── Company context switcher (Tech Admin only) ──────── -->
+  <div class="ctx-bar">
+    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+      <rect x="2" y="7" width="20" height="14" rx="2"/>
+      <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/>
+    </svg>
+    <span style="font-weight:600">Company context:</span>
+    <select id="company-ctx" onchange="switchCompanyCtx(this.value)">
+      <option value="">All Companies</option>
+      {% for c in companies %}
+      <option value="{{ c.id }}" {% if admin_company_id == c.id %}selected{% endif %}>{{ c.name }}</option>
+      {% endfor %}
+    </select>
+    <span id="ctx-badge" class="{% if admin_company_id %}ctx-badge-scoped{% else %}ctx-badge-all{% endif %}">
+      {% if admin_company_id %}Scoped{% else %}All companies{% endif %}
+    </span>
+    <span style="font-size:.72rem;color:#b45309;margin-left:auto">
+      Changing this filters all admin sections to the selected company
+    </span>
+  </div>
+  {% endif %}
+
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+    {% if is_tech_admin %}
+    <span style="display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:6px;font-size:.7rem;font-weight:700;background:#7c3aed18;color:#7c3aed;border:1px solid #7c3aed30">
+      <svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+      Tech Admin
+    </span>
+    {% elif is_portal_admin %}
+    <span style="display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:6px;font-size:.7rem;font-weight:700;background:#0f766e18;color:#0f766e;border:1px solid #0f766e30">
+      <svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9h6M9 12h6M9 15h4"/></svg>
+      Portal Admin
+    </span>
+    {% endif %}
+  </div>
+
   <div class="admin-tabs">
     <button class="admin-tab active" onclick="switchTab('users',this)">Users &amp; Roles</button>
     <button class="admin-tab" onclick="switchTab('employees',this)">Employees</button>
     <button class="admin-tab" onclick="switchTab('org',this)">Organisation</button>
+    {% if is_tech_admin %}
+    <button class="admin-tab" onclick="switchTab('roles',this)">
+      <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="display:inline;margin-right:3px;vertical-align:-1px"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      Roles &amp; Permissions
+    </button>
     <button class="admin-tab" onclick="switchTab('settings',this)">⚙ Widget Settings</button>
+    {% endif %}
   </div>
 
   <!-- ── Users & Roles tab ───────────────────────────────────── -->
@@ -84,28 +127,140 @@
   <!-- ── Organisation tab ───────────────────────────────────── -->
   <div class="admin-panel" id="tab-org" style="display:none">
     <div class="two-col">
+
+      <!-- Business Units -->
       <div class="card">
-        <div class="card-header"><h2>Business Units</h2></div>
-        <div class="card-body" style="padding:0" id="bu-list">
+        <div class="card-header">
+          <h2>Business Units</h2>
+          <button class="btn btn-primary btn-sm" onclick="openOrgModal('bu')">
+            <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Add BU
+          </button>
+        </div>
+        <div style="padding:0" id="bu-list">
           <p style="padding:16px;color:#94a3b8;font-size:.85rem">Loading…</p>
         </div>
       </div>
+
+      <!-- Locations -->
       <div class="card">
-        <div class="card-header"><h2>Locations</h2></div>
-        <div class="card-body" style="padding:0" id="loc-list">
+        <div class="card-header">
+          <h2>Locations</h2>
+          <button class="btn btn-primary btn-sm" onclick="openOrgModal('loc')">
+            <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Add Location
+          </button>
+        </div>
+        <div style="padding:0" id="loc-list">
           <p style="padding:16px;color:#94a3b8;font-size:.85rem">Loading…</p>
         </div>
       </div>
     </div>
+
+    <!-- Functional Units -->
     <div class="card" style="margin-top:16px">
-      <div class="card-header"><h2>Functional Units</h2></div>
-      <div class="card-body" style="padding:0" id="fu-list">
+      <div class="card-header">
+        <h2>Functional Units</h2>
+        <button class="btn btn-primary btn-sm" onclick="openOrgModal('fu')">
+          <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Add FU
+        </button>
+      </div>
+      <div style="padding:0" id="fu-list">
         <p style="padding:16px;color:#94a3b8;font-size:.85rem">Loading…</p>
       </div>
     </div>
   </div>
 
-  <!-- ── Widget Settings tab ────────────────────────────────── -->
+  <!-- ── Org modals ───────────────────────────────────────────── -->
+
+  <!-- BU modal -->
+  <div id="bu-modal" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.45);align-items:center;justify-content:center" onclick="if(event.target===this)closeOrgModal('bu')">
+    <div class="modal-box" style="width:440px" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div class="modal-title" id="bu-modal-title">Add Business Unit</div>
+        <button class="modal-close" onclick="closeOrgModal('bu')">×</button>
+      </div>
+      <div class="modal-body" style="display:flex;flex-direction:column;gap:12px">
+        <input type="hidden" id="bu-id">
+        <div class="form-group" style="margin:0"><label>Name *</label><input type="text" id="bu-name" class="form-control" placeholder="e.g. Engineering"></div>
+        <div class="form-group" style="margin:0"><label>Code</label><input type="text" id="bu-code" class="form-control" placeholder="e.g. ENG"></div>
+        <div class="form-group" style="margin:0"><label>Description</label><textarea id="bu-desc" class="form-control" rows="2" style="resize:vertical"></textarea></div>
+        <div id="bu-error" style="display:none;color:#dc2626;font-size:.78rem;background:#fef2f2;padding:8px 12px;border-radius:6px"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost btn-sm" onclick="closeOrgModal('bu')">Cancel</button>
+        <button class="btn btn-primary btn-sm" onclick="saveOrg('bu')">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Location modal -->
+  <div id="loc-modal" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.45);align-items:center;justify-content:center" onclick="if(event.target===this)closeOrgModal('loc')">
+    <div class="modal-box" style="width:440px" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div class="modal-title" id="loc-modal-title">Add Location</div>
+        <button class="modal-close" onclick="closeOrgModal('loc')">×</button>
+      </div>
+      <div class="modal-body" style="display:flex;flex-direction:column;gap:12px">
+        <input type="hidden" id="loc-id">
+        <div class="form-group" style="margin:0"><label>Name *</label><input type="text" id="loc-name" class="form-control" placeholder="e.g. London HQ"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div class="form-group" style="margin:0"><label>City</label><input type="text" id="loc-city" class="form-control" placeholder="London"></div>
+          <div class="form-group" style="margin:0"><label>Country</label><input type="text" id="loc-country" class="form-control" placeholder="UK"></div>
+        </div>
+        <div class="form-group" style="margin:0"><label>Office Code</label><input type="text" id="loc-code" class="form-control" placeholder="e.g. LDN"></div>
+        <div id="loc-error" style="display:none;color:#dc2626;font-size:.78rem;background:#fef2f2;padding:8px 12px;border-radius:6px"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost btn-sm" onclick="closeOrgModal('loc')">Cancel</button>
+        <button class="btn btn-primary btn-sm" onclick="saveOrg('loc')">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- FU modal -->
+  <div id="fu-modal" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.45);align-items:center;justify-content:center" onclick="if(event.target===this)closeOrgModal('fu')">
+    <div class="modal-box" style="width:440px" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div class="modal-title" id="fu-modal-title">Add Functional Unit</div>
+        <button class="modal-close" onclick="closeOrgModal('fu')">×</button>
+      </div>
+      <div class="modal-body" style="display:flex;flex-direction:column;gap:12px">
+        <input type="hidden" id="fu-id">
+        <div class="form-group" style="margin:0"><label>Name *</label><input type="text" id="fu-name" class="form-control" placeholder="e.g. Platform Engineering"></div>
+        <div class="form-group" style="margin:0"><label>Code</label><input type="text" id="fu-code" class="form-control" placeholder="e.g. PLT"></div>
+        <div class="form-group" style="margin:0">
+          <label>Business Unit</label>
+          <select id="fu-bu" class="form-control">
+            <option value="">— None —</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin:0"><label>Description</label><textarea id="fu-desc" class="form-control" rows="2" style="resize:vertical"></textarea></div>
+        <div id="fu-error" style="display:none;color:#dc2626;font-size:.78rem;background:#fef2f2;padding:8px 12px;border-radius:6px"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost btn-sm" onclick="closeOrgModal('fu')">Cancel</button>
+        <button class="btn btn-primary btn-sm" onclick="saveOrg('fu')">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Roles & Permissions tab ─────────────────────────────── -->
+  <div class="admin-panel" id="tab-roles" style="display:none">
+    <div class="card">
+      <div class="card-header">
+        <h2>Roles &amp; Feature Permissions</h2>
+        <span style="font-size:.75rem;color:#64748b">Define what each role can read, write or delete across portal features. Changes save immediately.</span>
+      </div>
+      <div style="padding:0;overflow-x:auto" id="role-matrix-container">
+        <p style="padding:24px;color:#94a3b8;font-size:.85rem">Loading permissions matrix…</p>
+      </div>
+    </div>
+  </div>
+
+  {% if is_tech_admin %}
+  <!-- ── Widget Settings tab ────────────────────────────── -->
   <div class="admin-panel" id="tab-settings" style="display:none">
     <div class="card" style="max-width:640px">
       <div class="card-header">
@@ -132,6 +287,7 @@
       </div>
     </div>
   </div>
+  {% endif %}{# is_tech_admin #}
 
   <div class="status-bar" id="status-bar">
     <span class="status-dot loading" id="status-dot"></span>
@@ -152,6 +308,7 @@
     <div class="modal-body">
       <div id="role-checkboxes" style="display:flex;flex-direction:column;gap:10px">
         {% for r in all_roles %}
+        {% if is_tech_admin or r.name not in ('SYSTEM_ADMIN', 'PORTAL_ADMIN') %}
         <label class="role-check">
           <input type="checkbox" value="{{ r.name }}" id="rc-{{ r.name }}">
           <span>
@@ -159,6 +316,7 @@
             {% if r.description %}<span style="font-size:.72rem;color:#64748b;margin-left:6px">{{ r.description }}</span>{% endif %}
           </span>
         </label>
+        {% endif %}
         {% endfor %}
       </div>
     </div>
@@ -172,7 +330,8 @@
 
 {% block scripts %}
 <script>
-const ALL_ROLES = {{ all_roles | tojson }};
+const ALL_ROLES      = {{ all_roles | tojson }};
+const IS_TECH_ADMIN  = {{ is_tech_admin | tojson }};
 let allUsers = [], allEmps = [], currentUserId = null, currentUserRoles = [];
 
 // ── Tab switching ──────────────────────────────────────────────────────────
@@ -183,6 +342,104 @@ function switchTab(name, btn) {
   document.getElementById('tab-' + name).style.display = '';
   if (name === 'org'      && document.getElementById('bu-list').innerHTML.includes('Loading')) loadOrg();
   if (name === 'settings' && document.getElementById('refresh-tbody').innerHTML.includes('Loading')) loadRefreshSettings();
+  if (name === 'roles'    && document.getElementById('role-matrix-container').innerHTML.includes('Loading')) loadRoleMatrix();
+}
+
+// ── Company context switcher (Tech Admin only) ────────────────────────────
+async function switchCompanyCtx(companyId) {
+  await fetch('/api/admin/switch-company', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({company_id: companyId || null})
+  });
+  const badge = document.getElementById('ctx-badge');
+  if (companyId) {
+    badge.textContent = 'Scoped'; badge.className = 'ctx-badge-scoped';
+  } else {
+    badge.textContent = 'All companies'; badge.className = 'ctx-badge-all';
+  }
+  // Reset and reload all data panels
+  allUsers = []; allEmps = [];
+  document.getElementById('users-tbody').innerHTML = '<tr class="empty-row"><td colspan="7">Loading…</td></tr>';
+  document.getElementById('emp-tbody').innerHTML   = '<tr class="empty-row"><td colspan="7">Loading…</td></tr>';
+  ['bu-list','loc-list','fu-list'].forEach(id =>
+    document.getElementById(id).innerHTML = '<p style="padding:16px;color:#94a3b8;font-size:.85rem">Loading…</p>'
+  );
+  init();
+  // Force org reload by resetting the sentinel text loadOrg() checks
+  document.getElementById('bu-list').innerHTML  = '<p style="padding:16px;color:#94a3b8;font-size:.85rem">Loading…</p>';
+  document.getElementById('loc-list').innerHTML = '<p style="padding:16px;color:#94a3b8;font-size:.85rem">Loading…</p>';
+  document.getElementById('fu-list').innerHTML  = '<p style="padding:16px;color:#94a3b8;font-size:.85rem">Loading…</p>';
+  loadOrg();
+}
+
+// ── Roles & Permissions matrix ────────────────────────────────────────────
+let _rolesData = null;
+
+async function loadRoleMatrix() {
+  const res = await fetch('/api/admin/roles/features');
+  if (!res.ok) return;
+  _rolesData = await res.json();
+  renderRoleMatrix();
+}
+
+function renderRoleMatrix() {
+  const { roles, features, matrix } = _rolesData;
+  const ACTIONS = [{k:'r', label:'R', full:'can_read'}, {k:'w', label:'W', full:'can_write'}, {k:'d', label:'D', full:'can_delete'}];
+
+  let html = '<table class="perm-matrix"><thead><tr>';
+  html += '<th class="pm-feature-col">Feature</th>';
+  for (const r of roles) {
+    const isSys = r.name === 'SYSTEM_ADMIN';
+    html += `<th class="pm-role-col" colspan="3" style="${isSys ? 'background:#7c3aed08' : ''}">
+      <div style="font-size:.68rem;font-weight:700;padding:3px 0;color:${isSys ? '#7c3aed' : 'inherit'}">${r.name.replace(/_/g,' ')}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;text-align:center;font-size:.6rem;color:#94a3b8">
+        <span>R</span><span>W</span><span>D</span>
+      </div>
+    </th>`;
+  }
+  html += '</tr></thead><tbody>';
+
+  for (const f of features) {
+    html += `<tr><td class="pm-feature-label">
+      <div style="font-size:.82rem;font-weight:600">${f.label}</div>
+      <div style="font-size:.67rem;color:#94a3b8;margin-top:2px">${f.description || ''}</div>
+    </td>`;
+    for (const r of roles) {
+      const isSys = r.name === 'SYSTEM_ADMIN';
+      const acc   = (matrix[r.id] || {})[f.id] || {r:false, w:false, d:false};
+      for (const a of ACTIONS) {
+        const checked = isSys || acc[a.k];
+        html += `<td class="pm-cell" style="${isSys ? 'background:#7c3aed04' : ''}">
+          <input type="checkbox" class="pm-cb"
+            data-role="${r.id}" data-feature="${f.id}" data-action="${a.full}"
+            ${checked ? 'checked' : ''} ${isSys ? 'disabled title="Tech Admin always has full access"' : ''}
+            onchange="updateFeatureAccess('${r.id}','${f.id}',this)">
+        </td>`;
+      }
+    }
+    html += '</tr>';
+  }
+  html += '</tbody></table>';
+  document.getElementById('role-matrix-container').innerHTML = html;
+}
+
+async function updateFeatureAccess(roleId, featureId, triggerEl) {
+  const cbs = document.querySelectorAll(`.pm-cb[data-role="${roleId}"][data-feature="${featureId}"]`);
+  const vals = {};
+  cbs.forEach(cb => { vals[cb.dataset.action] = cb.checked; });
+  const res = await fetch('/api/admin/roles/feature-access', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({
+      role_id: roleId, feature_id: featureId,
+      can_read: vals.can_read || false,
+      can_write: vals.can_write || false,
+      can_delete: vals.can_delete || false
+    })
+  });
+  if (!res.ok) {
+    triggerEl.checked = !triggerEl.checked; // revert on failure
+    alert('Failed to save permission. Please try again.');
+  }
 }
 
 // ── Users & Roles ──────────────────────────────────────────────────────────
@@ -293,39 +550,171 @@ function filterEmps() {
 }
 
 // ── Org tab ─────────────────────────────────────────────────────────────────
+let _buCache = [], _buData = {}, _locData = {}, _fuData = {};
+
+function orgActionBtns(type, id, empCount) {
+  const delAttrs = empCount === 0
+    ? `onclick="deleteOrg('${type}','${id}')"`
+    : `disabled title="Cannot delete — ${empCount} employee(s) assigned" style="opacity:.45;cursor:not-allowed"`;
+  return `<div style="display:flex;gap:6px;flex-shrink:0">
+    <button class="btn btn-ghost btn-sm" onclick="editOrg('${type}','${id}')">Edit</button>
+    <button class="btn btn-sm btn-danger" ${delAttrs}>Delete</button>
+  </div>`;
+}
+
+function editOrg(type, id) {
+  const maps = { bu: _buData, loc: _locData, fu: _fuData };
+  openOrgModal(type, maps[type][id] || null);
+}
+
 async function loadOrg() {
   const [bus, locs, fus] = await Promise.all([
-    fetch('/api/admin/org/business-units').then(r=>r.json()),
-    fetch('/api/admin/org/locations').then(r=>r.json()),
-    fetch('/api/admin/org/functional-units').then(r=>r.json()),
+    fetch('/api/admin/org/business-units').then(r => r.json()),
+    fetch('/api/admin/org/locations').then(r => r.json()),
+    fetch('/api/admin/org/functional-units').then(r => r.json()),
   ]);
+  _buCache = bus;
+  _buData  = Object.fromEntries(bus.map(b => [b.id, b]));
+  _locData = Object.fromEntries(locs.map(l => [l.id, l]));
+  _fuData  = Object.fromEntries(fus.map(f => [f.id, f]));
 
-  document.getElementById('bu-list').innerHTML = bus.map(b => `
+  document.getElementById('bu-list').innerHTML = bus.length ? bus.map(b => `
     <div style="display:flex;align-items:center;gap:12px;padding:12px 20px;border-bottom:1px solid #f1f5f9">
-      <div style="flex:1">
-        <div style="font-size:.83rem;font-weight:600">${b.name}</div>
-        <div style="font-size:.72rem;color:#64748b">${b.code}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:.83rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${b.name}</div>
+        <div style="font-size:.72rem;color:#64748b">${b.code || '—'}</div>
       </div>
-      <span style="font-size:1.1rem;font-weight:700;color:#2563eb">${b.emp_count}</span>
-    </div>`).join('') || '<p style="padding:16px;color:#94a3b8">No data.</p>';
+      <span style="font-size:1rem;font-weight:700;color:#2563eb;min-width:28px;text-align:right">${b.emp_count}</span>
+      ${orgActionBtns('bu', b.id, b.emp_count)}
+    </div>`).join('') : '<p style="padding:16px;color:#94a3b8">No data.</p>';
 
-  document.getElementById('loc-list').innerHTML = locs.map(l => `
+  document.getElementById('loc-list').innerHTML = locs.length ? locs.map(l => `
     <div style="display:flex;align-items:center;gap:12px;padding:12px 20px;border-bottom:1px solid #f1f5f9">
-      <div style="flex:1">
-        <div style="font-size:.83rem;font-weight:600">${l.name}</div>
-        <div style="font-size:.72rem;color:#64748b">${l.office_code||''}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:.83rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${l.name}</div>
+        <div style="font-size:.72rem;color:#64748b">${l.office_code || '—'}</div>
       </div>
-      <span style="font-size:1.1rem;font-weight:700;color:#2563eb">${l.emp_count}</span>
-    </div>`).join('') || '<p style="padding:16px;color:#94a3b8">No data.</p>';
+      <span style="font-size:1rem;font-weight:700;color:#2563eb;min-width:28px;text-align:right">${l.emp_count}</span>
+      ${orgActionBtns('loc', l.id, l.emp_count)}
+    </div>`).join('') : '<p style="padding:16px;color:#94a3b8">No data.</p>';
 
-  document.getElementById('fu-list').innerHTML = fus.map(f => `
+  document.getElementById('fu-list').innerHTML = fus.length ? fus.map(f => `
     <div style="display:flex;align-items:center;gap:12px;padding:12px 20px;border-bottom:1px solid #f1f5f9">
-      <div style="flex:1">
-        <div style="font-size:.83rem;font-weight:600">${f.name}</div>
-        <div style="font-size:.72rem;color:#64748b">${f.code||''} · ${f.bu_name||''}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:.83rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${f.name}</div>
+        <div style="font-size:.72rem;color:#64748b">${f.code || '—'} · ${f.bu_name || ''}</div>
       </div>
-      <span style="font-size:1.1rem;font-weight:700;color:#2563eb">${f.emp_count}</span>
-    </div>`).join('') || '<p style="padding:16px;color:#94a3b8">No data.</p>';
+      <span style="font-size:1rem;font-weight:700;color:#2563eb;min-width:28px;text-align:right">${f.emp_count}</span>
+      ${orgActionBtns('fu', f.id, f.emp_count)}
+    </div>`).join('') : '<p style="padding:16px;color:#94a3b8">No data.</p>';
+}
+
+function openOrgModal(type, data) {
+  const isEdit = !!data;
+  if (type === 'bu') {
+    document.getElementById('bu-modal-title').textContent = isEdit ? 'Edit Business Unit' : 'Add Business Unit';
+    document.getElementById('bu-id').value   = isEdit ? data.id   : '';
+    document.getElementById('bu-name').value = isEdit ? (data.name || '') : '';
+    document.getElementById('bu-code').value = isEdit ? (data.code || '') : '';
+    document.getElementById('bu-desc').value = isEdit ? (data.description || '') : '';
+    document.getElementById('bu-error').style.display = 'none';
+    document.getElementById('bu-modal').style.display = 'flex';
+    setTimeout(() => document.getElementById('bu-name').focus(), 50);
+
+  } else if (type === 'loc') {
+    document.getElementById('loc-modal-title').textContent = isEdit ? 'Edit Location' : 'Add Location';
+    document.getElementById('loc-id').value      = isEdit ? data.id : '';
+    document.getElementById('loc-name').value    = isEdit ? (data.name || '') : '';
+    document.getElementById('loc-city').value    = isEdit ? (data.city || '') : '';
+    document.getElementById('loc-country').value = isEdit ? (data.country || '') : '';
+    document.getElementById('loc-code').value    = isEdit ? (data.office_code || '') : '';
+    document.getElementById('loc-error').style.display = 'none';
+    document.getElementById('loc-modal').style.display = 'flex';
+    setTimeout(() => document.getElementById('loc-name').focus(), 50);
+
+  } else if (type === 'fu') {
+    document.getElementById('fu-modal-title').textContent = isEdit ? 'Edit Functional Unit' : 'Add Functional Unit';
+    document.getElementById('fu-id').value   = isEdit ? data.id : '';
+    document.getElementById('fu-name').value = isEdit ? (data.name || '') : '';
+    document.getElementById('fu-code').value = isEdit ? (data.code || '') : '';
+    document.getElementById('fu-desc').value = isEdit ? (data.description || '') : '';
+    const sel = document.getElementById('fu-bu');
+    sel.innerHTML = '<option value="">— None —</option>' +
+      _buCache.map(b => `<option value="${b.id}"${isEdit && data.business_unit_id === b.id ? ' selected' : ''}>${b.name}</option>`).join('');
+    document.getElementById('fu-error').style.display = 'none';
+    document.getElementById('fu-modal').style.display = 'flex';
+    setTimeout(() => document.getElementById('fu-name').focus(), 50);
+  }
+}
+
+function closeOrgModal(type) {
+  document.getElementById(type + '-modal').style.display = 'none';
+}
+
+function showOrgError(el, msg) {
+  el.textContent = msg;
+  el.style.display = '';
+}
+
+async function saveOrg(type) {
+  const id    = document.getElementById(`${type}-id`).value;
+  const errEl = document.getElementById(`${type}-error`);
+  errEl.style.display = 'none';
+  let url, body;
+
+  if (type === 'bu') {
+    const name = document.getElementById('bu-name').value.trim();
+    const code = document.getElementById('bu-code').value.trim();
+    const desc = document.getElementById('bu-desc').value.trim();
+    if (!name) { showOrgError(errEl, 'Name is required.'); return; }
+    url  = id ? `/api/admin/org/business-units/${id}` : '/api/admin/org/business-units';
+    body = { name, code: code || null, description: desc || null };
+
+  } else if (type === 'loc') {
+    const name    = document.getElementById('loc-name').value.trim();
+    const city    = document.getElementById('loc-city').value.trim();
+    const country = document.getElementById('loc-country').value.trim();
+    const code    = document.getElementById('loc-code').value.trim();
+    if (!name) { showOrgError(errEl, 'Name is required.'); return; }
+    url  = id ? `/api/admin/org/locations/${id}` : '/api/admin/org/locations';
+    body = { name, city: city || null, country: country || null, office_code: code || null };
+
+  } else if (type === 'fu') {
+    const name = document.getElementById('fu-name').value.trim();
+    const code = document.getElementById('fu-code').value.trim();
+    const desc = document.getElementById('fu-desc').value.trim();
+    const buId = document.getElementById('fu-bu').value;
+    if (!name) { showOrgError(errEl, 'Name is required.'); return; }
+    url  = id ? `/api/admin/org/functional-units/${id}` : '/api/admin/org/functional-units';
+    body = { name, code: code || null, description: desc || null, business_unit_id: buId || null };
+  }
+
+  const res  = await fetch(url, {
+    method: id ? 'PUT' : 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json();
+  if (res.ok) {
+    closeOrgModal(type);
+    loadOrg();
+  } else {
+    showOrgError(errEl, data.error || 'An error occurred. Please try again.');
+  }
+}
+
+async function deleteOrg(type, id) {
+  const urlMap  = { bu: 'business-units', loc: 'locations', fu: 'functional-units' };
+  const dataMap = { bu: _buData, loc: _locData, fu: _fuData };
+  const name    = (dataMap[type][id] || {}).name || id;
+  if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
+  const res  = await fetch(`/api/admin/org/${urlMap[type]}/${id}`, { method: 'DELETE' });
+  const data = await res.json();
+  if (res.ok) {
+    loadOrg();
+  } else {
+    alert(data.error || 'Delete failed. Please try again.');
+  }
 }
 
 // ── Modal ───────────────────────────────────────────────────────────────────
@@ -477,7 +866,7 @@ async function loadRefreshSettings() {
 async function init() {
   const [uRes, eRes] = await Promise.all([
     fetch('/api/admin/users'),
-    fetch('/api/employees'),
+    fetch('/api/admin/employees'),
   ]);
   if (uRes.ok) {
     allUsers = await uRes.json();

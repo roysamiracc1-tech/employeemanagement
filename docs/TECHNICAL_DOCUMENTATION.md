@@ -415,13 +415,16 @@ python -m pytest tests/test_helpers.py   # single file
 
 ```
 tests/
-├── conftest.py                  # Fixtures: app, client, auth/admin/manager sessions, sample data
-├── test_db.py                   # serialize() and to_dict() helpers
-├── test_helpers.py              # Business logic and pure functions
-├── test_auth.py                 # Auth decorators and login/logout routes
-├── test_routes_employees.py     # Employee directory, profile, self-edit APIs
-├── test_routes_vacation.py      # Vacation submit, cancel, review workflow
-└── test_routes_admin.py         # Admin panel, user/role management, company admin
+├── conftest.py                    # Fixtures: app, client, session helpers, sample data
+├── test_db.py                     # serialize() and to_dict() helpers
+├── test_helpers.py                # Business logic and pure functions
+├── test_auth.py                   # Auth decorators and login/logout routes
+├── test_routes_employees.py       # Employee directory, profile, self-edit APIs
+├── test_routes_vacation.py        # Vacation submit, cancel, review workflow
+├── test_routes_admin.py           # Admin panel, user/role management, company admin
+├── test_routes_auth_login.py      # Login/logout flows, session keys, access control
+├── test_routes_org.py             # Org CRUD, company scoping, context switcher, permissions matrix
+└── test_ui_ux.py                  # UI/UX regression: template structure, CSS paths, asset integrity
 ```
 
 ### Test Coverage Summary
@@ -429,12 +432,24 @@ tests/
 | File | Tests | What is covered |
 |------|-------|----------------|
 | `test_db.py` | 13 | `serialize()` — date, datetime, Decimal, primitives; `to_dict()` — type conversion |
-| `test_helpers.py` | 39 | `rule_label`, `build_nested` (tree construction, orphan nodes, multi-root), `next_employee_number`, `employee_solid_manager`, `used_days`, `is_direct_report`, vacation eligibility engine (gender rules, tenure rules, AND logic, no-rules case, rule_labels attached), `save_logo` (extension validation, file save, old file cleanup) |
-| `test_auth.py` | 18 | `@login_required` redirect, `@require_roles` per-role access, login form, unknown email error, logout session clear |
-| `test_routes_employees.py` | 24 | Directory (role gating), profile (own / other / not-found), my-team, `/api/employees` role-filtered responses, profile self-edit APIs (skills, certs, gender, theme toggle) |
-| `test_routes_vacation.py` | 20 | Vacation page load, submit (no manager, missing fields, ineligible type, end-before-start, annual limit exceeded, success), cancel (not-found, non-pending, success), review (invalid action, not-found, already-actioned, approve, reject) |
-| `test_routes_admin.py` | 16 | Admin panel access, register user (form load, missing name, duplicate email), user list, update roles, toggle user, validate skill, company list/new |
-| **Total** | **130** | |
+| `test_helpers.py` | 39 | `rule_label`, `build_nested`, `next_employee_number`, `employee_solid_manager`, `used_days`, `is_direct_report`, vacation eligibility engine, `save_logo` |
+| `test_auth.py` | 18 | `@login_required`, `@require_roles`, login form, unknown email error, logout |
+| `test_routes_employees.py` | 24 | Directory role gating, profile, self-edit APIs |
+| `test_routes_vacation.py` | 20 | Vacation submit, cancel, review (all edge cases) |
+| `test_routes_admin.py` | 19 | Admin panel, register user, user list, roles, toggle, validate skill, companies |
+| `test_routes_auth_login.py` | 21 | POST login sets session keys, company_id stored, Tech Admin gets null company, branding loaded, protected-route redirects |
+| `test_routes_org.py` | 31 | BU/loc/FU list with company filter, create (conflict, missing name), update (403 cross-company), delete (409 with employees), company context switch, role-feature permission matrix CRUD |
+| `test_ui_ux.py` | 48 | Login page 200/CSS path/split-panel structure/demo chips/no-old-classes, base.html CSS path, sidebar nav gating, admin panel tab visibility, CSS file integrity (all classes defined), template asset consistency (no bare `style.css`) |
+| **Total** | **238** | |
+
+### Pre-Commit Test Gate
+
+A Git pre-commit hook at `.git/hooks/pre-commit` runs the full 238-test suite before every commit. If any test fails the commit is aborted. This catches regressions before they reach the repository.
+
+```bash
+# The hook runs:
+python -m pytest tests/ -q --tb=short
+```
 
 ### Key Fixtures (conftest.py)
 
@@ -445,12 +460,204 @@ tests/
 | `admin_client` | Client with `SYSTEM_ADMIN` + `EMPLOYEE` session |
 | `manager_client` | Client with `SOLID_LINE_MANAGER` + `EMPLOYEE` session |
 | `SAMPLE_EMPLOYEE` | Reusable employee dict for mocking `fetch_employees` |
-| `SAMPLE_VACATION_TYPE` | Reusable vacation type dict for mocking |
+| `SAMPLE_VACATION_TYPE` | Reusable vacation type dict |
 
 ### Testing Strategy
 
-- **Pure functions** (`rule_label`, `build_nested`, `serialize`, `to_dict`) — called directly, no mocking needed.
-- **DB-dependent helpers** — `app.helpers.query` / `app.db.query` patched via `unittest.mock.patch`.
-- **Flask routes** — tested via `app.test_client()` with session pre-seeded; all DB calls in route modules patched individually.
-- **Auth enforcement** — verified by checking 302 redirect for unauthenticated / unauthorised requests, 200 for authorised ones.
+- **Pure functions** — called directly, no mocking needed.
+- **DB-dependent helpers** — `app.helpers.query` patched at the module-import level.
+- **Flask routes** — `app.test_client()` with session pre-seeded; all DB calls in route modules patched individually.
+- **Auth enforcement** — 302 redirect for unauthenticated/unauthorised requests, 200 for authorised.
+- **Company scoping** — captured SQL parameters inspected to confirm company_id filter is (or is not) applied.
+- **UI/UX** — HTML source parsed for CSS class names, asset paths, and structural landmarks; CSS file read directly.
+
+---
+
+## 12. Two-Tier Admin System
+
+### Design
+
+The portal uses two distinct admin tiers to separate platform-level concerns from company-level administration:
+
+| Role | Name | Scope | Company affiliation |
+|------|------|-------|-------------------|
+| `SYSTEM_ADMIN` | **Tech Admin** | All companies, all data, all settings | None — must have `company_id = NULL` in their employee record |
+| `PORTAL_ADMIN` | **Portal Admin** | Their own company only | One specific company |
+
+### Tech Admin (SYSTEM_ADMIN)
+
+- Not affiliated with any company (`employees.company_id = NULL`).
+- Sees all users, employees, BUs, locations, FUs, vacation types across every company.
+- Can select a **company context** via the switcher in the admin panel header — once selected, all admin sections filter to that company.
+- Can assign or revoke any role, including `PORTAL_ADMIN`.
+- Can access Widget Settings (global refresh intervals) and the Roles & Permissions matrix.
+- The company context is stored in `session['admin_company_id']` (separate from `session['company_id']`).
+
+### Portal Admin (PORTAL_ADMIN)
+
+- Belongs to one specific company (`employees.company_id` is set).
+- At login, `session['company_id']` is populated from their employee record.
+- All admin queries automatically filter by `session['company_id']` — no cross-company data is ever returned.
+- Can manage users, employees, BUs, locations, FUs, vacation types **within their company only**.
+- Cannot assign `SYSTEM_ADMIN` or `PORTAL_ADMIN` roles to others (blocked server-side).
+- Cannot access Widget Settings or cross-company Companies list.
+- Has a **Company Settings** link in the nav to edit their own company's branding.
+
+### `_company_scope()` Helper
+
+All admin route handlers call this function to determine the current company filter:
+
+```python
+def _company_scope():
+    roles = session.get('roles', [])
+    if 'SYSTEM_ADMIN' in roles:
+        return session.get('admin_company_id') or None  # None = all companies
+    if 'PORTAL_ADMIN' in roles:
+        return session.get('company_id') or None
+    return None
+```
+
+When the returned value is `None`, queries run without a company filter (Tech Admin, all-companies mode). When a UUID is returned, a `WHERE company_id = %s::uuid` clause is injected.
+
+### DB Migration
+
+```sql
+-- Run once: database/migrations/alter_table.sql
+ALTER TABLE business_units  ADD COLUMN IF NOT EXISTS company_id UUID REFERENCES companies(id);
+ALTER TABLE locations        ADD COLUMN IF NOT EXISTS company_id UUID REFERENCES companies(id);
+ALTER TABLE functional_units ADD COLUMN IF NOT EXISTS company_id UUID REFERENCES companies(id);
+
+INSERT INTO roles (name, description)
+VALUES ('PORTAL_ADMIN', 'Full administrative access within their assigned company')
+ON CONFLICT (name) DO NOTHING;
+```
+
+After applying, run `scripts/setup_db.py` to backfill `company_id` on existing rows.
+
+---
+
+## 13. Organisation CRUD (Admin)
+
+Admins can create, update, and delete Business Units, Locations, and Functional Units from the Organisation tab of the Admin Panel.
+
+### API Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/admin/org/business-units` | List BUs (company-scoped) |
+| POST | `/api/admin/org/business-units` | Create BU |
+| PUT | `/api/admin/org/business-units/<id>` | Update BU |
+| DELETE | `/api/admin/org/business-units/<id>` | Delete BU (409 if employees assigned) |
+| GET | `/api/admin/org/locations` | List locations |
+| POST | `/api/admin/org/locations` | Create location |
+| PUT | `/api/admin/org/locations/<id>` | Update location |
+| DELETE | `/api/admin/org/locations/<id>` | Delete location |
+| GET | `/api/admin/org/functional-units` | List FUs |
+| POST | `/api/admin/org/functional-units` | Create FU |
+| PUT | `/api/admin/org/functional-units/<id>` | Update FU |
+| DELETE | `/api/admin/org/functional-units/<id>` | Delete FU |
+
+### Safety Rules
+
+- **DELETE** returns HTTP 409 if any `employee_org_assignments` row has `is_current = TRUE` referencing the record being deleted.
+- **PUT/DELETE** for Portal Admin: `_assert_org_ownership()` checks the record's `company_id` matches the session's `company_id`; returns 403 otherwise.
+- **POST** for Portal Admin: `company_id` from `_company_scope()` is auto-injected into the INSERT; Portal Admin cannot create records for a different company.
+
+### UI
+
+Each list row in the Organisation tab shows an Edit button (opens pre-filled modal) and a Delete button (disabled with tooltip when employees are assigned). The FU create/edit modal populates the Business Unit dropdown from the currently loaded BU list. All changes save immediately via AJAX and reload the lists.
+
+---
+
+## 14. Feature-Level Permissions Matrix
+
+### Tables
+
+```sql
+portal_features (id, code, label, description, sort_order)
+role_feature_access (role_id, feature_id, can_read, can_write, can_delete)
+```
+
+`portal_features` defines the 8 feature areas:
+
+| code | label |
+|------|-------|
+| `employee_profiles` | Employee Profiles |
+| `org_structure` | Organisation Structure |
+| `user_accounts` | User Accounts |
+| `skills` | Skills & Certifications |
+| `vacations` | Vacations & Leave |
+| `reports` | Reports & Analytics |
+| `company_settings` | Company Settings |
+| `system_config` | System Configuration |
+
+`role_feature_access` stores three boolean flags (`can_read`, `can_write`, `can_delete`) per role–feature pair.
+
+### API Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/admin/roles/features` | Returns `{roles, features, matrix}` — full permission matrix |
+| POST | `/api/admin/roles/feature-access` | Update one role–feature cell (upsert) |
+
+Both are restricted to `SYSTEM_ADMIN`. The matrix is rendered in the **Roles & Permissions** tab as a table where each cell contains R/W/D checkboxes. Changes are saved on each checkbox toggle. `SYSTEM_ADMIN` cells are locked (always full access).
+
+---
+
+## 15. Multi-Company Context Switcher (Tech Admin)
+
+When a Tech Admin is logged in, the Admin Panel header shows a company dropdown:
+
+```
+Company context: [ All Companies ▾ ]   [Scoped]
+```
+
+Selecting a company POSTs to `/api/admin/switch-company` which stores the company UUID in `session['admin_company_id']`. All subsequent API calls from the admin panel (users, employees, BUs, locations, FUs) then filter to that company. Selecting "All Companies" clears the filter.
+
+The switcher also reloads all live data in the current active tab via `switchCompanyCtx()` in the browser JS.
+
+---
+
+## 16. Login Page
+
+The login page uses a **two-column split-panel layout**:
+
+- **Left panel** — dark gradient hero with product branding, tagline, and four feature highlights.
+- **Right panel** — white form panel with demo account chips (2-column grid, click-to-auto-login), email input, and submit button.
+
+Critical asset path: the stylesheet must be referenced as `filename='css/style.css'` (not `filename='style.css'`). This is verified by `tests/test_ui_ux.py::TestTemplateAssetConsistency::test_no_template_uses_bare_style_css`.
+
+---
+
+## 17. DB Setup Script
+
+`scripts/setup_db.py` is a one-shot, safe-to-re-run setup script that:
+
+1. **Applies schema migration** — adds `company_id` to `business_units`, `locations`, `functional_units`; creates `PORTAL_ADMIN` role; creates `portal_features` and `role_feature_access` tables.
+2. **Backfills company_id** on existing org table rows by looking at which company the employees assigned to each BU/location/FU belong to.
+3. **Removes Tech Admin from company** — sets `company_id = NULL` on all `SYSTEM_ADMIN` employee records.
+4. **Seeds portal features** and default role–feature access permissions.
+5. **Seeds Telia employees** — 100 employees with full org hierarchy, user accounts, manager relationships, using the live Telia company UUID from the DB.
+
+```bash
+python scripts/setup_db.py
+```
+
+---
+
+## 18. Telia Company Seed Data
+
+`database/telia_seed.sql` and `scripts/setup_db.py` seed the Telia Company with:
+
+| Entity | Count | Detail |
+|--------|-------|--------|
+| Business Units | 5 | Technology & Innovation, Commercial & Sales, Finance & Administration, People & Culture, Network & Operations |
+| Locations | 5 | Stockholm HQ, Helsinki, Oslo, Copenhagen, Tallinn |
+| Functional Units | 12 | Distributed across BUs |
+| Employees | 100 | L1–L6 (Junior → C-Suite) with Nordic names |
+| Manager hierarchy | Full | 4 levels: C-suite → VP → Senior Manager → IC |
+| Portal accounts | 100 | All employees receive a user account |
+| Portal Admin | 1 | Maria Andersson (CPO) seeded as `PORTAL_ADMIN` |
+
+The raw SQL seed (`telia_seed.sql`) uses hardcoded UUIDs and requires the Telia company to exist with exactly those UUIDs. The Python script (`setup_db.py`) is the recommended path as it dynamically looks up the actual Telia company UUID from the database.
 

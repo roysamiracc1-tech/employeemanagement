@@ -3,76 +3,134 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Login — HR Portal</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <title>Sign in — HR Portal</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body style="display:block">
 
-<div class="login-page">
-  <div class="login-card">
-    <div class="login-card-header">
-      <div class="login-logo">HR</div>
-      <h1>HR Competency Portal</h1>
-      <p>Sign in with your work email to continue</p>
+<div class="login-wrap">
+
+  <!-- ── Left: hero panel ──────────────────────────────────── -->
+  <div class="login-hero">
+    <div class="login-hero-brand">
+      <div class="login-hero-brand-icon">
+        <svg width="22" height="22" fill="none" stroke="rgba(255,255,255,.9)" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+          <circle cx="9" cy="7" r="4"/>
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
+        </svg>
+      </div>
+      <span class="login-hero-brand-name">HR Portal</span>
     </div>
 
-    <div class="login-card-body">
+    <h1 class="login-hero-title">People ops,<br>built for scale</h1>
+    <p class="login-hero-sub">
+      Manage employees, competencies, org structure and vacations across your entire organisation — from one unified platform.
+    </p>
+
+    <div class="login-hero-features">
+      <div class="login-hero-feat">
+        <div class="login-hero-feat-icon">
+          <svg width="16" height="16" fill="none" stroke="rgba(255,255,255,.85)" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+        </div>
+        Employee profiles &amp; competency tracking
+      </div>
+      <div class="login-hero-feat">
+        <div class="login-hero-feat-icon">
+          <svg width="16" height="16" fill="none" stroke="rgba(255,255,255,.85)" stroke-width="2" viewBox="0 0 24 24">
+            <rect x="2" y="7" width="20" height="14" rx="2"/>
+            <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/>
+            <line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/>
+          </svg>
+        </div>
+        Multi-company org structure management
+      </div>
+      <div class="login-hero-feat">
+        <div class="login-hero-feat-icon">
+          <svg width="16" height="16" fill="none" stroke="rgba(255,255,255,.85)" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          </svg>
+        </div>
+        Granular role-based access control
+      </div>
+      <div class="login-hero-feat">
+        <div class="login-hero-feat-icon">
+          <svg width="16" height="16" fill="none" stroke="rgba(255,255,255,.85)" stroke-width="2" viewBox="0 0 24 24">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+            <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
+            <line x1="3" y1="10" x2="21" y2="10"/>
+          </svg>
+        </div>
+        Vacation &amp; leave lifecycle management
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Right: form panel ──────────────────────────────────── -->
+  <div class="login-form-panel">
+    <div class="login-form-inner">
+
+      <h2 class="login-form-title">Welcome back</h2>
+      <p class="login-form-sub">Sign in to your workspace</p>
 
       {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
           {% for category, message in messages %}
-            <div class="flash flash-{{ category }}" style="border-radius:8px;margin-bottom:12px">{{ message }}</div>
+            <div class="flash flash-{{ category }}" style="border-radius:8px;margin-bottom:16px">{{ message }}</div>
           {% endfor %}
         {% endif %}
       {% endwith %}
 
-      <!-- Quick demo logins -->
       {% if demo_users %}
-      <div class="demo-panel">
-        <h4>Demo Accounts</h4>
+      <div class="demo-section-label">Quick access — demo accounts</div>
+      <div class="demo-grid">
         {% for u in demo_users %}
-        <div class="demo-user" onclick="setEmail('{{ u.email }}')">
-          <div>
-            <div class="demo-user-name">{{ u.name }}</div>
-            <div class="demo-user-role">
-              {{ u.job_title }}
-              &nbsp;·&nbsp;
-              {% for r in u.roles %}
-                {% if r != 'EMPLOYEE' %}
-                  <span style="color:#2563eb;font-size:.65rem;font-weight:600">{{ r.replace('_',' ') }}</span>
-                {% endif %}
-              {% endfor %}
-            </div>
+        <div class="demo-chip" onclick="quickLogin('{{ u.email }}')">
+          <div class="demo-chip-name">{{ u.name.split()[0] }} {{ u.name.split()[-1] }}</div>
+          <div class="demo-chip-title">{{ (u.job_title or '—')[:32] }}</div>
+          <div class="demo-chip-badges">
+            {% for r in u.roles %}{% if r != 'EMPLOYEE' %}
+            <span class="demo-chip-badge {% if r == 'SYSTEM_ADMIN' %}sys{% elif r == 'PORTAL_ADMIN' %}prt{% elif 'MANAGER' in r or 'HEAD' in r %}mgr{% elif 'HR' in r %}hr{% endif %}">
+              {{ r.replace('SYSTEM_ADMIN','Tech Admin').replace('PORTAL_ADMIN','Portal Admin').replace('_',' ') }}
+            </span>
+            {% endif %}{% endfor %}
           </div>
-          <button class="demo-use-btn">Use →</button>
         </div>
         {% endfor %}
       </div>
+      <div class="login-or">or enter your email below</div>
       {% endif %}
 
-      <form method="POST" action="{{ url_for('login') }}">
-        <div class="form-group">
-          <label for="email">Work Email</label>
+      <form method="POST" action="{{ url_for('login') }}" id="login-form">
+        <div class="form-group" style="margin-bottom:16px">
+          <label style="font-size:.8rem;font-weight:600;margin-bottom:6px;display:block;color:#374151">Work Email</label>
           <input id="email" name="email" type="email" class="form-control"
-                 placeholder="you@company.com" required autocomplete="email">
+                 placeholder="you@company.com" required autocomplete="email"
+                 style="padding:11px 14px;font-size:.9rem;border-radius:9px">
         </div>
-        <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;padding:10px">
-          Sign In
+        <button type="submit" class="btn btn-primary"
+                style="width:100%;justify-content:center;padding:12px;font-size:.9rem;font-weight:600;border-radius:9px;gap:6px">
+          Continue
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+            <path d="M5 12h14M12 5l7 7-7 7"/>
+          </svg>
         </button>
       </form>
 
-      <p style="text-align:center;font-size:.72rem;color:#94a3b8;margin-top:14px">
-        Demo mode — no password required
-      </p>
+      <p class="login-footer">Demo environment — no password required</p>
     </div>
   </div>
+
 </div>
 
 <script>
-function setEmail(email) {
+function quickLogin(email) {
   document.getElementById('email').value = email;
-  document.getElementById('email').focus();
+  document.getElementById('login-form').submit();
 }
 </script>
 </body>

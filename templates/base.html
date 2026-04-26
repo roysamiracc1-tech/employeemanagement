@@ -106,7 +106,7 @@
       <span class="nav-label">My Company</span>
     </a>
 
-    {% if has_role('SYSTEM_ADMIN') %}
+    {% if has_role('SYSTEM_ADMIN', 'PORTAL_ADMIN') %}
     <span class="sidebar-section-title">Administration</span>
     <a href="{{ url_for('admin') }}"
        class="nav-link {% if request.endpoint == 'admin' %}active{% endif %}">
@@ -116,6 +116,14 @@
       </svg>
       <span class="nav-label">Admin Panel</span>
     </a>
+    <a href="{{ url_for('admin_vacation_types') }}"
+       class="nav-link {% if request.endpoint in ('admin_vacation_types','admin_vacation_type_new','admin_vacation_type_edit') %}active{% endif %}">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path d="M3 17l4-8 4 4 4-6 4 10"/><path d="M3 21h18"/>
+      </svg>
+      <span class="nav-label">Vacation Types</span>
+    </a>
+    {% if is_tech_admin %}
     <a href="{{ url_for('admin_companies') }}"
        class="nav-link {% if request.endpoint in ('admin_companies','admin_company_new','admin_company_edit') %}active{% endif %}">
       <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -126,13 +134,18 @@
       </svg>
       <span class="nav-label">Companies</span>
     </a>
-    <a href="{{ url_for('admin_vacation_types') }}"
-       class="nav-link {% if request.endpoint in ('admin_vacation_types','admin_vacation_type_new','admin_vacation_type_edit') %}active{% endif %}">
+    {% endif %}
+    {% if is_portal_admin and not is_tech_admin %}
+    <a href="{{ url_for('admin_company_settings') }}"
+       class="nav-link {% if request.endpoint == 'admin_company_settings' %}active{% endif %}">
       <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-        <path d="M3 17l4-8 4 4 4-6 4 10"/><path d="M3 21h18"/>
+        <rect x="2" y="7" width="20" height="14" rx="2"/>
+        <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/>
+        <path d="M12 12v4m-2-2h4"/>
       </svg>
-      <span class="nav-label">Vacation Types</span>
+      <span class="nav-label">Company Settings</span>
     </a>
+    {% endif %}
     {% endif %}
   </nav>
 

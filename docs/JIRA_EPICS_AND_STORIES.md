@@ -2,8 +2,7 @@
 
 > **Jira Project:** EmployeeManagementKanban (KAN)
 > **Board URL:** https://roysamiracc1-1777144763345.atlassian.net/jira/software/projects/KAN/boards
-> All 62 issues (10 Epics + 52 Stories) are live in Jira. Status: **To Do**
-> All items are **completed and deployed** to `main`.
+> All issues are live in Jira. All items are **completed and deployed** to `main`.
 
 ---
 
@@ -21,6 +20,12 @@
 | [KAN-9](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-9) | EP8 — Company Branding & Theming | KAN-52 · KAN-53 · KAN-54 · KAN-55 · KAN-56 · KAN-57 · KAN-58 |
 | [KAN-10](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-10) | EP9 — Dashboard & Real-Time Metrics | KAN-59 · KAN-60 · KAN-61 · KAN-62 |
 | [KAN-11](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-11) | EP10 — Work Anniversary Recognition | KAN-63 · KAN-64 |
+| [KAN-65](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-65) | EP11 — Two-Tier Admin System | Stories below |
+| [KAN-66](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-66) | EP12 — Multi-Company Org CRUD | Stories below |
+| [KAN-67](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-67) | EP13 — Feature-Level Permission Matrix | Stories below |
+| [KAN-68](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-68) | EP14 — Test Automation & Quality Gates | Stories below |
+| [KAN-69](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-69) | EP15 — Login Page Redesign | Stories below |
+| [KAN-70](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-70) | EP16 — Multi-Company Seed Data (Telia) | Stories below |
 
 ---
 
@@ -165,3 +170,73 @@
 |----------|-----------|---------------------|----------|
 | [KAN-63](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-63) | As a **manager or admin**, I want to see a visual indicator next to employees whose work anniversaries are upcoming so I can acknowledge them. | 🎂 badge computed from `join_date`; urgency levels: normal (>7 days), soon (≤7 days), urgent (today/tomorrow); animated per urgency. | Should Have |
 | [KAN-64](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-64) | As a **manager**, I want to hover over the badge to see the exact anniversary date and tenure. | Tooltip shows "N-year anniversary on DD MMM YYYY" on hover with smooth animation. | Should Have |
+
+---
+
+## EPIC 11 — Two-Tier Admin System
+**Label:** `admin` `multi-tenant` `security`
+**Description:** Introduce two distinct admin tiers — Tech Admin (system-wide) and Portal Admin (company-scoped) — to support multi-company SaaS operations.
+
+| Story ID | User Story | Acceptance Criteria | Priority |
+|----------|-----------|---------------------|----------|
+| KAN-65 | As a **platform owner**, I want a Tech Admin role that spans all companies so I can manage the entire portal from one account. | `SYSTEM_ADMIN` role grants full cross-company access; not affiliated with any company; `company_id = NULL` on employee record. | Must Have |
+| KAN-66 | As an **HR Director**, I want a Portal Admin role scoped to my company so I can self-manage my company's data without impacting others. | `PORTAL_ADMIN` role; all admin queries auto-filter by `session['company_id']`; cannot see other companies' data. | Must Have |
+| KAN-67 | As a **Tech Admin**, I want to switch company context in the Admin Panel so I can manage a specific company's data without separate logins. | Company context bar in admin header; selecting a company filters all admin sections; selecting "All Companies" removes filter; stored in `session['admin_company_id']`. | Must Have |
+| KAN-68 | As a **Tech Admin**, I should not belong to any company so there is no data-isolation conflict. | `scripts/setup_db.py` sets `company_id = NULL` on all `SYSTEM_ADMIN` employee records; new Tech Admin registrations must have no company; `session['company_id']` is empty. | Must Have |
+
+---
+
+## EPIC 12 — Multi-Company Org CRUD
+**Label:** `org-structure` `admin` `crud`
+**Description:** Full create/update/delete management of Business Units, Locations, and Functional Units from the admin panel, with per-company data isolation.
+
+| Story ID | User Story | Acceptance Criteria | Priority |
+|----------|-----------|---------------------|----------|
+| KAN-69 | As a **Portal Admin**, I want to add, edit, and delete Business Units for my company so I can keep the org chart accurate. | POST/PUT/DELETE `/api/admin/org/business-units`; company_id auto-injected; 409 if employees assigned on delete; Edit modal pre-filled from live data. | Must Have |
+| KAN-70 | As a **Portal Admin**, I want to add, edit, and delete Locations so I can track where employees are based. | POST/PUT/DELETE `/api/admin/org/locations`; office_code unique per instance; 409 on delete if employees assigned. | Must Have |
+| KAN-71 | As a **Portal Admin**, I want to add, edit, and delete Functional Units, linking each to a Business Unit so the hierarchy is complete. | POST/PUT/DELETE `/api/admin/org/functional-units`; BU dropdown in FU modal populated from live BU list; cross-company write blocked with 403. | Must Have |
+| KAN-72 | As a **Tech Admin**, I want to manage org structure for any company I select in the context switcher so I can assist Portal Admins. | Tech Admin in company context can CRUD org entries for that company; Tech Admin with "All Companies" selected can see all entries. | Should Have |
+
+---
+
+## EPIC 13 — Feature-Level Permission Matrix
+**Label:** `rbac` `admin` `permissions`
+**Description:** Allow Tech Admin to define granular read/write/delete permissions per role per feature area via a visual matrix in the Admin Panel.
+
+| Story ID | User Story | Acceptance Criteria | Priority |
+|----------|-----------|---------------------|----------|
+| KAN-73 | As a **Tech Admin**, I want to define what each role can read, write, and delete for each portal feature so access can be tuned without code changes. | Roles & Permissions tab with 8 feature rows × all roles × R/W/D checkboxes; changes saved via `POST /api/admin/roles/feature-access`; `SYSTEM_ADMIN` row locked. | Must Have |
+| KAN-74 | As a **Tech Admin**, I want permission changes to take effect immediately so I do not need to restart the server. | upsert via `ON CONFLICT DO UPDATE`; no server restart required; UI reverts checkbox on API failure. | Must Have |
+
+---
+
+## EPIC 14 — Test Automation & Quality Gates
+**Label:** `testing` `ci` `quality`
+**Description:** Establish a comprehensive automated test suite covering unit, integration, and UI/UX regression; enforce via pre-commit gate.
+
+| Story ID | User Story | Acceptance Criteria | Priority |
+|----------|-----------|---------------------|----------|
+| KAN-75 | As a **developer**, I want a pre-commit hook that runs all tests so regressions cannot reach the repository. | `.git/hooks/pre-commit` runs `pytest tests/ -q`; aborts commit on failure; 238 tests in ≤ 1 second. | Must Have |
+| KAN-76 | As a **developer**, I want UI/UX regression tests that catch broken template assets so login page breakages are caught before commit. | `test_ui_ux.py` verifies CSS path (`css/style.css`), all login page CSS classes exist in stylesheet, no old class names remain, admin tab visibility per role. | Must Have |
+| KAN-77 | As a **developer**, I want integration tests for all admin CRUD endpoints including company scoping so security boundaries are continuously verified. | `test_routes_org.py` — company filter in query params for Portal Admin, 403 cross-company write, 409 on delete with employees, context switch sets session. | Must Have |
+
+---
+
+## EPIC 15 — Login Page Redesign
+**Label:** `ui` `ux` `design`
+**Description:** Replace the single-card login with a modern split-panel layout: hero branding panel (left) + clean form panel (right) with demo account chips.
+
+| Story ID | User Story | Acceptance Criteria | Priority |
+|----------|-----------|---------------------|----------|
+| KAN-78 | As a **new user**, I want a professional login page that communicates product value so I trust the portal. | Split-panel: left hero with gradient, tagline, 4 feature bullets; right panel with form, title, footer. Responsive (hero collapses on mobile). | Should Have |
+| KAN-79 | As a **demo/tester**, I want one-click demo account chips so I can log in without typing an email. | 2-column grid of demo cards; each shows name, title, role badge; clicking auto-submits the form; `quickLogin()` JS function. | Should Have |
+
+---
+
+## EPIC 16 — Multi-Company Seed Data (Telia)
+**Label:** `seed-data` `testing` `telia`
+**Description:** Seed a second company (Telia Company) with realistic Nordic employee data to demonstrate multi-company capabilities.
+
+| Story ID | User Story | Acceptance Criteria | Priority |
+|----------|-----------|---------------------|----------|
+| KAN-80 | As a **Tech Admin**, I want realistic employee data for a second company (Telia) so I can demonstrate multi-company features to stakeholders. | `scripts/setup_db.py` seeds 100 Telia employees across 5 BUs, 5 locations, 12 FUs; full management hierarchy; user accounts with correct roles; Portal Admin seeded as Maria Andersson. | Should Have |

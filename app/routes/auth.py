@@ -19,6 +19,7 @@ def login():
         row = query("""
             SELECT u.id::text, u.employee_id::text, u.email,
                    e.first_name, e.last_name, e.job_title,
+                   e.company_id::text AS company_id,
                    COALESCE(u.theme_preference, 'light') AS theme_preference,
                    ARRAY_REMOVE(ARRAY_AGG(r.name ORDER BY r.name), NULL) AS roles
             FROM users u
@@ -26,12 +27,14 @@ def login():
             LEFT JOIN user_roles ur ON ur.user_id = u.id
             LEFT JOIN roles r ON r.id = ur.role_id
             WHERE LOWER(u.email) = %s AND u.is_active
-            GROUP BY u.id, u.employee_id, u.email, e.first_name, e.last_name, e.job_title, u.theme_preference
+            GROUP BY u.id, u.employee_id, u.email, e.first_name, e.last_name, e.job_title,
+                     e.company_id, u.theme_preference
         """, (email,), one=True)
         if row:
             session.permanent = True
             session['user_id']     = row['id']
             session['employee_id'] = row['employee_id']
+            session['company_id']  = row['company_id'] or ''
             session['user_name']   = f"{row['first_name']} {row['last_name']}"
             session['user_email']  = row['email']
             session['user_title']  = row['job_title'] or ''

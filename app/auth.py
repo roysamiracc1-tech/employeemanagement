@@ -31,8 +31,10 @@ def register_context_processor(app):
     def inject_ctx():
         def has_role(*roles):
             return any(r in session.get('roles', []) for r in roles)
-        branding   = session.get('branding') or {}
-        theme_pref = session.get('theme_pref', 'light')
+        branding       = session.get('branding') or {}
+        theme_pref     = session.get('theme_pref', 'light')
+        is_tech_admin  = 'SYSTEM_ADMIN' in session.get('roles', [])
+        is_portal_admin = 'PORTAL_ADMIN' in session.get('roles', [])
         return dict(
             has_role=has_role,
             session=session,
@@ -40,4 +42,6 @@ def register_context_processor(app):
             now=datetime.datetime.now,
             branding=branding,
             theme_pref=theme_pref,
+            is_tech_admin=is_tech_admin,
+            is_portal_admin=is_portal_admin,
         )
