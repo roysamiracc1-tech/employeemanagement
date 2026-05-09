@@ -52,6 +52,10 @@
               onclick="bmSetMode(this,'admired')" title="Desired = want to use it · Admired = used it and love it">
         ❤️ Admired &amp; Desired
       </button>
+      <button class="an-pill" data-mode="sankey"
+              onclick="bmSetMode(this,'sankey')" title="Technologies developers work with vs. want to work with next year">
+        🔄 Transitions
+      </button>
     </div>
   </div>
 
@@ -70,6 +74,15 @@
     <div id="bm-loading" class="an-loading">Loading…</div>
 
     <div id="bm-body" style="display:none">
+      <!-- Transition / Sankey explainer -->
+      <div id="bm-sk-info" style="display:none;margin-bottom:14px;padding:10px 14px;background:#fdf4ff;border:1.5px solid #e9d5ff;border-radius:8px;font-size:.79rem;color:#6b21a8;line-height:1.6">
+        <strong>Worked with → Want to work with</strong> — shows technology migration paths.<br>
+        <span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#3b82f6;vertical-align:middle;margin-right:4px"></span><strong>Currently Used</strong>: developers work with this today (origin stack).<br>
+        <span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#22c55e;vertical-align:middle;margin-right:4px"></span><strong>Want to Use</strong>: high pull — many developers across stacks want this next year.<br>
+        <span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#f59e0b;vertical-align:middle;margin-right:4px"></span><strong>Core / Sticky</strong>: both widely used AND widely wanted — dominant platforms.<br>
+        Insight: align your company's hiring and training towards the <em>Want to Use</em> column.
+      </div>
+
       <!-- Admired & Desired explainer -->
       <div id="bm-ad-info" style="display:none;margin-bottom:14px;padding:10px 14px;background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:8px;font-size:.79rem;color:#1e40af;line-height:1.6">
         <strong>Admired &amp; Desired</strong> — gauges hype vs reality.<br>
@@ -126,12 +139,10 @@ function bmSetMode(btn, mode) {
   document.querySelectorAll('.an-pill[data-mode]').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   _curMode = mode;
-  // Admired & Desired: OS toggle not relevant
-  if (mode === 'admired') {
+  document.getElementById('bm-ad-info').style.display = mode === 'admired' ? '' : 'none';
+  document.getElementById('bm-sk-info').style.display = mode === 'sankey'  ? '' : 'none';
+  if (mode !== 'popular') {
     document.getElementById('bm-os-toggle').style.display = 'none';
-    document.getElementById('bm-ad-info').style.display = '';
-  } else {
-    document.getElementById('bm-ad-info').style.display = 'none';
   }
   bmLoad();
 }
@@ -177,12 +188,22 @@ async function bmLoad() {
     const legend = document.getElementById('bm-overlay-legend');
     legend.style.display = co && SKILL_CATS.has(_curCat) && _curMode === 'popular' ? '' : 'none';
 
-    if (_curMode === 'admired') {
-      _renderAdmiredChart(data);
-      _renderAdmiredTable(data);
+    // Always show the chart canvas for popular/admired; hide for sankey
+    const canvas = document.getElementById('bm-chart');
+    const skPanel = document.getElementById('bm-sankey-panel');
+    if (_curMode === 'sankey') {
+      canvas.style.display = 'none';
+      _renderSankeyView(data);
     } else {
-      _renderChart(data);
-      _renderTable(data);
+      canvas.style.display = '';
+      if (skPanel) skPanel.innerHTML = '';
+      if (_curMode === 'admired') {
+        _renderAdmiredChart(data);
+        _renderAdmiredTable(data);
+      } else {
+        _renderChart(data);
+        _renderTable(data);
+      }
     }
 
     load.style.display = 'none'; body.style.display = '';
@@ -303,6 +324,133 @@ function _renderTable(data) {
   document.getElementById('bm-source-note').textContent =
     'Source: Stack Overflow Developer Survey ' + data.year + ' · All Respondents';
 }
+
+// ── Transitions (Sankey) view ─────────────────────────────────────────────────
+function _renderSankeyView(data) {
+  if (_bmChart) { _bmChart.destroy(); _bmChart = null; }
+
+  const rows = data.rows.filter(r => r.sankey_role);
+  const worked   = rows.filter(r => r.sankey_role === 'worked_with');
+  const both     = rows.filter(r => r.sankey_role === 'both');
+  const wanted   = rows.filter(r => r.sankey_role === 'want_to_work_with');
+
+  // Render two-panel layout inside the chart canvas area (replace with HTML)
+  document.getElementById('bm-chart').style.display = 'none';
+
+  const panel = document.getElementById('bm-sankey-panel') || (() => {
+    const d = document.createElement('div');
+    d.id = 'bm-sankey-panel';
+    document.getElementById('bm-chart').parentNode.insertBefore(
+      d, document.getElementById('bm-chart'));
+    return d;
+  })();
+
+  if (!rows.length) {
+    panel.innerHTML = '<p style="color:#94a3b8;font-size:.85rem;padding:16px">No transition data for this category.</p>';
+    document.getElementById('bm-table-title').textContent = data.category;
+    return;
+  }
+
+  const _pill = (tech, color, bg, icon) =>
+    `<div style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;
+       background:${bg};border-radius:20px;font-size:.78rem;font-weight:600;
+       color:${color};margin:3px;border:1.5px solid ${color}30">
+       <span>${icon}</span>${escH(tech)}
+     </div>`;
+
+  const workedHtml  = worked.map(r => _pill(r.technology, '#1d4ed8', '#eff6ff', '◀')).join('');
+  const bothHtml    = both.map(r   => _pill(r.technology, '#92400e', '#fffbeb', '⬛')).join('');
+  const wantedHtml  = wanted.map(r => _pill(r.technology, '#166534', '#f0fdf4', '▶')).join('');
+
+  panel.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:16px;align-items:start;margin-bottom:16px">
+
+      <!-- Left: Currently Used -->
+      <div style="background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:10px;padding:14px">
+        <div style="font-size:.72rem;font-weight:700;color:#1d4ed8;text-transform:uppercase;
+                    letter-spacing:.05em;margin-bottom:10px">
+          ◀ Currently Working With (${worked.length})
+        </div>
+        <div style="font-size:.74rem;color:#1e40af;margin-bottom:10px;line-height:1.5">
+          Developers who use these today are actively looking to transition to new technologies.
+        </div>
+        <div>${workedHtml || '<span style="color:#94a3b8;font-size:.78rem">—</span>'}</div>
+      </div>
+
+      <!-- Centre: Arrow + Core -->
+      <div style="display:flex;flex-direction:column;align-items:center;gap:8px;padding-top:20px">
+        <div style="font-size:1.4rem;color:#f59e0b">⇒</div>
+        ${both.length ? `
+        <div style="background:#fffbeb;border:1.5px solid #fde68a;border-radius:10px;padding:10px;max-width:200px">
+          <div style="font-size:.68rem;font-weight:700;color:#92400e;text-transform:uppercase;
+                      letter-spacing:.05em;margin-bottom:8px;text-align:center">
+            ⬛ Core & Sticky (${both.length})
+          </div>
+          <div style="font-size:.68rem;color:#78350f;margin-bottom:8px;text-align:center">
+            Dominant platforms — used AND wanted
+          </div>
+          <div style="text-align:center">${bothHtml}</div>
+        </div>` : ''}
+      </div>
+
+      <!-- Right: Want to Use -->
+      <div style="background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:10px;padding:14px">
+        <div style="font-size:.72rem;font-weight:700;color:#166534;text-transform:uppercase;
+                    letter-spacing:.05em;margin-bottom:10px">
+          ▶ Want to Work With (${wanted.length})
+        </div>
+        <div style="font-size:.74rem;color:#14532d;margin-bottom:10px;line-height:1.5">
+          High pull technologies — developers across many stacks want these next year.
+          Prioritise for hiring and training.
+        </div>
+        <div>${wantedHtml || '<span style="color:#94a3b8;font-size:.78rem">—</span>'}</div>
+      </div>
+    </div>
+
+    <!-- Flow description -->
+    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;
+                padding:10px 14px;font-size:.78rem;color:#475569;line-height:1.6">
+      <strong>How to read this:</strong>
+      Developers currently using <span style="color:#1d4ed8;font-weight:600">blue technologies ◀</span>
+      are flowing towards
+      <span style="color:#166534;font-weight:600">green technologies ▶</span>.
+      <span style="color:#92400e;font-weight:600">Amber technologies ⬛</span> are sticky —
+      developers who use them already also want to keep using them.
+      <br>Use this to align your team's upskilling roadmap with where the industry is heading.
+    </div>`;
+
+  // Summary table
+  const allRoles = [
+    ...worked.map(r  => ({...r, _label: 'Currently Used',     _color: '#1d4ed8'})),
+    ...both.map(r    => ({...r, _label: 'Core / Sticky',       _color: '#92400e'})),
+    ...wanted.map(r  => ({...r, _label: 'Want to Work With',   _color: '#166534'})),
+  ];
+  const thead = document.getElementById('bm-thead');
+  thead.innerHTML = '<tr><th>#</th><th>Technology</th><th>Role</th>' +
+    '<th style="text-align:right">Usage %</th>' +
+    '<th style="text-align:right">Desired %</th>' +
+    '<th style="text-align:right">Admired %</th></tr>';
+
+  const tbody = document.getElementById('bm-tbody');
+  tbody.innerHTML = allRoles.map((r, i) => `<tr>
+    <td style="color:#94a3b8;font-size:.72rem">${i + 1}</td>
+    <td style="font-weight:600">${escH(r.technology)}</td>
+    <td><span style="font-size:.7rem;font-weight:700;color:${r._color};
+      padding:2px 8px;border-radius:10px;background:${r._color}15">${r._label}</span></td>
+    <td style="text-align:right">${r.usage_pct != null ? r.usage_pct + '%' : '—'}</td>
+    <td style="text-align:right;color:#3b82f6">${r.desired_pct != null ? r.desired_pct + '%' : '—'}</td>
+    <td style="text-align:right;color:#ef4444">${r.admired_pct != null ? r.admired_pct + '%' : '—'}</td>
+  </tr>`).join('');
+
+  document.getElementById('bm-table-title').textContent =
+    data.category + ' — Transition map (' + rows.length + ' technologies)';
+  document.getElementById('bm-source-note').textContent =
+    'Source: Stack Overflow Developer Survey ' + data.year + ' · Worked with vs. Want to work with';
+}
+
+// Ensure chart canvas is re-shown when switching back to other modes
+const _origRenderChart     = window._renderChart;
+const _origRenderAdmired   = window._renderAdmiredChart;
 
 // ── Admired & Desired chart ──────────────────────────────────────────────────
 function _renderAdmiredChart(data) {

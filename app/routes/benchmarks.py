@@ -48,7 +48,7 @@ def api_admin_benchmarks():
 
     rows = [to_dict(r) for r in query("""
         SELECT technology, usage_pct, context, rank_in_category,
-               desired_pct, admired_pct
+               desired_pct, admired_pct, sankey_role
         FROM survey_benchmarks
         WHERE survey_year = %s AND category = %s AND context = %s
         ORDER BY rank_in_category
