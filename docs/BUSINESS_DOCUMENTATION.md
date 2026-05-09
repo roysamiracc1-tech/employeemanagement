@@ -274,3 +274,87 @@ Counts are refreshed on a configurable per-role interval (default varies; config
 | HRIS import/export | Not built | Recommended: CSV import for bulk employee creation |
 | SSO/LDAP | Not built | Recommended: replace email-only login with OAuth2/SAML |
 
+
+---
+
+### 3.11 Email Notifications
+
+All HR events trigger email notifications to relevant parties. Notifications are configurable per company by Company Admin or Super Admin.
+
+**Notification events:**
+
+| Event | Default recipients |
+|---|---|
+| `VACATION_REQUESTED` | Solid-Line Manager (forced), HR Admin (mutable) |
+| `VACATION_APPROVED` | Employee (mutable) |
+| `VACATION_REJECTED` | Employee (forced) |
+| `VACATION_CANCELLED` | Manager + HR Admin (mutable) |
+| `EMPLOYEE_CREATED` | HR Admin + Solid-Line Manager (mutable) |
+| `SKILL_VALIDATED` | Employee (mutable) |
+
+**Configuration (Admin Panel → Notifications tab):**
+- Enable or disable each event per recipient role
+- Mark `allow_mute = false` to prevent recipients from silencing a critical notification
+- "Inherit to sub-roles" propagates settings down the role hierarchy in one click
+- Individual users can mute mutable notifications from their profile preferences
+
+---
+
+### 3.12 Full-text Employee & Vacation Search
+
+A global search bar is available in the topbar on every page and a dedicated search results page at `/search`.
+
+**What can be searched:**
+- **Employees** — name, job title, email, department (PostgreSQL GIN full-text index)
+- **Vacations** — natural language: "my upcoming vacation", "team vacation next month"
+- **Org chart** — natural language: "people reporting to me", "my team" → loads org tree
+
+**How it works:**
+- A database trigger (`trg_employee_search`) keeps the `employee_search_index` table updated automatically whenever an employee record is inserted or changed.
+- Vacation queries are matched against pattern libraries and translated to date-range SQL.
+- Org chart queries detect intent ("reporting", "team") and return an action shortcut that links directly to the org tree focused at the right person.
+
+---
+
+### 3.13 Vacation Calendar
+
+All employees have access to a month-grid leave calendar at `/vacation/calendar`.
+
+**Scope filters:**
+- **Mine** — own approved and pending requests
+- **My Team** — direct solid-line reports' approved and pending requests
+- **All** — company-wide (scoped to user's company)
+
+Weekend days are greyed out. Pending requests show with a hatched pattern. A colour legend is auto-generated from the vacation type colours configured by the company.
+
+---
+
+### 3.14 Bulk Employee Import
+
+Company Admins and HR Admins can import employees in bulk via CSV.
+
+**Workflow:**
+1. Admin uploads a CSV file (drag-and-drop or browse). Required columns: `first_name`, `last_name`, `email`.
+2. System validates each row: required fields, email format, uniqueness, employment type enum.
+3. A preview shows all rows with per-row validation status and error messages.
+4. **Portal Admin / Tech Admin**: zero-error imports are auto-approved and can be processed immediately.
+5. **HR Admin**: imports go to `PENDING_REVIEW` status and require Company Admin approval before processing.
+6. Once approved, clicking "Process Import" creates all valid employee records.
+7. Failed rows are marked `SKIPPED`; the import is marked `COMPLETED` even if some rows fail.
+
+**CSV format:** `first_name`, `last_name`, `email` (required) + `job_title`, `employment_type`, `gender`, `phone_number`, `join_date` (optional).
+
+---
+
+### 3.15 Mobile Responsive Design
+
+The portal is fully usable on mobile devices (phones and tablets).
+
+| Breakpoint | Behaviour |
+|---|---|
+| < 768px | Sidebar becomes an off-canvas drawer (hamburger opens, tap overlay closes) |
+| < 768px | Data tables convert to labelled card stacks |
+| < 768px | Admin tabs stack vertically |
+| < 768px | Login panels stack vertically |
+| < 480px | Search bar hidden from topbar (use /search page) |
+| All sizes | Org tree is horizontally scrollable with touch momentum |

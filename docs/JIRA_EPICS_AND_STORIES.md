@@ -257,3 +257,62 @@
 | KAN-85 | As any user, I want the chart to look like a family tree with connecting lines so the hierarchy is visually clear. | Top-down layout: parent card → vertical stem → horizontal connector → child cards; T-connector lines drawn with CSS pseudo-elements; no SVG or canvas required. | Must Have |
 | KAN-86 | As a **developer**, I want a `/api/org-tree/context` endpoint so the frontend can fetch ancestor chains without loading the entire tree. | Returns `{ focus: {...}, ancestors: [{...}, ...] }` ordered CEO-first; uses upward recursive CTE; no depth limit (org is finite). | Must Have |
 | KAN-87 | As a **developer**, I want integration tests covering the new context endpoint and family tree page so regressions are caught pre-commit. | `TestOrgTreePage` (6 tests): accessible to all roles, contains `ftree-root` and `org-nav`. `TestApiOrgTree` (4 tests): root param, empty tree, redirect. `TestApiOrgTreeContext` (5 tests): ancestors, no ancestors at top, default to session, null focus. | Must Have |
+
+---
+
+## EP18 — Email Notification System
+**Jira:** KAN-88 · **Label:** `notifications` `email`
+
+| Story ID | User Story | Acceptance Criteria | Priority |
+|---|---|---|---|
+| KAN-88 | As a **Company Admin**, I want to configure which roles receive which notification events so that only relevant people are alerted. | Admin matrix UI shows events × roles; checkboxes for enabled + allow_mute; saved via POST /api/notifications/settings. | Must Have |
+| KAN-89 | As a **Company Admin**, I want to propagate notification settings down the role hierarchy so I don't configure each role individually. | inherit=true on POST propagates to all sub-roles via ROLE_HIERARCHY map. | Must Have |
+| KAN-90 | As an **Employee**, I want to mute non-critical notifications so I am not overwhelmed. | POST /api/notifications/mute; only works if allow_mute=true in company config. | Should Have |
+| KAN-91 | As a **Developer**, I want async email sending so HTTP requests are never blocked by SMTP. | threading.Thread sends email outside request lifecycle; SMTP_HOST empty = log-only dev mode. | Must Have |
+
+---
+
+## EP19 — Full-Text Search
+**Jira:** KAN-92 · **Label:** `search` `ux`
+
+| Story ID | User Story | Acceptance Criteria | Priority |
+|---|---|---|---|
+| KAN-92 | As an **Employee**, I want to search for colleagues by name or job title so I can find them quickly. | GET /api/search?q= uses plainto_tsquery on GIN-indexed employee_search_index; returns ranked results. | Must Have |
+| KAN-93 | As an **Employee**, I want to search for my upcoming vacations in natural language. | "my upcoming vacation", "next month" patterns parsed server-side to date-range queries. | Should Have |
+| KAN-94 | As a **Manager**, I want to type "people reporting to me" and see my org tree. | Pattern matching returns focus_tree action with root_id=my employee_id. | Should Have |
+| KAN-95 | As any user, I want a search bar always visible in the topbar. | .topbar-search form present on all authenticated pages; links to /search results page. | Must Have |
+
+---
+
+## EP20 — Vacation Calendar
+**Jira:** KAN-96 · **Label:** `calendar` `vacation`
+
+| Story ID | User Story | Acceptance Criteria | Priority |
+|---|---|---|---|
+| KAN-96 | As an **Employee**, I want a month-grid calendar of my leave so I can see my planned absences at a glance. | /vacation/calendar renders pure CSS/JS month grid; scope=mine shows own approved+pending requests. | Must Have |
+| KAN-97 | As a **Manager**, I want to see my whole team's leave in the calendar so I can plan workload. | scope=team queries manager_relationships for solid-line reports; all their approved+pending requests shown. | Must Have |
+| KAN-98 | As an **Admin**, I want to see company-wide leave in the calendar. | scope=all scoped to company_id; colour legend auto-generated from vacation type colours. | Should Have |
+
+---
+
+## EP21 — Bulk Employee Import
+**Jira:** KAN-99 · **Label:** `import` `hr-ops`
+
+| Story ID | User Story | Acceptance Criteria | Priority |
+|---|---|---|---|
+| KAN-99  | As a **Portal Admin**, I want to import employees from a CSV so I can onboard large teams at once. | Drag-drop upload → row-level validation → preview → auto-approve (zero errors) → process. | Must Have |
+| KAN-100 | As an **HR Admin**, I want to upload a CSV that goes through an approval workflow before employees are created. | HR Admin uploads → status=PENDING_REVIEW → Portal Admin approves → process. | Must Have |
+| KAN-101 | As a **Portal Admin**, I want to review and reject an HR Admin's import if it contains errors. | POST /api/admin/imports/<id>/reject with reason; import marked REJECTED. | Must Have |
+| KAN-102 | As a **Developer**, I want per-row validation so that a few bad rows don't block the entire import. | Each row gets validation_errors JSONB; VALID rows imported independently of INVALID rows. | Must Have |
+
+---
+
+## EP22 — Mobile Responsive Design
+**Jira:** KAN-103 · **Label:** `mobile` `ux` `frontend`
+
+| Story ID | User Story | Acceptance Criteria | Priority |
+|---|---|---|---|
+| KAN-103 | As a **Mobile User**, I want the sidebar to open as a drawer so I can navigate on a phone. | @media <768px: sidebar transform translateX(-100%); hamburger toggles .mob-open; overlay closes it. | Must Have |
+| KAN-104 | As a **Mobile User**, I want data tables to show as labelled cards so I can read them without horizontal scroll. | .data-table td becomes display:flex with ::before content:attr(data-label). | Must Have |
+| KAN-105 | As a **Mobile User**, I want the org tree to scroll horizontally with touch momentum. | .ftree-wrap: overflow-x:auto; -webkit-overflow-scrolling:touch. | Should Have |
+| KAN-106 | As a **Mobile User**, I want the login page to stack vertically so it's usable on a small screen. | .login-wrap flex-direction:column at <768px; hero collapses to 180px. | Should Have |
