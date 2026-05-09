@@ -5,6 +5,58 @@
 {% block content %}
 <div class="page">
 
+  {% if companies %}
+  <!-- ── Company context bar (Tech Admin only) ──────────────── -->
+  <div class="ctx-bar" style="align-items:flex-start;flex-wrap:wrap;gap:10px">
+    <div style="display:flex;align-items:center;gap:6px;padding-top:4px">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      <strong>Company:</strong>
+    </div>
+
+    <!-- custom logo dropdown -->
+    <div class="co-picker" id="co-picker">
+      <button type="button" class="co-picker-btn" id="co-picker-btn" onclick="toggleCoPicker()">
+        <span id="co-picker-selected">
+          {% if admin_company_id %}
+            {% for co in companies %}{% if co.id == admin_company_id %}
+              {% if co.logo_url %}<img src="{{ co.logo_url }}" alt="" class="co-picker-logo">{% endif %}
+              <span>{{ co.name }}</span>
+            {% endif %}{% endfor %}
+          {% else %}
+            <span style="opacity:.6">All Companies</span>
+          {% endif %}
+        </span>
+        <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="co-picker-menu" id="co-picker-menu">
+        <div class="co-picker-opt" onclick="switchDashboardCompany('')">
+          <span style="opacity:.6;font-style:italic">All Companies</span>
+        </div>
+        {% for co in companies %}
+        <div class="co-picker-opt {% if admin_company_id == co.id %}co-picker-opt--active{% endif %}"
+             onclick="switchDashboardCompany('{{ co.id }}')">
+          {% if co.logo_url %}<img src="{{ co.logo_url }}" alt="" class="co-picker-logo">{% endif %}
+          <div>
+            <div style="font-weight:600;font-size:.88rem">{{ co.name }}</div>
+            {% if co.admins %}
+            <div style="font-size:.73rem;opacity:.65;margin-top:1px">
+              {% for a in co.admins %}{{ a.name }}{% if not loop.last %}, {% endif %}{% endfor %}
+            </div>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    {% if admin_company_id %}
+    <span class="ctx-badge-scoped">Scoped</span>
+    {% else %}
+    <span class="ctx-badge-all">All Companies</span>
+    {% endif %}
+  </div>
+  {% endif %}
+
   <!-- ── Live refresh indicator ────────────────────────────── -->
   <div class="refresh-bar" id="refresh-bar">
     <span class="refresh-dot ok" id="refresh-dot"></span>
@@ -319,5 +371,25 @@ function tickLastUpdated() {
 refreshStats();
 setInterval(refreshStats,       REFRESH_MS);
 setInterval(tickLastUpdated,    1000);
+
+const COMPANIES_DATA = {{ companies_json | safe }};
+
+function toggleCoPicker() {
+  document.getElementById('co-picker-menu').classList.toggle('co-picker-menu--open');
+}
+document.addEventListener('click', function(e) {
+  const picker = document.getElementById('co-picker');
+  if (picker && !picker.contains(e.target)) {
+    document.getElementById('co-picker-menu').classList.remove('co-picker-menu--open');
+  }
+});
+
+function switchDashboardCompany(companyId) {
+  fetch('/api/admin/switch-company', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({company_id: companyId})
+  }).then(() => location.reload());
+}
 </script>
 {% endblock %}

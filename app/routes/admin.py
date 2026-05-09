@@ -1,3 +1,5 @@
+import json
+
 from flask import session, redirect, url_for, request, render_template, flash, jsonify
 
 from app import app
@@ -21,6 +23,38 @@ def _company_scope():
     return None
 
 
+def _companies_with_admins():
+    """Return active companies with logo_url, theme_color and their PORTAL_ADMIN/HR_ADMIN users."""
+    companies = [to_dict(r) for r in query(
+        "SELECT id::text, name, logo_url, theme_color FROM companies WHERE is_active ORDER BY name"
+    )]
+    if not companies:
+        return companies
+    admins = query("""
+        SELECT e.company_id::text, e.first_name, e.last_name, e.job_title,
+               array_agg(DISTINCT r.name ORDER BY r.name) AS roles
+        FROM employees e
+        JOIN users u ON u.employee_id = e.id AND u.is_active
+        JOIN user_roles ur ON ur.user_id = u.id
+        JOIN roles r ON r.id = ur.role_id
+        WHERE r.name IN ('PORTAL_ADMIN', 'HR_ADMIN')
+          AND e.employment_status = 'ACTIVE'
+        GROUP BY e.company_id, e.id, e.first_name, e.last_name, e.job_title
+        ORDER BY e.last_name
+    """)
+    admins_by_company = {}
+    for a in admins:
+        cid = a['company_id']
+        admins_by_company.setdefault(cid, []).append({
+            'name': f"{a['first_name']} {a['last_name']}",
+            'job_title': a['job_title'],
+            'roles': list(a['roles']),
+        })
+    for co in companies:
+        co['admins'] = admins_by_company.get(co['id'], [])
+    return companies
+
+
 @app.route('/admin')
 @require_roles(*_ADMIN_ROLES)
 def admin():
@@ -29,12 +63,13 @@ def admin():
     companies     = []
     admin_company_id = ''
     if is_tech_admin:
-        companies        = [to_dict(r) for r in query("SELECT id::text, name FROM companies WHERE is_active ORDER BY name")]
+        companies        = _companies_with_admins()
         admin_company_id = session.get('admin_company_id') or ''
     return render_template('admin/panel.html',
                            all_roles=all_roles,
                            is_tech_admin=is_tech_admin,
                            companies=companies,
+                           companies_json=json.dumps(companies),
                            admin_company_id=admin_company_id)
 
 

@@ -2,58 +2,58 @@ from flask import session, request, render_template, jsonify
 
 from app import app
 from app.db import query, to_dict
-from app.auth import require_roles
-from app.helpers import MGMT_ROLES, TREE_CTE, build_nested
+from app.auth import login_required
+from app.helpers import TREE_CTE, build_nested
 
 
 @app.route('/org-tree')
-@require_roles('SYSTEM_ADMIN', 'HR_ADMIN', 'DEPARTMENT_HEAD', 'LOCATION_HEAD',
-               'SOLID_LINE_MANAGER', 'DOTTED_LINE_MANAGER')
+@login_required
 def org_tree():
-    roles    = session.get('roles', [])
-    is_admin = any(r in roles for r in ['SYSTEM_ADMIN', 'HR_ADMIN', 'DEPARTMENT_HEAD', 'LOCATION_HEAD'])
-    all_employees = []
-    if is_admin:
-        all_employees = [to_dict(r) for r in query("""
-            SELECT e.id::text, e.first_name, e.last_name, e.job_title
-            FROM employees e WHERE e.employment_status='ACTIVE'
-            ORDER BY e.first_name, e.last_name
-        """)]
-    return render_template('org/tree.html',
-                           is_admin=is_admin,
-                           own_emp_id=session['employee_id'],
-                           all_employees=all_employees)
+    return render_template('org/tree.html', own_emp_id=session['employee_id'])
 
 
 @app.route('/api/org-tree')
-@require_roles('SYSTEM_ADMIN', 'HR_ADMIN', 'DEPARTMENT_HEAD', 'LOCATION_HEAD',
-               'SOLID_LINE_MANAGER', 'DOTTED_LINE_MANAGER')
+@login_required
 def api_org_tree():
-    roles    = session.get('roles', [])
-    is_admin = any(r in roles for r in ['SYSTEM_ADMIN', 'HR_ADMIN', 'DEPARTMENT_HEAD', 'LOCATION_HEAD'])
-    root_id  = request.args.get('root', '').strip()
+    root_id = request.args.get('root', '').strip() or session['employee_id']
+    flat    = [to_dict(r) for r in query(TREE_CTE, ([root_id],))]
+    roots   = build_nested(flat)
+    if not roots:
+        return jsonify(None)
+    return jsonify(roots[0] if len(roots) == 1 else roots)
 
-    if not is_admin:
-        root_ids = [session['employee_id']]
-    elif root_id:
-        root_ids = [root_id]
-    else:
-        top_rows = query("""
-            SELECT e.id::text FROM employees e
-            WHERE e.employment_status = 'ACTIVE'
-              AND NOT EXISTS (
-                  SELECT 1 FROM manager_relationships mr
-                  WHERE mr.employee_id = e.id
-                    AND mr.relationship_type = 'SOLID_LINE'
-                    AND mr.is_current
-              )
-            ORDER BY e.first_name, e.last_name
-        """)
-        root_ids = [r['id'] for r in top_rows]
 
-    if not root_ids:
-        return jsonify([])
+@app.route('/api/org-tree/context')
+@login_required
+def api_org_tree_context():
+    """Return focus person's basic info + ancestor chain from root to their direct manager."""
+    emp_id = request.args.get('of', '').strip() or session['employee_id']
 
-    flat  = [to_dict(r) for r in query(TREE_CTE, (root_ids,))]
-    roots = build_nested(flat)
-    return jsonify(roots if len(roots) != 1 else roots[0])
+    focus = query("""
+        SELECT e.id::text, e.first_name, e.last_name, e.job_title
+        FROM employees e
+        WHERE e.id = %s::uuid AND e.employment_status = 'ACTIVE'
+    """, (emp_id,), one=True)
+
+    ancestors = query("""
+        WITH RECURSIVE up AS (
+            SELECT mr.manager_id AS id, 1 AS level
+            FROM manager_relationships mr
+            WHERE mr.employee_id = %s::uuid
+              AND mr.relationship_type = 'SOLID_LINE'
+              AND mr.is_current
+            UNION ALL
+            SELECT mr.manager_id, up.level + 1
+            FROM manager_relationships mr
+            JOIN up ON mr.employee_id = up.id
+            WHERE mr.relationship_type = 'SOLID_LINE' AND mr.is_current
+        )
+        SELECT e.id::text, e.first_name, e.last_name, e.job_title
+        FROM up JOIN employees e ON e.id = up.id
+        ORDER BY up.level DESC
+    """, (emp_id,))
+
+    return jsonify({
+        'focus':     to_dict(focus) if focus else None,
+        'ancestors': [to_dict(a) for a in ancestors],
+    })

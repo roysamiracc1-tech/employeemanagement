@@ -7,22 +7,55 @@
 
   {% if is_tech_admin %}
   <!-- ── Company context switcher (Tech Admin only) ──────── -->
-  <div class="ctx-bar">
-    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-      <rect x="2" y="7" width="20" height="14" rx="2"/>
-      <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/>
-    </svg>
-    <span style="font-weight:600">Company context:</span>
-    <select id="company-ctx" onchange="switchCompanyCtx(this.value)">
-      <option value="">All Companies</option>
-      {% for c in companies %}
-      <option value="{{ c.id }}" {% if admin_company_id == c.id %}selected{% endif %}>{{ c.name }}</option>
-      {% endfor %}
-    </select>
+  <div class="ctx-bar" style="align-items:flex-start;flex-wrap:wrap;gap:10px">
+    <div style="display:flex;align-items:center;gap:6px;padding-top:4px">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <rect x="2" y="7" width="20" height="14" rx="2"/>
+        <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/>
+      </svg>
+      <span style="font-weight:600">Company context:</span>
+    </div>
+
+    <!-- custom logo dropdown -->
+    <div class="co-picker" id="admin-co-picker">
+      <button type="button" class="co-picker-btn" id="admin-co-picker-btn" onclick="toggleAdminCoPicker()">
+        <span id="admin-co-picker-selected">
+          {% if admin_company_id %}
+            {% for c in companies %}{% if c.id == admin_company_id %}
+              {% if c.logo_url %}<img src="{{ c.logo_url }}" alt="" class="co-picker-logo">{% endif %}
+              <span>{{ c.name }}</span>
+            {% endif %}{% endfor %}
+          {% else %}
+            <span style="opacity:.6">All Companies</span>
+          {% endif %}
+        </span>
+        <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="co-picker-menu" id="admin-co-picker-menu">
+        <div class="co-picker-opt" onclick="switchCompanyCtx('')">
+          <span style="opacity:.6;font-style:italic">All Companies</span>
+        </div>
+        {% for c in companies %}
+        <div class="co-picker-opt {% if admin_company_id == c.id %}co-picker-opt--active{% endif %}"
+             onclick="switchCompanyCtx('{{ c.id }}')">
+          {% if c.logo_url %}<img src="{{ c.logo_url }}" alt="" class="co-picker-logo">{% endif %}
+          <div>
+            <div style="font-weight:600;font-size:.88rem">{{ c.name }}</div>
+            {% if c.admins %}
+            <div style="font-size:.73rem;opacity:.65;margin-top:1px">
+              {% for a in c.admins %}{{ a.name }}{% if not loop.last %}, {% endif %}{% endfor %}
+            </div>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
     <span id="ctx-badge" class="{% if admin_company_id %}ctx-badge-scoped{% else %}ctx-badge-all{% endif %}">
       {% if admin_company_id %}Scoped{% else %}All companies{% endif %}
     </span>
-    <span style="font-size:.72rem;color:#b45309;margin-left:auto">
+    <span style="font-size:.72rem;color:#b45309;margin-left:auto;padding-top:4px">
       Changing this filters all admin sections to the selected company
     </span>
   </div>
@@ -345,8 +378,22 @@ function switchTab(name, btn) {
   if (name === 'roles'    && document.getElementById('role-matrix-container').innerHTML.includes('Loading')) loadRoleMatrix();
 }
 
+// ── Company logo picker ───────────────────────────────────────────────────
+const COMPANIES_DATA = {{ companies_json | safe }};
+
+function toggleAdminCoPicker() {
+  document.getElementById('admin-co-picker-menu').classList.toggle('co-picker-menu--open');
+}
+document.addEventListener('click', function(e) {
+  const picker = document.getElementById('admin-co-picker');
+  if (picker && !picker.contains(e.target)) {
+    document.getElementById('admin-co-picker-menu').classList.remove('co-picker-menu--open');
+  }
+});
+
 // ── Company context switcher (Tech Admin only) ────────────────────────────
 async function switchCompanyCtx(companyId) {
+  document.getElementById('admin-co-picker-menu').classList.remove('co-picker-menu--open');
   await fetch('/api/admin/switch-company', {
     method: 'POST', headers: {'Content-Type':'application/json'},
     body: JSON.stringify({company_id: companyId || null})
@@ -357,6 +404,19 @@ async function switchCompanyCtx(companyId) {
   } else {
     badge.textContent = 'All companies'; badge.className = 'ctx-badge-all';
   }
+  // Update picker button face
+  const sel = document.getElementById('admin-co-picker-selected');
+  const co  = COMPANIES_DATA.find(c => c.id === companyId);
+  if (co) {
+    sel.innerHTML = (co.logo_url ? `<img src="${co.logo_url}" class="co-picker-logo" alt="">` : '') +
+                    `<span>${co.name}</span>`;
+  } else {
+    sel.innerHTML = `<span style="opacity:.6">All Companies</span>`;
+  }
+  // Mark active option
+  document.querySelectorAll('#admin-co-picker-menu .co-picker-opt').forEach(el => {
+    el.classList.toggle('co-picker-opt--active', el.getAttribute('onclick') === `switchCompanyCtx('${companyId}')`);
+  });
   // Reset and reload all data panels
   allUsers = []; allEmps = [];
   document.getElementById('users-tbody').innerHTML = '<tr class="empty-row"><td colspan="7">Loading…</td></tr>';

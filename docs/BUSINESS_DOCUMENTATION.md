@@ -141,6 +141,29 @@ Each employee has a current org assignment linking them to any combination of th
 
 ---
 
+### 3.10 Org Tree — Family Tree View
+
+The **Organisation Tree** page is accessible to every logged-in employee. It renders as a visual **family tree** (top-down, hierarchical) rather than a folder/indent list.
+
+**How it works:**
+- The tree always **starts from the logged-in employee** — they appear at the root with their team fanning out below.
+- Each person is shown as a card with their avatar, name, job title, and location.
+- Solid-line reporting relationships are shown as connecting lines between cards.
+
+**Navigation:**
+
+| Action | How |
+|--------|-----|
+| Move **up** to manager | Click the blue **↑ [Manager Name]** button above the tree |
+| Move **down** into a team | Click the **Focus ↓** magnifier on any card with reports |
+| Jump to any level | Click a name in the **breadcrumb trail** at the top |
+| Return to own view | Click **← My view** when browsing elsewhere in the org |
+| Expand / collapse a team | Click the pill counter (e.g. **▾ 4**) below any card |
+
+**Access:** All roles (including individual contributors) can view the org tree. Everyone always starts from their own node and can navigate upwards to see the full company hierarchy.
+
+---
+
 ### 3.6 Company Branding
 
 Each company can customise how the portal appears for their employees:

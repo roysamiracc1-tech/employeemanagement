@@ -240,3 +240,20 @@
 | Story ID | User Story | Acceptance Criteria | Priority |
 |----------|-----------|---------------------|----------|
 | KAN-80 | As a **Tech Admin**, I want realistic employee data for a second company (Telia) so I can demonstrate multi-company features to stakeholders. | `scripts/setup_db.py` seeds 100 Telia employees across 5 BUs, 5 locations, 12 FUs; full management hierarchy; user accounts with correct roles; Portal Admin seeded as Maria Andersson. | Should Have |
+
+---
+
+## EP17 — Family Tree Org Chart & Employee-Centric Navigation
+**Jira:** KAN-81 · **Label:** `org-chart` `ux`
+
+**Description:** Redesign the organisation tree from a folder/indent structure into a proper top-down family tree chart that starts from the logged-in employee, with full up/down navigation.
+
+| Story ID | User Story | Acceptance Criteria | Priority |
+|----------|-----------|---------------------|----------|
+| KAN-81 | As an **employee**, I want the org tree to start from my own position so I immediately see my place in the hierarchy. | Tree always loads rooted at `session['employee_id']`; "you" node is highlighted in purple; route is `@login_required` (all roles). | Must Have |
+| KAN-82 | As an **employee**, I want to navigate up the tree to see my manager's team so I understand the wider org context. | Blue ↑ button shows direct manager name; clicking re-focuses the tree at the manager's node; breadcrumb trail updates. | Must Have |
+| KAN-83 | As a **manager**, I want to navigate down into a specific person's team so I can review their reporting structure. | Focus ↓ button visible on hover for any node with reports; clicking re-focuses tree at that person; ← My view button returns. | Must Have |
+| KAN-84 | As any user, I want a breadcrumb trail showing my path through the org so I can jump to any ancestor level. | Breadcrumb renders all ancestors from CEO to current focus; each ancestor is a clickable button; current focus shown in bold. | Must Have |
+| KAN-85 | As any user, I want the chart to look like a family tree with connecting lines so the hierarchy is visually clear. | Top-down layout: parent card → vertical stem → horizontal connector → child cards; T-connector lines drawn with CSS pseudo-elements; no SVG or canvas required. | Must Have |
+| KAN-86 | As a **developer**, I want a `/api/org-tree/context` endpoint so the frontend can fetch ancestor chains without loading the entire tree. | Returns `{ focus: {...}, ancestors: [{...}, ...] }` ordered CEO-first; uses upward recursive CTE; no depth limit (org is finite). | Must Have |
+| KAN-87 | As a **developer**, I want integration tests covering the new context endpoint and family tree page so regressions are caught pre-commit. | `TestOrgTreePage` (6 tests): accessible to all roles, contains `ftree-root` and `org-nav`. `TestApiOrgTree` (4 tests): root param, empty tree, redirect. `TestApiOrgTreeContext` (5 tests): ancestors, no ancestors at top, default to session, null focus. | Must Have |

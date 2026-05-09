@@ -55,14 +55,14 @@ class TestRequireRoles:
             response = client.get('/directory')
             assert response.status_code == 200
 
-    def test_org_tree_blocked_for_plain_employee(self, auth_client):
+    def test_org_tree_accessible_for_plain_employee(self, auth_client):
+        # Org tree is now open to all logged-in users (starts from their own node)
         response = auth_client.get('/org-tree')
-        assert response.status_code == 302
+        assert response.status_code == 200
 
     def test_org_tree_accessible_for_manager(self, manager_client):
-        with patch('app.routes.org.query', return_value=[]):
-            response = manager_client.get('/org-tree')
-            assert response.status_code == 200
+        response = manager_client.get('/org-tree')
+        assert response.status_code == 200
 
     def test_vacation_team_blocked_for_plain_employee(self, auth_client):
         response = auth_client.get('/vacation/team')
@@ -75,7 +75,8 @@ class TestRequireRoles:
 
 class TestLoginRoute:
     def test_login_page_loads(self, client):
-        with patch('app.routes.auth.query', return_value=[]):
+        # _login_demo_data makes 3 queries: tech_admin, companies, all_users
+        with patch('app.routes.auth.query', side_effect=[None, [], []]):
             response = client.get('/login')
             assert response.status_code == 200
 
@@ -85,7 +86,9 @@ class TestLoginRoute:
         assert '/dashboard' in response.headers['Location']
 
     def test_login_post_unknown_email_shows_error(self, client):
-        with patch('app.routes.auth.query', side_effect=[None, []]):
+        # POST: 1 query (user lookup) returns None → redirect back to GET
+        # GET re-render: _login_demo_data makes 3 more queries
+        with patch('app.routes.auth.query', side_effect=[None, None, [], []]):
             response = client.post('/login', data={'email': 'nobody@example.com'},
                                    follow_redirects=True)
             assert response.status_code == 200

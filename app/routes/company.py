@@ -8,7 +8,7 @@ from app.helpers import company_stats, save_logo
 
 @app.route('/company')
 @app.route('/company/<company_id>')
-@login_required
+@require_roles('SYSTEM_ADMIN', 'PORTAL_ADMIN')
 def company_view(company_id=None):
     if company_id is None:
         emp = query("SELECT company_id::text FROM employees WHERE id=%s::uuid",

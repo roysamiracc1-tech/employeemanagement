@@ -440,3 +440,130 @@ class TestRoleFeaturePermissions:
                                   data=json.dumps({'can_read': True}),
                                   content_type='application/json')
         assert r.status_code == 400
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Family-tree Org Chart
+# ─────────────────────────────────────────────────────────────────────────────
+
+EMP_ID  = 'emp00001-0000-0000-0000-000000000001'
+MGR_ID  = 'mgr00001-0000-0000-0000-000000000001'
+CEO_ID  = 'ceo00001-0000-0000-0000-000000000001'
+
+FOCUS_ROW  = {'id': EMP_ID,  'first_name': 'Oliver', 'last_name': 'Hartmann', 'job_title': 'Engineer'}
+MGR_ROW    = {'id': MGR_ID,  'first_name': 'Lars',   'last_name': 'Eriksson', 'job_title': 'VP Eng'}
+CEO_ROW    = {'id': CEO_ID,  'first_name': 'Sofia',  'last_name': 'Andrade',  'job_title': 'CEO'}
+
+TREE_ROW   = {
+    'id': EMP_ID, 'first_name': 'Oliver', 'last_name': 'Hartmann',
+    'job_title': 'Engineer', 'employment_type': 'FULL_TIME',
+    'location': 'London', 'business_unit': 'Engineering',
+    'manager_id': None, 'depth': 0,
+}
+
+
+class TestOrgTreePage:
+    """GET /org-tree is accessible to every logged-in user."""
+
+    def test_accessible_to_plain_employee(self, auth_client):
+        r = auth_client.get('/org-tree')
+        assert r.status_code == 200
+
+    def test_accessible_to_manager(self, manager_client):
+        r = manager_client.get('/org-tree')
+        assert r.status_code == 200
+
+    def test_redirects_unauthenticated(self, client):
+        r = client.get('/org-tree')
+        assert r.status_code in (301, 302)
+
+    def test_page_contains_ftree_root(self, auth_client):
+        r = auth_client.get('/org-tree')
+        assert b'ftree-root' in r.data
+
+    def test_page_contains_own_id(self, auth_client):
+        """Template must embed OWN_ID so JS can mark the 'you' node."""
+        r = auth_client.get('/org-tree')
+        assert b'OWN_ID' in r.data
+
+    def test_page_contains_org_nav(self, auth_client):
+        r = auth_client.get('/org-tree')
+        assert b'org-nav' in r.data
+
+
+class TestApiOrgTree:
+    """GET /api/org-tree defaults to the session employee."""
+
+    def test_returns_json(self, auth_client):
+        with patch('app.routes.org.query', return_value=[TREE_ROW]), \
+             patch('app.routes.org.build_nested', return_value=[FOCUS_ROW]):
+            r = auth_client.get('/api/org-tree')
+        assert r.status_code == 200
+        assert r.content_type.startswith('application/json')
+
+    def test_root_param_respected(self, auth_client):
+        with patch('app.routes.org.query', return_value=[TREE_ROW]) as mock_q, \
+             patch('app.routes.org.build_nested', return_value=[FOCUS_ROW]):
+            auth_client.get(f'/api/org-tree?root={MGR_ID}')
+        call_args = mock_q.call_args[0]
+        assert MGR_ID in str(call_args)
+
+    def test_empty_tree_returns_none(self, auth_client):
+        with patch('app.routes.org.query', return_value=[]), \
+             patch('app.routes.org.build_nested', return_value=[]):
+            r = auth_client.get('/api/org-tree')
+        assert r.status_code == 200
+        assert r.get_json() is None
+
+    def test_unauthenticated_redirected(self, client):
+        r = client.get('/api/org-tree')
+        assert r.status_code in (301, 302)
+
+
+class TestApiOrgTreeContext:
+    """GET /api/org-tree/context returns focus info and ancestor chain."""
+
+    def _context_mock(self, focus_row, ancestor_rows):
+        """Side-effect for query: first call = focus person, second = ancestors."""
+        calls = iter([focus_row, ancestor_rows])
+        def side(sql, params=(), one=False):
+            return next(calls)
+        return side
+
+    def test_returns_focus_and_ancestors(self, auth_client):
+        with patch('app.routes.org.query',
+                   side_effect=self._context_mock(FOCUS_ROW, [MGR_ROW, CEO_ROW])):
+            r = auth_client.get(f'/api/org-tree/context?of={EMP_ID}')
+        assert r.status_code == 200
+        data = r.get_json()
+        assert data['focus']['first_name'] == 'Oliver'
+        assert len(data['ancestors']) == 2
+        assert data['ancestors'][0]['first_name'] == 'Lars'
+
+    def test_no_ancestors_for_top_node(self, auth_client):
+        with patch('app.routes.org.query',
+                   side_effect=self._context_mock(CEO_ROW, [])):
+            r = auth_client.get(f'/api/org-tree/context?of={CEO_ID}')
+        data = r.get_json()
+        assert data['ancestors'] == []
+        assert data['focus']['first_name'] == 'Sofia'
+
+    def test_defaults_to_session_employee(self, auth_client):
+        """Without ?of= param, uses session employee_id."""
+        with patch('app.routes.org.query',
+                   side_effect=self._context_mock(FOCUS_ROW, [])):
+            r = auth_client.get('/api/org-tree/context')
+        assert r.status_code == 200
+        data = r.get_json()
+        assert data['focus'] is not None
+
+    def test_unknown_employee_returns_null_focus(self, auth_client):
+        with patch('app.routes.org.query',
+                   side_effect=self._context_mock(None, [])):
+            r = auth_client.get(f'/api/org-tree/context?of={EMP_ID}')
+        data = r.get_json()
+        assert data['focus'] is None
+
+    def test_unauthenticated_redirected(self, client):
+        r = client.get('/api/org-tree/context')
+        assert r.status_code in (301, 302)

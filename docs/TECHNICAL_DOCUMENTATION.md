@@ -247,7 +247,8 @@ Browser → Flask Route
 |--------|------|-------------|
 | GET | `/api/employees` | Paginated employee list with filters |
 | GET | `/api/my-team` | Direct reports of logged-in manager |
-| GET | `/api/org-tree?root=<id>` | Recursive tree from root (empty = full org) |
+| GET | `/api/org-tree?root=<id>` | Recursive tree from root (defaults to session employee) |
+| GET | `/api/org-tree/context?of=<id>` | Focus employee info + full ancestor chain for nav breadcrumb |
 | GET | `/api/dashboard/stats` | Role-filtered dashboard metrics |
 
 ### Vacation APIs
@@ -293,33 +294,104 @@ Tenure is computed as `(today - join_date).days / 30.44` (months) and `/ 365.25`
 
 ---
 
-## 7. Org Tree Algorithm
+## 7. Org Tree — Family Tree Layout
 
-Uses a PostgreSQL **recursive CTE** limited to 10 levels:
+### Visual design
+The org chart renders as a **top-down family tree** (not a folder/indent list). Each person is a card node; children fan out horizontally below their parent connected by CSS T-connector lines:
+
+```
+              ┌──────────┐
+              │  CEO     │
+              └────┬─────┘
+       ┌───────────┼───────────┐
+ ┌─────┴─────┐ ┌───┴────┐ ┌───┴────┐
+ │ VP Eng    │ │ VP Fin │ │ VP HR  │
+ └─────┬─────┘ └────────┘ └────────┘
+    ┌──┴──┐
+ ┌──┴──┐ ┌┴────┐
+ │ Mgr │ │ Mgr │
+ └─────┘ └─────┘
+```
+
+Each card shows: avatar (initials, colour-coded), full name, job title, location.  
+Cards link to the employee's full profile. A **Focus ↓** button (visible on hover) zooms the tree into that person's subtree.
+
+### Navigation
+
+The tree is **employee-centric**: it always starts from the currently logged-in employee. Two navigation mechanisms allow movement:
+
+| Control | Action |
+|---------|--------|
+| **↑ [Manager Name]** button | Navigate up — loads the manager's subtree as the new root |
+| **Breadcrumb** (ancestor chain) | Click any ancestor to jump directly to their subtree |
+| **Focus ↓** on a card | Navigate down — loads that person's subtree as the new root |
+| **← My view** button | Returns to the logged-in employee's own subtree |
+
+Access: `@login_required` — all employees can view; the tree always starts at their own node.
+
+### Downward tree CTE (`TREE_CTE` in `helpers.py`)
+
+PostgreSQL recursive CTE, depth-limited to 10 levels:
 
 ```sql
 WITH RECURSIVE tree AS (
-    -- Base case: selected root employees
+    -- Base case: the focus employee
     SELECT e.id, ..., NULL::uuid AS manager_id, 0 AS depth
-    FROM employees e
-    WHERE e.id = ANY(%s::uuid[]) AND e.employment_status='ACTIVE'
+    FROM employees e WHERE e.id = ANY(%s::uuid[]) AND e.employment_status='ACTIVE'
 
     UNION ALL
 
-    -- Recursive case: find employees whose SOLID_LINE manager is already in tree
+    -- Recursive: employees whose SOLID_LINE manager is already in the tree
     SELECT e.id, ..., mr.manager_id, t.depth + 1
     FROM employees e
     JOIN manager_relationships mr ON mr.employee_id = e.id
         AND mr.relationship_type = 'SOLID_LINE' AND mr.is_current
     JOIN tree t ON t.id = mr.manager_id
-    WHERE e.employment_status = 'ACTIVE' AND t.depth < 10
+    WHERE e.employment_status='ACTIVE' AND t.depth < 10
 )
-SELECT id::text, ..., manager_id::text, depth FROM tree
 ```
 
-`_build_nested(flat)` converts the flat ordered list into a nested `{..., children: [...]}` structure consumed by the client-side `buildNode()` recursive DOM builder.
+`build_nested(flat)` converts the ordered flat list into `{..., children: [...]}` consumed by `buildNode()`.
 
-For **Full Org** view (admin, no root selected), the base case uses all employees with no current SOLID_LINE manager.
+### Upward ancestor CTE (`/api/org-tree/context`)
+
+A second recursive CTE walks **upwards** from the focus employee to build the breadcrumb:
+
+```sql
+WITH RECURSIVE up AS (
+    SELECT mr.manager_id AS id, 1 AS level
+    FROM manager_relationships mr
+    WHERE mr.employee_id = %s::uuid
+      AND mr.relationship_type = 'SOLID_LINE' AND mr.is_current
+    UNION ALL
+    SELECT mr.manager_id, up.level + 1
+    FROM manager_relationships mr
+    JOIN up ON mr.employee_id = up.id
+    WHERE mr.relationship_type = 'SOLID_LINE' AND mr.is_current
+)
+SELECT e.id::text, e.first_name, e.last_name, e.job_title
+FROM up JOIN employees e ON e.id = up.id
+ORDER BY up.level DESC  -- CEO first, direct manager last
+```
+
+Returns `{ focus: {...}, ancestors: [{...}, ...] }`.
+
+### CSS connector pattern
+
+The T-connector lines between parent and children are drawn entirely with CSS pseudo-elements — no SVG:
+
+```css
+/* Horizontal connector spanning all siblings */
+.ft-row > .ft-node::before  { content:''; position:absolute; top:0; left:0; right:0; height:2px; }
+.ft-row > .ft-node:first-child::before { left: 50%; }   /* trim left  */
+.ft-row > .ft-node:last-child::before  { right: 50%; }  /* trim right */
+.ft-row > .ft-node:only-child::before  { display: none; }
+
+/* Vertical drop from connector to card */
+.ft-row > .ft-node::after   { content:''; top:0; left:50%; width:2px; height:22px; }
+```
+
+The vertical stem from parent card to the horizontal connector is a `<div class="ft-stem">` (2×22 px).
 
 ---
 

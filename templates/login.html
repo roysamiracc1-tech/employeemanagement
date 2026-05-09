@@ -85,25 +85,50 @@
         {% endif %}
       {% endwith %}
 
-      {% if demo_users %}
-      <div class="demo-section-label">Quick access — demo accounts</div>
+      <!-- ── Tech Admin chip ───────────────────────────────── -->
+      {% if tech_admin %}
+      <div class="demo-section-label">Super Admin</div>
       <div class="demo-grid">
-        {% for u in demo_users %}
-        <div class="demo-chip" onclick="quickLogin('{{ u.email }}')">
-          <div class="demo-chip-name">{{ u.name.split()[0] }} {{ u.name.split()[-1] }}</div>
-          <div class="demo-chip-title">{{ (u.job_title or '—')[:32] }}</div>
+        <div class="demo-chip demo-chip--tech" onclick="quickLogin('{{ tech_admin.email }}')">
+          <div class="demo-chip-name">{{ tech_admin.name }}</div>
+          <div class="demo-chip-title">Tech Admin</div>
           <div class="demo-chip-badges">
-            {% for r in u.roles %}{% if r != 'EMPLOYEE' %}
-            <span class="demo-chip-badge {% if r == 'SYSTEM_ADMIN' %}sys{% elif r == 'PORTAL_ADMIN' %}prt{% elif 'MANAGER' in r or 'HEAD' in r %}mgr{% elif 'HR' in r %}hr{% endif %}">
-              {{ r.replace('SYSTEM_ADMIN','Tech Admin').replace('PORTAL_ADMIN','Portal Admin').replace('_',' ') }}
-            </span>
-            {% endif %}{% endfor %}
+            <span class="demo-chip-badge sys">Super Admin</span>
           </div>
         </div>
-        {% endfor %}
       </div>
-      <div class="login-or">or enter your email below</div>
       {% endif %}
+
+      <!-- ── Company picker + role chips ───────────────────── -->
+      {% if demo_companies %}
+      <div class="demo-section-label" style="margin-top:14px">Sign in as — select a company</div>
+
+      <div class="co-picker" id="login-co-picker" style="width:100%;margin-bottom:12px">
+        <button type="button" class="co-picker-btn" style="width:100%" onclick="toggleLoginCoPicker()">
+          <span id="login-co-selected">
+            {% set first = demo_companies[0] %}
+            {% if first.logo_url %}<img src="{{ first.logo_url }}" alt="" class="co-picker-logo">{% endif %}
+            <span>{{ first.name }}</span>
+          </span>
+          <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="co-picker-menu" id="login-co-picker-menu" style="width:100%">
+          {% for co in demo_companies %}
+          <div class="co-picker-opt {% if loop.first %}co-picker-opt--active{% endif %}"
+               data-id="{{ co.id }}" onclick="selectDemoCompany('{{ co.id }}')">
+            {% if co.logo_url %}<img src="{{ co.logo_url }}" alt="" class="co-picker-logo">{% endif %}
+            <span style="font-weight:600">{{ co.name }}</span>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- role chips injected here by JS -->
+      <div id="demo-company-section"></div>
+
+      {% endif %}
+
+      <div class="login-or">or enter your email below</div>
 
       <form method="POST" action="{{ url_for('login') }}" id="login-form">
         <div class="form-group" style="margin-bottom:16px">
@@ -132,6 +157,68 @@ function quickLogin(email) {
   document.getElementById('email').value = email;
   document.getElementById('login-form').submit();
 }
+
+const DEMO_COMPANIES = {{ demo_companies_json | safe }};
+
+function toggleLoginCoPicker() {
+  document.getElementById('login-co-picker-menu').classList.toggle('co-picker-menu--open');
+}
+document.addEventListener('click', function(e) {
+  const picker = document.getElementById('login-co-picker');
+  if (picker && !picker.contains(e.target)) {
+    const menu = document.getElementById('login-co-picker-menu');
+    if (menu) menu.classList.remove('co-picker-menu--open');
+  }
+});
+
+function selectDemoCompany(id) {
+  document.getElementById('login-co-picker-menu').classList.remove('co-picker-menu--open');
+  const co = DEMO_COMPANIES.find(c => c.id === id);
+  if (!co) return;
+  // Update button face
+  const sel = document.getElementById('login-co-selected');
+  sel.innerHTML = (co.logo_url ? `<img src="${co.logo_url}" class="co-picker-logo" alt="">` : '') + `<span>${co.name}</span>`;
+  // Mark active option
+  document.querySelectorAll('#login-co-picker-menu .co-picker-opt').forEach(el => {
+    el.classList.toggle('co-picker-opt--active', el.dataset.id === id);
+  });
+  renderDemoCompany(co);
+}
+
+const ROLE_GROUPS = [
+  { key: 'portal_admins',   label: 'Company Admin',          badge: 'prt', badgeLabel: 'Company Admin'   },
+  { key: 'hr_admins',       label: 'HR Manager',             badge: 'hr',  badgeLabel: 'HR Manager'      },
+  { key: 'solid_managers',  label: 'Solid Line Manager',     badge: 'mgr', badgeLabel: 'Solid Manager'   },
+  { key: 'dotted_managers', label: 'Dotted Line Manager',    badge: 'mgr', badgeLabel: 'Dotted Manager'  },
+  { key: 'contributors',    label: 'Individual Contributor', badge: '',    badgeLabel: 'Employee'        },
+];
+
+function renderDemoCompany(co) {
+  const container = document.getElementById('demo-company-section');
+  let html = '';
+  for (const grp of ROLE_GROUPS) {
+    const users = co[grp.key] || [];
+    if (!users.length) continue;
+    html += `<div class="demo-role-group">
+      <div class="demo-role-group-label">${grp.label}</div>
+      <div class="demo-grid" style="margin-top:4px">`;
+    for (const u of users) {
+      const badge = grp.badge
+        ? `<div class="demo-chip-badges"><span class="demo-chip-badge ${grp.badge}">${grp.badgeLabel}</span></div>`
+        : '';
+      html += `<div class="demo-chip" onclick="quickLogin('${u.email}')">
+        <div class="demo-chip-name">${u.name}</div>
+        <div class="demo-chip-title">${(u.job_title || '—').slice(0, 34)}</div>
+        ${badge}
+      </div>`;
+    }
+    html += `</div></div>`;
+  }
+  container.innerHTML = html || `<p style="font-size:.78rem;opacity:.55;margin:4px 0 8px">No demo users found for this company.</p>`;
+}
+
+// Render first company on load
+if (DEMO_COMPANIES.length) renderDemoCompany(DEMO_COMPANIES[0]);
 </script>
 </body>
 </html>

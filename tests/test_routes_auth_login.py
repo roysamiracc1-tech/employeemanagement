@@ -14,43 +14,65 @@ DEMO_USER_ROW = {
     'id': 'user-001', 'employee_id': 'emp-001',
     'email': 'oliver@company.com',
     'first_name': 'Oliver', 'last_name': 'Hartmann',
-    'job_title': 'CTO', 'company_id': None,
+    'job_title': 'Tech Admin', 'company_id': None,
     'theme_preference': 'light',
     'roles': ['SYSTEM_ADMIN', 'EMPLOYEE'],
 }
 
-DEMO_USERS_LIST = [
-    {'name': 'Oliver Hartmann', 'email': 'oliver@company.com',
-     'job_title': 'CTO', 'roles': ['SYSTEM_ADMIN', 'EMPLOYEE']},
-]
+# Row returned by the tech-admin query in _login_demo_data()
+TECH_ADMIN_ROW = {
+    'email': 'oliver@company.com',
+    'name': 'Oliver Hartmann',
+    'job_title': 'Tech Admin',
+}
+
+DEMO_COMPANY_ROW = {
+    'id': 'co-001', 'name': 'Acme Corp',
+    'logo_url': None, 'theme_color': '#2563eb',
+}
+
+
+def _demo_query_side(sql, params=(), one=False):
+    """Mock for _login_demo_data: tech row → companies → users → empty."""
+    if 'SYSTEM_ADMIN' in sql and one:
+        return TECH_ADMIN_ROW
+    if 'companies' in sql and 'is_active' in sql:
+        return [] if one else [DEMO_COMPANY_ROW]
+    return [] if not one else None
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 class TestLoginPage:
     def test_get_returns_200(self, client):
-        with patch('app.routes.auth.query', return_value=DEMO_USERS_LIST):
+        with patch('app.routes.auth.query', side_effect=_demo_query_side):
             r = client.get('/login')
         assert r.status_code == 200
 
     def test_html_contains_form(self, client):
-        with patch('app.routes.auth.query', return_value=DEMO_USERS_LIST):
+        with patch('app.routes.auth.query', side_effect=_demo_query_side):
             r = client.get('/login')
         html = r.data.decode()
         assert '<form' in html
         assert 'name="email"' in html
 
-    def test_demo_users_rendered_from_query(self, client):
-        with patch('app.routes.auth.query', return_value=DEMO_USERS_LIST):
+    def test_tech_admin_chip_rendered(self, client):
+        with patch('app.routes.auth.query', side_effect=_demo_query_side):
             r = client.get('/login')
         html = r.data.decode()
         assert 'Oliver Hartmann' in html
         assert 'oliver@company.com' in html
 
-    def test_no_demo_panel_when_no_demo_users(self, client):
-        with patch('app.routes.auth.query', return_value=[]):
+    def test_tech_admin_labelled_super_admin(self, client):
+        with patch('app.routes.auth.query', side_effect=_demo_query_side):
             r = client.get('/login')
         html = r.data.decode()
-        assert 'demo-chip' not in html
+        assert 'Super Admin' in html
+
+    def test_no_demo_chips_when_no_data(self, client):
+        with patch('app.routes.auth.query', return_value=None, side_effect=[None, [], []]):
+            r = client.get('/login')
+        html = r.data.decode()
+        assert 'demo-chip--tech' not in html
 
     def test_redirects_already_logged_in_user(self, client):
         _set_session(client)

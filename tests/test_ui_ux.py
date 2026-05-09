@@ -36,17 +36,22 @@ def assert_no_broken_links(html):
 # LOGIN PAGE
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _demo_query_stub(sql, params=(), one=False):
+    """Minimal stub for _login_demo_data: returns None for one=True, [] for lists."""
+    return None if one else []
+
+
 class TestLoginPageStructure:
     """The login page must be a clean split-panel layout with correct assets."""
 
     def _html(self, client):
-        with patch('app.routes.auth.query', return_value=[]):
+        with patch('app.routes.auth.query', side_effect=_demo_query_stub):
             status, html = get_html(client, '/login')
         assert status == 200, f"Login page returned {status}"
         return html
 
     def test_returns_200(self, client):
-        with patch('app.routes.auth.query', return_value=[]):
+        with patch('app.routes.auth.query', side_effect=_demo_query_stub):
             status, _ = get_html(client, '/login')
         assert status == 200
 
@@ -87,11 +92,12 @@ class TestLoginPageStructure:
         assert 'Inter' in html, "Inter font not requested"
 
     def test_demo_accounts_rendered(self, client):
-        demo = [{
-            'name': 'Oliver Hartmann', 'email': 'oliver@company.com',
-            'job_title': 'CTO', 'roles': ['SYSTEM_ADMIN', 'EMPLOYEE'],
-        }]
-        with patch('app.routes.auth.query', return_value=demo):
+        tech_row = {'email': 'oliver@company.com', 'name': 'Oliver Hartmann', 'job_title': 'Tech Admin'}
+        def _side(sql, params=(), one=False):
+            if 'SYSTEM_ADMIN' in sql and one:
+                return tech_row
+            return [] if not one else None
+        with patch('app.routes.auth.query', side_effect=_side):
             _, html = get_html(client, '/login')
         assert 'demo-chip' in html,   "Demo account chips not rendered"
         assert 'demo-grid' in html,   "Demo account grid not rendered"
@@ -99,11 +105,15 @@ class TestLoginPageStructure:
         assert 'Oliver Hartmann' in html
 
     def test_demo_badges_show_role_labels(self, client):
-        demo = [{'name': 'A B', 'email': 'a@b.com', 'job_title': 'Dev',
-                 'roles': ['SYSTEM_ADMIN', 'EMPLOYEE']}]
-        with patch('app.routes.auth.query', return_value=demo):
+        tech_row = {'email': 'a@b.com', 'name': 'A B', 'job_title': 'Tech Admin'}
+        def _side(sql, params=(), one=False):
+            if 'SYSTEM_ADMIN' in sql and one:
+                return tech_row
+            return [] if not one else None
+        with patch('app.routes.auth.query', side_effect=_side):
             _, html = get_html(client, '/login')
-        assert 'Tech Admin' in html, "SYSTEM_ADMIN should display as 'Tech Admin'"
+        assert 'Super Admin' in html, "Tech Admin chip should show 'Super Admin' badge"
+        assert 'Tech Admin' in html,  "Tech Admin label missing"
 
     def test_no_old_login_card_classes(self, client):
         """Ensure the old (broken) login-card / login-page classes are gone."""

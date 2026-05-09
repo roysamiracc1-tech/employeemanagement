@@ -1,8 +1,73 @@
+import json
+from collections import defaultdict
+
 from flask import session, redirect, url_for, request, render_template, flash
 
 from app import app
 from app.db import query, execute, to_dict
 from app.auth import login_required
+
+
+def _login_demo_data():
+    """Return structured demo data: tech_admin + per-company role buckets."""
+    _tech_row = query("""
+        SELECT u.email, e.first_name || ' ' || e.last_name AS name, e.job_title
+        FROM users u
+        JOIN employees e ON e.id = u.employee_id
+        JOIN user_roles ur ON ur.user_id = u.id
+        JOIN roles r ON r.id = ur.role_id
+        WHERE r.name = 'SYSTEM_ADMIN' AND e.company_id IS NULL AND u.is_active
+        LIMIT 1
+    """, one=True)
+    tech = to_dict(_tech_row) if _tech_row else None
+
+    companies_raw = [to_dict(r) for r in query(
+        "SELECT id::text, name, logo_url, theme_color FROM companies WHERE is_active ORDER BY name"
+    )]
+
+    all_users = query("""
+        SELECT u.email, e.first_name || ' ' || e.last_name AS name, e.job_title,
+               e.company_id::text AS company_id, e.employee_number,
+               array_agg(DISTINCT r.name ORDER BY r.name) AS roles
+        FROM users u
+        JOIN employees e ON e.id = u.employee_id AND e.employment_status = 'ACTIVE'
+        LEFT JOIN user_roles ur ON ur.user_id = u.id
+        LEFT JOIN roles r ON r.id = ur.role_id
+        WHERE u.is_active AND e.company_id IS NOT NULL
+        GROUP BY u.email, e.first_name, e.last_name, e.job_title, e.company_id, e.employee_number
+        ORDER BY e.company_id, e.employee_number
+    """)
+
+    LIMITS = {'portal_admins': 1, 'hr_admins': 2, 'solid_managers': 2,
+              'dotted_managers': 2, 'contributors': 2}
+    buckets = defaultdict(lambda: {k: [] for k in LIMITS})
+
+    for u in all_users:
+        roles = set(u['roles'] or ['EMPLOYEE'])
+        cid   = u['company_id']
+        person = {'email': u['email'], 'name': u['name'], 'job_title': u['job_title']}
+        if 'PORTAL_ADMIN' in roles:
+            key = 'portal_admins'
+        elif 'HR_ADMIN' in roles:
+            key = 'hr_admins'
+        elif 'SOLID_LINE_MANAGER' in roles and 'DOTTED_LINE_MANAGER' not in roles:
+            key = 'solid_managers'
+        elif 'DOTTED_LINE_MANAGER' in roles:
+            key = 'dotted_managers'
+        elif roles <= {'EMPLOYEE'}:
+            key = 'contributors'
+        else:
+            continue
+        if len(buckets[cid][key]) < LIMITS[key]:
+            buckets[cid][key].append(person)
+
+    companies = []
+    for co in companies_raw:
+        entry = dict(co)
+        entry.update(buckets.get(co['id'], {k: [] for k in LIMITS}))
+        companies.append(entry)
+
+    return {'tech_admin': tech, 'companies': companies}
 
 
 @app.route('/')
@@ -50,18 +115,11 @@ def login():
             return redirect(url_for('dashboard'))
         flash('No active account found for that email address.', 'error')
 
-    demo_users = query("""
-        SELECT e.first_name || ' ' || e.last_name AS name, u.email, e.job_title,
-               ARRAY_REMOVE(ARRAY_AGG(r.name ORDER BY r.name), NULL) AS roles
-        FROM users u
-        JOIN employees e ON e.id = u.employee_id
-        LEFT JOIN user_roles ur ON ur.user_id = u.id
-        LEFT JOIN roles r ON r.id = ur.role_id
-        WHERE e.employee_number IN ('EMP-001','EMP-002','EMP-003','EMP-007','EMP-008','EMP-013')
-        GROUP BY u.email, e.first_name, e.last_name, e.job_title, e.employee_number
-        ORDER BY e.employee_number
-    """)
-    return render_template('login.html', demo_users=demo_users)
+    demo = _login_demo_data()
+    return render_template('login.html',
+                           tech_admin=demo['tech_admin'],
+                           demo_companies=demo['companies'],
+                           demo_companies_json=json.dumps(demo['companies']))
 
 
 @app.route('/logout')
