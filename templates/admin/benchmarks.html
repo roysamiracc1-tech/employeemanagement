@@ -1,0 +1,280 @@
+{% extends 'base.html' %}
+{% block title %}Tech Benchmarks — HR Portal{% endblock %}
+{% block page_title %}Tech Benchmarks{% endblock %}
+
+{% block content %}
+<div class="page" style="max-width:1100px">
+
+  <!-- ── Header ─────────────────────────────────────────────────────────── -->
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px">
+    <div>
+      <h1 style="font-size:1.25rem;font-weight:700;margin-bottom:4px">
+        Stack Overflow Developer Survey — Most Popular Technologies
+      </h1>
+      <p style="font-size:.8rem;color:#64748b">
+        2025 · All Respondents ·
+        <a href="https://survey.stackoverflow.co/2025" target="_blank" rel="noopener"
+           style="color:#3b82f6">survey.stackoverflow.co/2025</a>
+        · Data licensed under ODbL
+      </p>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <!-- Company overlay selector -->
+      <div style="display:flex;align-items:center;gap:6px">
+        <label style="font-size:.75rem;color:#64748b;white-space:nowrap">Compare with:</label>
+        <select id="bm-company" class="form-control" style="min-width:160px;max-width:200px;font-size:.8rem"
+                onchange="bmLoad()">
+          <option value="">— No company —</option>
+          {% for co in companies %}
+          <option value="{{ co.id }}">{{ co.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="window.print()">⎙ Print</button>
+    </div>
+  </div>
+
+  <!-- ── Overlay legend (shown when company selected) ──────────────────── -->
+  <div id="bm-overlay-legend" style="display:none;margin-bottom:14px;padding:10px 14px;background:#fdf4ff;border:1.5px solid #e9d5ff;border-radius:8px;font-size:.78rem;color:#7c3aed">
+    <strong>Purple bar</strong> = % of your company's active employees who have this skill listed in their profile.
+    Only visible for skill-related categories.
+  </div>
+
+  <!-- ── Category tabs ──────────────────────────────────────────────────── -->
+  <div class="an-tabs" id="bm-tabs" style="flex-wrap:wrap">
+    {% for cat in category_order %}
+    <button class="an-tab {% if loop.first %}active{% endif %}"
+            data-cat="{{ cat }}"
+            onclick="bmSwitchTab(this,'{{ cat }}')">
+      {{ cat }}
+    </button>
+    {% endfor %}
+  </div>
+
+  <!-- ── Chart + table panel ────────────────────────────────────────────── -->
+  <div class="an-tab-content" id="bm-panel">
+    <div id="bm-loading" class="an-loading">Loading…</div>
+
+    <div id="bm-body" style="display:none">
+      <div id="bm-os-toggle" style="display:none;margin-bottom:12px">
+        <div class="an-range-pills">
+          <button class="an-pill active" data-ctx="all_respondents" onclick="bmSetCtx(this,'all_respondents')">All</button>
+          <button class="an-pill" data-ctx="personal"       onclick="bmSetCtx(this,'personal')">Personal</button>
+          <button class="an-pill" data-ctx="professional"   onclick="bmSetCtx(this,'professional')">Professional</button>
+        </div>
+      </div>
+
+      <!-- Chart -->
+      <div style="position:relative;margin-bottom:20px">
+        <canvas id="bm-chart"></canvas>
+      </div>
+
+      <!-- Table -->
+      <div class="an-card">
+        <div class="an-card-hdr" style="justify-content:space-between">
+          <span style="font-weight:700;font-size:.8rem" id="bm-table-title">Results</span>
+          <span style="font-size:.7rem;color:#94a3b8" id="bm-source-note">Source: Stack Overflow 2025</span>
+        </div>
+        <div class="table-wrap">
+          <table class="an-table" id="bm-table">
+            <thead id="bm-thead"></thead>
+            <tbody id="bm-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script>
+let _curCat   = '{{ category_order[0] }}';
+let _curCtx   = 'all_respondents';
+let _bmChart  = null;
+const SKILL_CATS = new Set([
+  'Programming Languages','Databases','Web Frameworks',
+  'Cloud & DevOps','Dev IDEs','Large Language Models'
+]);
+
+function bmSwitchTab(btn, cat) {
+  document.querySelectorAll('.an-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  _curCat = cat;
+  _curCtx = 'all_respondents';
+  document.querySelectorAll('.an-pill[data-ctx]').forEach(b => {
+    b.classList.toggle('active', b.dataset.ctx === 'all_respondents');
+  });
+  bmLoad();
+}
+
+function bmSetCtx(btn, ctx) {
+  document.querySelectorAll('.an-pill[data-ctx]').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  _curCtx = ctx;
+  bmLoad();
+}
+
+async function bmLoad() {
+  const load = document.getElementById('bm-loading');
+  const body = document.getElementById('bm-body');
+  load.style.display = ''; body.style.display = 'none';
+
+  const co = document.getElementById('bm-company')?.value || '';
+  const p  = new URLSearchParams({
+    category: _curCat, year: 2025, context: _curCtx
+  });
+  if (co) p.set('company_id', co);
+
+  try {
+    const res  = await fetch('/api/admin/benchmarks?' + p.toString());
+    const data = await res.json();
+
+    // OS toggle visibility
+    const osToggle = document.getElementById('bm-os-toggle');
+    osToggle.style.display = _curCat === 'Operating Systems' ? '' : 'none';
+
+    // Overlay legend
+    const legend = document.getElementById('bm-overlay-legend');
+    legend.style.display = co && SKILL_CATS.has(_curCat) ? '' : 'none';
+
+    _renderChart(data);
+    _renderTable(data);
+
+    load.style.display = 'none'; body.style.display = '';
+  } catch (e) {
+    load.textContent = 'Error loading data: ' + e.message;
+  }
+}
+
+function _renderChart(data) {
+  if (_bmChart) { _bmChart.destroy(); _bmChart = null; }
+
+  const rows    = data.rows;
+  const overlay = data.overlay || [];
+  const overlayMap = {};
+  overlay.forEach(o => { overlayMap[o.technology] = parseFloat(o.company_pct); });
+
+  const labels   = rows.map(r => r.technology);
+  const so_vals  = rows.map(r => parseFloat(r.usage_pct));
+  const co_vals  = rows.map(r => overlayMap[r.technology] || 0);
+  const hasOverlay = overlay.length > 0;
+
+  const ctx = document.getElementById('bm-chart').getContext('2d');
+  const datasets = [
+    {
+      label:           'SO 2025 — % of all respondents',
+      data:            so_vals,
+      backgroundColor: '#3b82f6',
+      borderRadius:    3,
+    }
+  ];
+  if (hasOverlay) {
+    datasets.push({
+      label:           'Your company — % of active employees with this skill',
+      data:            co_vals,
+      backgroundColor: '#a855f7',
+      borderRadius:    3,
+    });
+  }
+
+  // Dynamic height: 28px per row, minimum 300px
+  const height = Math.max(300, labels.length * 28);
+  document.getElementById('bm-chart').style.height = height + 'px';
+
+  _bmChart = new Chart(ctx, {
+    type: 'bar',
+    data: { labels, datasets },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          display: true,
+          position: 'top',
+          labels: { boxWidth: 12, font: { size: 11 } }
+        },
+        tooltip: {
+          callbacks: {
+            label: ctx => ` ${ctx.dataset.label.split('—')[0].trim()}: ${ctx.parsed.x}%`
+          }
+        }
+      },
+      scales: {
+        x: {
+          beginAtZero: true,
+          max: 100,
+          ticks: { callback: v => v + '%', font: { size: 10 } },
+          grid: { color: '#e2e8f020' }
+        },
+        y: {
+          ticks: { font: { size: 10 } },
+          grid: { display: false }
+        }
+      }
+    }
+  });
+}
+
+function _renderTable(data) {
+  const rows    = data.rows;
+  const overlay = data.overlay || [];
+  const overlayMap = {};
+  overlay.forEach(o => { overlayMap[o.technology] = o; });
+  const hasOverlay = overlay.length > 0;
+  const totalEmp   = data.total_employees || 0;
+
+  // Table header
+  const thead = document.getElementById('bm-thead');
+  thead.innerHTML = '<tr>' +
+    '<th style="width:28px">#</th>' +
+    '<th>Technology</th>' +
+    '<th style="text-align:right">SO 2025 %</th>' +
+    (hasOverlay
+      ? '<th style="text-align:right">Company %</th>' +
+        '<th style="text-align:right">Employees</th>'
+      : '') +
+    '</tr>';
+
+  // Table body
+  const tbody = document.getElementById('bm-tbody');
+  tbody.innerHTML = rows.map((r, i) => {
+    const ov  = overlayMap[r.technology];
+    const pct = ov ? parseFloat(ov.company_pct) : 0;
+    const cnt = ov ? ov.emp_count : 0;
+    const bar = `<div style="display:inline-block;height:6px;border-radius:3px;background:#3b82f6;width:${Math.min(parseFloat(r.usage_pct),100)}%;max-width:100px;vertical-align:middle;margin-right:6px"></div>`;
+    return '<tr>' +
+      `<td style="color:#94a3b8;font-size:.72rem">${i + 1}</td>` +
+      `<td style="font-weight:600">${escH(r.technology)}</td>` +
+      `<td style="text-align:right">${bar}<strong>${r.usage_pct}%</strong></td>` +
+      (hasOverlay
+        ? `<td style="text-align:right;color:${pct > 0 ? '#7c3aed' : '#94a3b8'}">${pct > 0 ? pct + '%' : '—'}</td>` +
+          `<td style="text-align:right;color:#64748b">${cnt > 0 ? cnt + ' / ' + totalEmp : '—'}</td>`
+        : '') +
+      '</tr>';
+  }).join('');
+
+  document.getElementById('bm-table-title').textContent = data.category + ' (' + rows.length + ' technologies)';
+  document.getElementById('bm-source-note').textContent =
+    'Source: Stack Overflow Developer Survey ' + data.year + ' · All Respondents';
+}
+
+function escH(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// Init
+bmLoad();
+</script>
+
+<style>
+@media print {
+  .sidebar, .topbar, #bm-company, .an-tabs, #bm-os-toggle { display: none !important; }
+  .an-tab-content { border: none; }
+  #bm-chart { max-height: 600px !important; }
+}
+</style>
+{% endblock %}

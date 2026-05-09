@@ -29,7 +29,7 @@ register_context_processor(app)
 
 # Register all route modules (import-time side-effect: @app.route decorators fire)
 from app.routes import auth, dashboard, employees, admin, org, company, vacation  # noqa: F401
-from app.routes import notifications, search, calendar, imports, analytics  # noqa: F401
+from app.routes import notifications, search, calendar, imports, analytics, benchmarks  # noqa: F401
 
 # Register page-view tracker (after_request hook)
 from app.services import page_tracker as _pt
