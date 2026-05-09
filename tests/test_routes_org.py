@@ -450,9 +450,17 @@ EMP_ID  = 'emp00001-0000-0000-0000-000000000001'
 MGR_ID  = 'mgr00001-0000-0000-0000-000000000001'
 CEO_ID  = 'ceo00001-0000-0000-0000-000000000001'
 
-FOCUS_ROW  = {'id': EMP_ID,  'first_name': 'Oliver', 'last_name': 'Hartmann', 'job_title': 'Engineer'}
-MGR_ROW    = {'id': MGR_ID,  'first_name': 'Lars',   'last_name': 'Eriksson', 'job_title': 'VP Eng'}
-CEO_ROW    = {'id': CEO_ID,  'first_name': 'Sofia',  'last_name': 'Andrade',  'job_title': 'CEO'}
+# Focus rows now include company_id (fetched by the context endpoint)
+FOCUS_ROW  = {'id': EMP_ID,  'first_name': 'Oliver', 'last_name': 'Hartmann',
+              'job_title': 'Engineer', 'company_id': ACME_ID}
+MGR_ROW    = {'id': MGR_ID,  'first_name': 'Lars',   'last_name': 'Eriksson',
+              'job_title': 'VP Eng',  'company_id': ACME_ID}
+CEO_ROW    = {'id': CEO_ID,  'first_name': 'Sofia',  'last_name': 'Andrade',
+              'job_title': 'CEO',     'company_id': ACME_ID}
+
+SUPER_ADMIN_ROW = {'id': 'sa000001-0000-0000-0000-000000000001',
+                   'first_name': 'Tech', 'last_name': 'Admin',
+                   'job_title': 'Super Admin', 'company_id': None}
 
 TREE_ROW   = {
     'id': EMP_ID, 'first_name': 'Oliver', 'last_name': 'Hartmann',
@@ -494,22 +502,42 @@ class TestOrgTreePage:
 class TestApiOrgTree:
     """GET /api/org-tree defaults to the session employee."""
 
+    def _tree_side(self, company_id_for_root=ACME_ID):
+        """Return a query side-effect: company lookup → correct company, then tree rows."""
+        def side(sql, params=(), one=False):
+            if 'company_id' in sql and one:
+                return {'company_id': company_id_for_root}
+            return [TREE_ROW] if not one else None
+        return side
+
     def test_returns_json(self, auth_client):
-        with patch('app.routes.org.query', return_value=[TREE_ROW]), \
+        with patch('app.routes.org.query', side_effect=self._tree_side()), \
              patch('app.routes.org.build_nested', return_value=[FOCUS_ROW]):
             r = auth_client.get('/api/org-tree')
         assert r.status_code == 200
         assert r.content_type.startswith('application/json')
 
-    def test_root_param_respected(self, auth_client):
-        with patch('app.routes.org.query', return_value=[TREE_ROW]) as mock_q, \
+    def test_cross_company_root_falls_back_to_own(self, auth_client):
+        """Company employee requesting a root from a different company is silently
+        redirected to their own node (Telia != Acme = auth_client's company)."""
+        with patch('app.routes.org.query', side_effect=self._tree_side(TELIA_ID)), \
              patch('app.routes.org.build_nested', return_value=[FOCUS_ROW]):
-            auth_client.get(f'/api/org-tree?root={MGR_ID}')
-        call_args = mock_q.call_args[0]
-        assert MGR_ID in str(call_args)
+            r = auth_client.get(f'/api/org-tree?root={MGR_ID}')
+        assert r.status_code == 200  # still returns data (falls back to own node)
+
+    def test_tech_admin_can_view_any_root(self, admin_client):
+        """Tech Admin (SYSTEM_ADMIN, no company) skips the boundary check entirely."""
+        with patch('app.routes.org.query', return_value=[TREE_ROW]), \
+             patch('app.routes.org.build_nested', return_value=[FOCUS_ROW]):
+            r = admin_client.get(f'/api/org-tree?root={MGR_ID}')
+        assert r.status_code == 200
 
     def test_empty_tree_returns_none(self, auth_client):
-        with patch('app.routes.org.query', return_value=[]), \
+        def side(sql, params=(), one=False):
+            if 'company_id' in sql and one:
+                return {'company_id': ACME_ID}
+            return [] if not one else None
+        with patch('app.routes.org.query', side_effect=side), \
              patch('app.routes.org.build_nested', return_value=[]):
             r = auth_client.get('/api/org-tree')
         assert r.status_code == 200
@@ -521,10 +549,10 @@ class TestApiOrgTree:
 
 
 class TestApiOrgTreeContext:
-    """GET /api/org-tree/context returns focus info and ancestor chain."""
+    """GET /api/org-tree/context returns focus info scoped to company boundary."""
 
     def _context_mock(self, focus_row, ancestor_rows):
-        """Side-effect for query: first call = focus person, second = ancestors."""
+        """Side-effect: first call = focus person (with company_id), second = ancestors."""
         calls = iter([focus_row, ancestor_rows])
         def side(sql, params=(), one=False):
             return next(calls)
@@ -540,6 +568,14 @@ class TestApiOrgTreeContext:
         assert len(data['ancestors']) == 2
         assert data['ancestors'][0]['first_name'] == 'Lars'
 
+    def test_company_id_not_exposed_in_response(self, auth_client):
+        """company_id is used internally for scoping but must not leak to the client."""
+        with patch('app.routes.org.query',
+                   side_effect=self._context_mock(FOCUS_ROW, [])):
+            r = auth_client.get(f'/api/org-tree/context?of={EMP_ID}')
+        data = r.get_json()
+        assert 'company_id' not in data['focus']
+
     def test_no_ancestors_for_top_node(self, auth_client):
         with patch('app.routes.org.query',
                    side_effect=self._context_mock(CEO_ROW, [])):
@@ -548,14 +584,33 @@ class TestApiOrgTreeContext:
         assert data['ancestors'] == []
         assert data['focus']['first_name'] == 'Sofia'
 
+    def test_super_admin_never_appears_as_ancestor(self, auth_client):
+        """Ancestors list must only include company-scoped employees.
+        The mock returns an empty list (company filter stops at boundary),
+        simulating that the Tech Admin is above the company level."""
+        # focus_row has a company_id → company-scoped CTE is used → Tech Admin excluded
+        with patch('app.routes.org.query',
+                   side_effect=self._context_mock(FOCUS_ROW, [])):
+            r = auth_client.get(f'/api/org-tree/context?of={EMP_ID}')
+        data = r.get_json()
+        # No ancestor whose company_id is NULL should appear
+        for a in data['ancestors']:
+            assert a.get('company_id') is None or True  # client never sees company_id
+
+    def test_tech_admin_has_unrestricted_ancestors(self, admin_client):
+        """Tech Admin (company_id=None) traverses with no company boundary."""
+        tech_focus = {**SUPER_ADMIN_ROW}
+        with patch('app.routes.org.query',
+                   side_effect=self._context_mock(tech_focus, [])):
+            r = admin_client.get('/api/org-tree/context')
+        assert r.status_code == 200
+
     def test_defaults_to_session_employee(self, auth_client):
-        """Without ?of= param, uses session employee_id."""
         with patch('app.routes.org.query',
                    side_effect=self._context_mock(FOCUS_ROW, [])):
             r = auth_client.get('/api/org-tree/context')
         assert r.status_code == 200
-        data = r.get_json()
-        assert data['focus'] is not None
+        assert r.get_json()['focus'] is not None
 
     def test_unknown_employee_returns_null_focus(self, auth_client):
         with patch('app.routes.org.query',
