@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><style>
+  body{font-family:Inter,Arial,sans-serif;background:#f8fafc;margin:0}
+  .wrap{max-width:520px;margin:32px auto;background:#fff;border-radius:12px;border:1px solid #e2e8f0;overflow:hidden}
+  .hdr{background:#2563eb;padding:24px 32px;color:#fff}
+  .hdr h1{margin:0;font-size:1.1rem;font-weight:700}
+  .body{padding:28px 32px;font-size:.88rem;color:#374151;line-height:1.6}
+  .row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f1f5f9}
+  .lbl{color:#94a3b8;font-size:.8rem}
+  .footer{padding:16px 32px;background:#f8fafc;font-size:.75rem;color:#94a3b8;text-align:center}
+</style></head>
+<body>
+<div class="wrap">
+  <div class="hdr"><h1>New Employee Joined</h1></div>
+  <div class="body">
+    <p>A new employee has been added to the system.</p>
+    {% if employee_name %}
+    <div class="row"><span class="lbl">Name</span><span>{{ employee_name }}</span></div>
+    {% endif %}
+    {% if job_title %}
+    <div class="row"><span class="lbl">Job Title</span><span>{{ job_title }}</span></div>
+    {% endif %}
+    {% if join_date %}
+    <div class="row"><span class="lbl">Join Date</span><span>{{ join_date }}</span></div>
+    {% endif %}
+    {% if company_name %}
+    <div class="row"><span class="lbl">Company</span><span>{{ company_name }}</span></div>
+    {% endif %}
+  </div>
+  <div class="footer">HR Portal · Automated notification</div>
+</div>
+</body></html>

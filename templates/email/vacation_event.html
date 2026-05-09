@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><style>
+  body{font-family:Inter,Arial,sans-serif;background:#f8fafc;margin:0;padding:0}
+  .wrap{max-width:520px;margin:32px auto;background:#fff;border-radius:12px;
+        border:1px solid #e2e8f0;overflow:hidden}
+  .hdr{background:{% if event_type=='VACATION_APPROVED' %}#16a34a
+                  {% elif event_type=='VACATION_REJECTED' %}#dc2626
+                  {% elif event_type=='VACATION_CANCELLED' %}#d97706
+                  {% else %}#2563eb{% endif %};
+       padding:24px 32px;color:#fff}
+  .hdr h1{margin:0;font-size:1.1rem;font-weight:700}
+  .body{padding:28px 32px;font-size:.88rem;color:#374151;line-height:1.6}
+  .badge{display:inline-block;padding:4px 12px;border-radius:999px;font-size:.75rem;
+         font-weight:700;
+         background:{% if event_type=='VACATION_APPROVED' %}#dcfce7;color:#166534
+                    {% elif event_type=='VACATION_REJECTED' %}#fee2e2;color:#991b1b
+                    {% elif event_type=='VACATION_CANCELLED' %}#fef3c7;color:#92400e
+                    {% else %}#dbeafe;color:#1e40af{% endif %}}
+  .row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f1f5f9}
+  .lbl{color:#94a3b8;font-size:.8rem}
+  .footer{padding:16px 32px;background:#f8fafc;font-size:.75rem;color:#94a3b8;text-align:center}
+</style></head>
+<body>
+<div class="wrap">
+  <div class="hdr">
+    <h1>HR Portal — {{ event_type.replace('_',' ').title() }}</h1>
+  </div>
+  <div class="body">
+    <span class="badge">{{ event_type.replace('_',' ') }}</span>
+
+    {% if requester_name %}
+    <div class="row"><span class="lbl">Employee</span><span>{{ requester_name }}</span></div>
+    {% endif %}
+    {% if vacation_type %}
+    <div class="row"><span class="lbl">Leave type</span><span>{{ vacation_type }}</span></div>
+    {% endif %}
+    {% if start_date %}
+    <div class="row"><span class="lbl">Start date</span><span>{{ start_date }}</span></div>
+    {% endif %}
+    {% if end_date %}
+    <div class="row"><span class="lbl">End date</span><span>{{ end_date }}</span></div>
+    {% endif %}
+    {% if working_days %}
+    <div class="row"><span class="lbl">Working days</span><span>{{ working_days }}</span></div>
+    {% endif %}
+    {% if manager_note %}
+    <div class="row"><span class="lbl">Note</span><span>{{ manager_note }}</span></div>
+    {% endif %}
+
+    <p style="margin-top:20px;color:#6b7280;font-size:.82rem">
+      Log in to <a href="#" style="color:#2563eb">HR Portal</a> to view details.
+    </p>
+  </div>
+  <div class="footer">HR Portal · This is an automated notification</div>
+</div>
+</body>
+</html>

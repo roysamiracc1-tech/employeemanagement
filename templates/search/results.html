@@ -1,0 +1,123 @@
+{% extends 'base.html' %}
+{% block title %}Search — HR Portal{% endblock %}
+{% block page_title %}Search{% endblock %}
+
+{% block content %}
+<div class="page">
+  <div style="max-width:760px">
+
+    <!-- Search input -->
+    <div class="search-page-bar">
+      <svg width="18" height="18" fill="none" stroke="#94a3b8" stroke-width="2" viewBox="0 0 24 24">
+        <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+      </svg>
+      <input id="srch-input" class="search-page-input" type="text"
+             placeholder="Search employees, vacations, org chart…"
+             value="{{ q }}" autofocus autocomplete="off">
+    </div>
+    <p style="font-size:.75rem;color:#94a3b8;margin:8px 0 20px">
+      Try: "my upcoming vacation", "people reporting to me", employee names, job titles
+    </p>
+
+    <div id="srch-results">
+      {% if q %}
+      <p style="color:#94a3b8;font-size:.85rem">Loading…</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const INIT_Q = {{ q | tojson }};
+let debTimer = null;
+
+document.getElementById('srch-input').addEventListener('input', function() {
+  clearTimeout(debTimer);
+  debTimer = setTimeout(() => runSearch(this.value.trim()), 280);
+});
+
+function runSearch(q) {
+  if (q.length < 2) { document.getElementById('srch-results').innerHTML = ''; return; }
+  history.replaceState(null,'','/search?q=' + encodeURIComponent(q));
+
+  fetch('/api/search?q=' + encodeURIComponent(q))
+    .then(r => r.json())
+    .then(data => renderResults(data, q));
+}
+
+function renderResults(data, q) {
+  const container = document.getElementById('srch-results');
+  let html = '';
+
+  // Org intent
+  if (data.org) {
+    html += `<div class="srch-section">
+      <div class="srch-section-title">Org Chart</div>
+      <a href="/org-tree" class="srch-org-card"
+         onclick="sessionStorage.setItem('orgFocusId','${data.org.root_id || ''}');return true;">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M3 3h4v4H3z"/><path d="M17 3h4v4h-4z"/><path d="M10 17h4v4h-4z"/>
+          <path d="M5 7v4h14V7"/><path d="M12 11v6"/>
+        </svg>
+        ${escHtml(data.org.label)}
+        <span class="srch-org-arrow">→</span>
+      </a>
+    </div>`;
+  }
+
+  // Employees
+  if (data.employees && data.employees.length) {
+    html += `<div class="srch-section"><div class="srch-section-title">Employees</div><div class="srch-emp-list">`;
+    data.employees.forEach(e => {
+      const initials = ((e.first_name||'')[0]+(e.last_name||'')[0]).toUpperCase();
+      html += `<a href="/profile/${e.id}" class="srch-emp-row">
+        <div class="srch-emp-av" style="background:${avatarColor(e.first_name+e.last_name)}">${initials}</div>
+        <div>
+          <div class="srch-emp-name">${escHtml(e.first_name+' '+e.last_name)}</div>
+          <div class="srch-emp-meta">${escHtml(e.job_title||'')} ${e.location ? '· '+escHtml(e.location) : ''}</div>
+        </div>
+      </a>`;
+    });
+    html += `</div></div>`;
+  }
+
+  // Vacations
+  if (data.vacations && data.vacations.length) {
+    html += `<div class="srch-section"><div class="srch-section-title">Vacations</div>`;
+    data.vacations.forEach(v => {
+      html += `<div class="srch-vac-row">
+        <span class="srch-vac-dot" style="background:${escHtml(v.color||'#3b82f6')}"></span>
+        <div>
+          <div class="srch-vac-name">${escHtml(v.employee_name||'')} — ${escHtml(v.type_name||'')}</div>
+          <div class="srch-vac-dates">${escHtml(String(v.start_date))} → ${escHtml(String(v.end_date))}
+            <span class="srch-vac-badge">${escHtml(v.status||'')}</span>
+          </div>
+        </div>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+
+  if (!html) {
+    html = `<p style="color:#94a3b8;font-size:.85rem">No results found for "<strong>${escHtml(q)}</strong>".</p>`;
+  }
+
+  container.innerHTML = html;
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+const _AV = ['#3b82f6','#8b5cf6','#ec4899','#f59e0b','#10b981','#06b6d4','#ef4444','#6366f1'];
+function avatarColor(n) {
+  let h=0; for(const c of n) h=(h*31+c.charCodeAt(0))&0xffffffff;
+  return _AV[Math.abs(h)%_AV.length];
+}
+
+// Auto-run on page load if query present
+if (INIT_Q.length >= 2) runSearch(INIT_Q);
+</script>
+{% endblock %}

@@ -7,6 +7,7 @@ from app.db import query, execute, insert_returning, to_dict
 from app.auth import login_required, require_roles
 from app.helpers import (vacation_types_for_employee, employee_solid_manager,
                           used_days, rule_label)
+from app.services import notification_service
 
 MGMT_VACATION_ROLES = ['SYSTEM_ADMIN', 'HR_ADMIN', 'SOLID_LINE_MANAGER', 'DOTTED_LINE_MANAGER']
 
@@ -237,6 +238,26 @@ def api_vacation_submit():
         VALUES (%s::uuid,%s::uuid,%s::uuid,%s,%s,%s,%s)
         RETURNING id::text
     """, (emp_id, vt_id, mgr_id, start_d, end_d, days, notes))
+
+    # Notify manager and HR (best-effort — errors must not break the submit)
+    try:
+        co_id   = session.get('company_id')
+        emp_row = query("SELECT first_name, last_name FROM employees WHERE id=%s::uuid",
+                        (emp_id,), one=True)
+        vt_name = query("SELECT name FROM vacation_types WHERE id=%s::uuid", (vt_id,), one=True)
+        notification_service.dispatch(
+            'VACATION_REQUESTED', company_id=co_id,
+            employee_id=emp_id, manager_id=mgr_id,
+            extra_ctx={
+                'requester_name': f"{emp_row['first_name']} {emp_row['last_name']}" if emp_row else '',
+                'vacation_type':  vt_name['name'] if vt_name else '',
+                'start_date':     str(start_d),
+                'end_date':       str(end_d),
+                'working_days':   days,
+            })
+    except Exception:
+        pass
+
     return jsonify({'ok': True, 'id': row['id'], 'working_days': days})
 
 
@@ -340,4 +361,30 @@ def api_vacation_review(req_id):
         SET status=%s, manager_note=%s, reviewed_at=NOW(), updated_at=NOW()
         WHERE id=%s::uuid
     """, (new_status, note, req_id))
+
+    # Notify employee (best-effort)
+    try:
+        full_req = query("""
+            SELECT vr.employee_id::text, vr.start_date, vr.end_date, vr.working_days,
+                   vt.name AS vacation_type, e.company_id::text AS company_id
+            FROM vacation_requests vr
+            JOIN vacation_types vt ON vt.id = vr.vacation_type_id
+            JOIN employees e ON e.id = vr.employee_id
+            WHERE vr.id=%s::uuid
+        """, (req_id,), one=True)
+        if full_req and full_req.get('company_id'):
+            event = 'VACATION_APPROVED' if new_status == 'APPROVED' else 'VACATION_REJECTED'
+            notification_service.dispatch(
+                event, company_id=full_req['company_id'],
+                employee_id=full_req['employee_id'], manager_id=mgr_id,
+                extra_ctx={
+                    'vacation_type': full_req.get('vacation_type', ''),
+                    'start_date':    str(full_req['start_date']),
+                    'end_date':      str(full_req['end_date']),
+                    'working_days':  full_req.get('working_days'),
+                    'manager_note':  note or '',
+                })
+    except Exception:
+        pass
+
     return jsonify({'ok': True, 'status': new_status})

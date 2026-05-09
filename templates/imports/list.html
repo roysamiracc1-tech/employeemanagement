@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+{% block title %}Employee Imports{% endblock %}
+{% block page_title %}Employee Imports{% endblock %}
+
+{% block content %}
+<div class="page">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px">
+    <h2 style="font-size:1.1rem;font-weight:700;margin:0">Bulk Employee Imports</h2>
+    <a href="/admin/imports/upload" class="btn btn-primary btn-sm">+ New Import</a>
+  </div>
+
+  {% if imports %}
+  <div style="overflow-x:auto">
+    <table class="data-table">
+      <thead>
+        <tr><th>File</th><th>Status</th><th>Rows</th><th>Valid</th><th>Errors</th><th>Imported</th><th>Uploaded by</th><th>Date</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for imp in imports %}
+        <tr>
+          <td>{{ imp.filename or '—' }}</td>
+          <td><span class="badge {% if imp.status=='COMPLETED' %}badge-green
+                                 {% elif imp.status in ('FAILED','REJECTED') %}badge-red
+                                 {% elif imp.status=='PENDING_REVIEW' %}badge-yellow
+                                 {% else %}badge-blue{% endif %}" style="font-size:.65rem">{{ imp.status }}</span></td>
+          <td>{{ imp.row_count }}</td>
+          <td>{{ imp.valid_count }}</td>
+          <td>{{ imp.error_count }}</td>
+          <td>{{ imp.imported_count }}</td>
+          <td style="font-size:.78rem">{{ imp.uploaded_by_email }}</td>
+          <td style="font-size:.75rem;color:#94a3b8">{{ imp.created_at | string | truncate(16, True, '') }}</td>
+          <td><a href="/admin/imports/{{ imp.id }}/preview" class="btn btn-ghost btn-sm" style="font-size:.72rem">View</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p style="color:#94a3b8;font-size:.85rem">No imports yet. <a href="/admin/imports/upload">Upload a CSV</a> to get started.</p>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,137 @@
+{% extends 'base.html' %}
+{% block title %}Bulk Import Employees{% endblock %}
+{% block page_title %}Bulk Employee Import{% endblock %}
+
+{% block content %}
+<div class="page" style="max-width:820px">
+
+  <div class="card" style="margin-bottom:20px">
+    <div class="card-header">CSV Format</div>
+    <div class="card-body" style="font-size:.82rem;color:#64748b">
+      <p>Required columns: <code>first_name</code>, <code>last_name</code>, <code>email</code></p>
+      <p>Optional: <code>job_title</code>, <code>employment_type</code> (FULL_TIME/PART_TIME/CONTRACTOR/INTERN),
+         <code>gender</code> (MALE/FEMALE/OTHER), <code>phone_number</code>, <code>join_date</code> (YYYY-MM-DD)</p>
+      <p>HR Admins: imports require Company Admin approval before processing.</p>
+    </div>
+  </div>
+
+  <!-- Drop zone -->
+  <div id="drop-zone" class="import-drop-zone" onclick="document.getElementById('csv-file').click()">
+    <svg width="40" height="40" fill="none" stroke="#94a3b8" stroke-width="1.5" viewBox="0 0 24 24">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+      <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+    </svg>
+    <p style="margin:10px 0 4px;font-weight:600;color:#374151">Drop your CSV here or click to browse</p>
+    <p style="font-size:.78rem;color:#94a3b8">Max 5 000 rows · CSV only</p>
+    <input id="csv-file" type="file" accept=".csv" style="display:none" onchange="handleFile(this.files[0])">
+  </div>
+
+  <div id="upload-status" style="margin-top:16px"></div>
+  <div id="preview-section" style="display:none;margin-top:20px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <h3 style="font-size:.95rem;font-weight:700;margin:0">Preview</h3>
+      <div style="display:flex;gap:8px">
+        <span id="valid-badge" class="badge badge-green"></span>
+        <span id="error-badge" class="badge badge-red"></span>
+      </div>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="data-table" id="preview-table">
+        <thead><tr id="preview-thead"></tr></thead>
+        <tbody id="preview-tbody"></tbody>
+      </table>
+    </div>
+    <div style="margin-top:16px;display:flex;gap:10px">
+      <button class="btn btn-primary" id="submit-btn" onclick="submitImport()" style="display:none">
+        Upload &amp; Submit for Review
+      </button>
+      <a href="/admin/imports" class="btn btn-ghost">View all imports</a>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let parsedFile  = null;
+let importId    = null;
+
+const dropZone = document.getElementById('drop-zone');
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault(); dropZone.classList.remove('drag-over');
+  if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+});
+
+function handleFile(file) {
+  if (!file) return;
+  parsedFile = file;
+  const reader = new FileReader();
+  reader.onload = e => previewCsv(e.target.result);
+  reader.readAsText(file);
+}
+
+function previewCsv(text) {
+  const lines  = text.split(/\r?\n/).filter(l => l.trim());
+  if (lines.length < 2) { showStatus('File appears empty.', 'error'); return; }
+
+  const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g,''));
+  const rows    = lines.slice(1, 21);  // preview first 20 rows
+
+  const thead = document.getElementById('preview-thead');
+  thead.innerHTML = headers.map(h => `<th>${h}</th>`).join('') + '<th>Status</th>';
+
+  const tbody = document.getElementById('preview-tbody');
+  tbody.innerHTML = rows.map(line => {
+    const cells = line.split(',').map(c => c.trim().replace(/^"|"$/g,''));
+    return '<tr>' + cells.map(c => `<td>${escHtml(c)}</td>`).join('') + '<td>—</td></tr>';
+  }).join('');
+
+  document.getElementById('valid-badge').textContent = `${lines.length-1} rows`;
+  document.getElementById('preview-section').style.display = '';
+  document.getElementById('submit-btn').style.display = '';
+  showStatus(`Parsed ${lines.length-1} rows. Click "Upload" to validate and submit.`, 'info');
+}
+
+async function submitImport() {
+  if (!parsedFile) return;
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true; btn.textContent = 'Uploading…';
+
+  const fd = new FormData();
+  fd.append('csv_file', parsedFile, parsedFile.name);
+
+  const res  = await fetch('/api/admin/imports/upload', {method:'POST', body:fd});
+  const data = await res.json();
+
+  if (!res.ok) {
+    showStatus(data.error || 'Upload failed.', 'error');
+    btn.disabled = false; btn.textContent = 'Upload & Submit for Review';
+    return;
+  }
+
+  importId = data.import_id;
+  const s = data.summary;
+  showStatus(
+    `Uploaded: ${s.row_count} rows · ${s.valid_count} valid · ${s.error_count} errors. ` +
+    (data.needs_approval ? 'Pending Company Admin approval.' : 'Ready to process.'),
+    s.error_count ? 'warn' : 'success'
+  );
+  btn.textContent = 'View Import';
+  btn.onclick = () => window.location = data.preview_url;
+  btn.disabled = false;
+}
+
+function showStatus(msg, type) {
+  const colors = {success:'#dcfce7;color:#166534', error:'#fee2e2;color:#991b1b',
+                  warn:'#fef3c7;color:#92400e', info:'#dbeafe;color:#1e40af'};
+  document.getElementById('upload-status').innerHTML =
+    `<div style="padding:10px 14px;border-radius:8px;font-size:.82rem;background:${colors[type]||colors.info}">${msg}</div>`;
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
+{% endblock %}

@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><style>
+  body{font-family:Inter,Arial,sans-serif;background:#f8fafc;margin:0}
+  .wrap{max-width:520px;margin:32px auto;background:#fff;border-radius:12px;border:1px solid #e2e8f0;overflow:hidden}
+  .hdr{background:#059669;padding:24px 32px;color:#fff}
+  .hdr h1{margin:0;font-size:1.1rem;font-weight:700}
+  .body{padding:28px 32px;font-size:.88rem;color:#374151;line-height:1.6}
+  .row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f1f5f9}
+  .lbl{color:#94a3b8;font-size:.8rem}
+  .footer{padding:16px 32px;background:#f8fafc;font-size:.75rem;color:#94a3b8;text-align:center}
+</style></head>
+<body>
+<div class="wrap">
+  <div class="hdr"><h1>Skill Validated ✓</h1></div>
+  <div class="body">
+    <p>Your skill has been validated by your manager or HR.</p>
+    {% if skill_name %}
+    <div class="row"><span class="lbl">Skill</span><span>{{ skill_name }}</span></div>
+    {% endif %}
+    {% if level %}
+    <div class="row"><span class="lbl">Validated level</span><span>{{ level }}</span></div>
+    {% endif %}
+    {% if validator_name %}
+    <div class="row"><span class="lbl">Validated by</span><span>{{ validator_name }}</span></div>
+    {% endif %}
+  </div>
+  <div class="footer">HR Portal · Automated notification</div>
+</div>
+</body></html>

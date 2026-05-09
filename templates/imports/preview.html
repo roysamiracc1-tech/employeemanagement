@@ -1,0 +1,111 @@
+{% extends 'base.html' %}
+{% block title %}Import Preview{% endblock %}
+{% block page_title %}Import Preview{% endblock %}
+
+{% block content %}
+<div class="page" style="max-width:960px">
+
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap">
+    <h2 style="font-size:1rem;font-weight:700;margin:0">{{ imp.filename }}</h2>
+    <span class="badge {% if imp.status == 'COMPLETED' %}badge-green
+                        {% elif imp.status == 'FAILED' %}badge-red
+                        {% elif imp.status in ('PENDING_REVIEW',) %}badge-yellow
+                        {% else %}badge-blue{% endif %}">{{ imp.status }}</span>
+    <span style="font-size:.78rem;color:#94a3b8">{{ imp.row_count }} rows · {{ imp.valid_count }} valid · {{ imp.error_count }} errors</span>
+  </div>
+
+  {% if imp.status == 'PENDING_REVIEW' %}
+  <div style="background:#fef9c3;border:1px solid #fde68a;border-radius:10px;padding:14px 18px;margin-bottom:18px;font-size:.83rem;color:#92400e">
+    This import is awaiting Company Admin approval before employees are created.
+    {% if has_role('SYSTEM_ADMIN','PORTAL_ADMIN') %}
+    <div style="margin-top:10px;display:flex;gap:8px">
+      <button class="btn btn-primary btn-sm" onclick="approveImport()">Approve</button>
+      <button class="btn btn-danger btn-sm"  onclick="rejectImport()">Reject</button>
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if imp.status == 'APPROVED' and has_role('SYSTEM_ADMIN','PORTAL_ADMIN') %}
+  <div style="background:#dcfce7;border:1px solid #86efac;border-radius:10px;padding:14px 18px;margin-bottom:18px;font-size:.83rem;color:#166534">
+    Approved. Click <strong>Process</strong> to create the employees.
+    <button class="btn btn-primary btn-sm" style="margin-left:12px" onclick="processImport()">Process Import</button>
+  </div>
+  {% endif %}
+
+  {% if imp.status == 'COMPLETED' %}
+  <div style="background:#dcfce7;border:1px solid #86efac;border-radius:10px;padding:14px 18px;margin-bottom:18px;font-size:.83rem;color:#166534">
+    ✓ Import completed — {{ imp.imported_count }} employees created.
+  </div>
+  {% endif %}
+
+  <div style="overflow-x:auto">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>#</th><th>First Name</th><th>Last Name</th><th>Email</th>
+          <th>Job Title</th><th>Type</th><th>Status</th><th>Errors</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr class="{% if row.status == 'INVALID' %}import-row-error{% elif row.status == 'IMPORTED' %}import-row-ok{% endif %}">
+          <td>{{ row.row_number }}</td>
+          <td>{{ row.raw_data.first_name or '—' }}</td>
+          <td>{{ row.raw_data.last_name  or '—' }}</td>
+          <td>{{ row.raw_data.email      or '—' }}</td>
+          <td>{{ row.raw_data.job_title  or '—' }}</td>
+          <td>{{ row.raw_data.employment_type or '—' }}</td>
+          <td>
+            <span class="badge {% if row.status=='VALID' or row.status=='IMPORTED' %}badge-green
+                               {% elif row.status=='INVALID' %}badge-red
+                               {% else %}badge-blue{% endif %}" style="font-size:.65rem">
+              {{ row.status }}
+            </span>
+          </td>
+          <td style="color:#ef4444;font-size:.75rem">
+            {% if row.validation_errors %}
+              {{ row.validation_errors | join(', ') }}
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div style="margin-top:16px">
+    <a href="/admin/imports" class="btn btn-ghost btn-sm">← All Imports</a>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const IMPORT_ID = {{ import_id | tojson }};
+
+async function approveImport() {
+  const r = await fetch(`/api/admin/imports/${IMPORT_ID}/approve`, {method:'POST'});
+  if (r.ok) location.reload();
+}
+
+async function rejectImport() {
+  const reason = prompt('Rejection reason (optional):');
+  if (reason === null) return;
+  const r = await fetch(`/api/admin/imports/${IMPORT_ID}/reject`, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({reason})
+  });
+  if (r.ok) location.reload();
+}
+
+async function processImport() {
+  const btn = event.target;
+  btn.disabled = true; btn.textContent = 'Processing…';
+  const r = await fetch(`/api/admin/imports/${IMPORT_ID}/process`, {method:'POST'});
+  const d = await r.json();
+  if (r.ok) location.reload();
+  else { alert(d.error); btn.disabled=false; btn.textContent='Process Import'; }
+}
+</script>
+{% endblock %}

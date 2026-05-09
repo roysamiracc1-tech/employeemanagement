@@ -1,0 +1,145 @@
+{% extends 'base.html' %}
+{% block title %}Vacation Calendar — HR Portal{% endblock %}
+{% block page_title %}Vacation Calendar{% endblock %}
+
+{% block content %}
+<div class="page">
+
+  <!-- ── Controls ──────────────────────────────────────────── -->
+  <div class="cal-controls">
+    <div style="display:flex;align-items:center;gap:10px">
+      <button class="btn btn-ghost btn-sm" onclick="changeMonth(-1)">‹ Prev</button>
+      <h2 id="cal-title" style="font-size:1rem;font-weight:700;min-width:140px;text-align:center"></h2>
+      <button class="btn btn-ghost btn-sm" onclick="changeMonth(1)">Next ›</button>
+      <button class="btn btn-ghost btn-sm" onclick="goToday()">Today</button>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="cal-scope-btn active" data-scope="mine"  onclick="setScope(this,'mine')">Mine</button>
+      <button class="cal-scope-btn"        data-scope="team"  onclick="setScope(this,'team')">My Team</button>
+      <button class="cal-scope-btn"        data-scope="all"   onclick="setScope(this,'all')">All</button>
+    </div>
+  </div>
+
+  <!-- ── Legend ──────────────────────────────────────────────── -->
+  <div id="cal-legend" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;font-size:.72rem"></div>
+
+  <!-- ── Calendar grid ─────────────────────────────────────── -->
+  <div class="cal-wrap">
+    <div class="cal-grid" id="cal-grid">
+      <div class="cal-day-hdr">Mon</div><div class="cal-day-hdr">Tue</div>
+      <div class="cal-day-hdr">Wed</div><div class="cal-day-hdr">Thu</div>
+      <div class="cal-day-hdr">Fri</div><div class="cal-day-hdr">Sat</div>
+      <div class="cal-day-hdr">Sun</div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let curYear = new Date().getFullYear();
+let curMonth = new Date().getMonth() + 1;
+let curScope = 'mine';
+let cachedData = null;
+
+const MONTH_NAMES = ['January','February','March','April','May','June',
+                     'July','August','September','October','November','December'];
+const DAY_MS = 86400000;
+
+function changeMonth(delta) {
+  curMonth += delta;
+  if (curMonth > 12) { curMonth = 1; curYear++; }
+  if (curMonth < 1)  { curMonth = 12; curYear--; }
+  loadCalendar();
+}
+
+function goToday() {
+  const now = new Date();
+  curYear = now.getFullYear(); curMonth = now.getMonth()+1;
+  loadCalendar();
+}
+
+function setScope(btn, scope) {
+  document.querySelectorAll('.cal-scope-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  curScope = scope;
+  loadCalendar();
+}
+
+async function loadCalendar() {
+  document.getElementById('cal-title').textContent = `${MONTH_NAMES[curMonth-1]} ${curYear}`;
+  const res  = await fetch(`/api/vacation/calendar?year=${curYear}&month=${curMonth}&scope=${curScope}`);
+  const data = await res.json();
+  cachedData = data;
+  renderGrid(data);
+}
+
+function renderGrid(data) {
+  const grid = document.getElementById('cal-grid');
+  // Remove all day cells (keep 7 header cells)
+  while (grid.children.length > 7) grid.removeChild(grid.lastChild);
+
+  const firstDay = new Date(data.year, data.month - 1, 1);
+  // JS: 0=Sun … 6=Sat; we want Mon=0
+  const startOffset = (firstDay.getDay() + 6) % 7;
+  const daysInMonth = new Date(data.year, data.month, 0).getDate();
+  const today       = new Date();
+
+  // Empty cells before first day
+  for (let i = 0; i < startOffset; i++) {
+    const empty = document.createElement('div');
+    empty.className = 'cal-cell cal-cell--empty';
+    grid.appendChild(empty);
+  }
+
+  // Color map for legend
+  const colorMap = {};
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateObj  = new Date(data.year, data.month - 1, d);
+    const isoDate  = dateObj.toISOString().slice(0, 10);
+    const isToday  = dateObj.toDateString() === today.toDateString();
+    const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6;
+
+    const cell = document.createElement('div');
+    cell.className = 'cal-cell' + (isToday ? ' cal-cell--today' : '') +
+                     (isWeekend ? ' cal-cell--weekend' : '');
+
+    const dayNum = document.createElement('div');
+    dayNum.className = 'cal-day-num';
+    dayNum.textContent = d;
+    cell.appendChild(dayNum);
+
+    const events = data.events_by_date[isoDate] || [];
+    events.forEach(ev => {
+      const chip = document.createElement('div');
+      chip.className = 'cal-event' + (ev.status === 'PENDING' ? ' cal-event--pending' : '');
+      chip.style.background = ev.color;
+      chip.textContent = ev.employee_name.split(' ')[0];
+      chip.title = `${ev.employee_name} · ${ev.type_name} (${ev.status})`;
+      cell.appendChild(chip);
+      colorMap[ev.type_name] = ev.color;
+    });
+
+    grid.appendChild(cell);
+  }
+
+  // Legend
+  const legend = document.getElementById('cal-legend');
+  legend.innerHTML = Object.entries(colorMap).map(([name, color]) =>
+    `<span style="display:flex;align-items:center;gap:4px">
+      <span style="width:10px;height:10px;border-radius:2px;background:${color};display:inline-block"></span>
+      ${name}
+    </span>`
+  ).join('') +
+  `<span style="display:flex;align-items:center;gap:4px;margin-left:8px">
+    <span style="width:10px;height:10px;border-radius:2px;background:repeating-linear-gradient(45deg,#94a3b8 0,#94a3b8 2px,transparent 2px,transparent 6px);display:inline-block"></span>
+    Pending
+  </span>`;
+}
+
+// Initial load
+loadCalendar();
+</script>
+{% endblock %}
