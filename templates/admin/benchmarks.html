@@ -40,7 +40,21 @@
     Only visible for skill-related categories.
   </div>
 
-  <!-- ── Category tabs ──────────────────────────────────────────────────── -->
+  <!-- ── View mode + Category tabs ─────────────────────────────────────── -->
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap">
+    <span style="font-size:.74rem;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.05em">View:</span>
+    <div class="an-range-pills">
+      <button class="an-pill active" data-mode="popular"
+              onclick="bmSetMode(this,'popular')" title="% of all respondents who currently use each technology">
+        📊 Most Popular
+      </button>
+      <button class="an-pill" data-mode="admired"
+              onclick="bmSetMode(this,'admired')" title="Desired = want to use it · Admired = used it and love it">
+        ❤️ Admired &amp; Desired
+      </button>
+    </div>
+  </div>
+
   <div class="an-tabs" id="bm-tabs" style="flex-wrap:wrap">
     {% for cat in category_order %}
     <button class="an-tab {% if loop.first %}active{% endif %}"
@@ -56,6 +70,14 @@
     <div id="bm-loading" class="an-loading">Loading…</div>
 
     <div id="bm-body" style="display:none">
+      <!-- Admired & Desired explainer -->
+      <div id="bm-ad-info" style="display:none;margin-bottom:14px;padding:10px 14px;background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:8px;font-size:.79rem;color:#1e40af;line-height:1.6">
+        <strong>Admired &amp; Desired</strong> — gauges hype vs reality.<br>
+        <span style="color:#3b82f6">●</span> <strong>Desired</strong>: % of <em>all respondents</em> who want to use this technology next year (but don't currently).<br>
+        <span style="color:#ef4444">●</span> <strong>Admired</strong>: % of <em>current users</em> who want to <em>continue</em> using it — the satisfaction / retention rate.<br>
+        A large gap (admired ≫ desired) means the technology is loved by its users but under-hyped industry-wide.
+      </div>
+
       <div id="bm-os-toggle" style="display:none;margin-bottom:12px">
         <div class="an-range-pills">
           <button class="an-pill active" data-ctx="all_respondents" onclick="bmSetCtx(this,'all_respondents')">All</button>
@@ -93,11 +115,26 @@
 <script>
 let _curCat   = '{{ category_order[0] }}';
 let _curCtx   = 'all_respondents';
+let _curMode  = 'popular';   // 'popular' | 'admired'
 let _bmChart  = null;
 const SKILL_CATS = new Set([
   'Programming Languages','Databases','Web Frameworks',
   'Cloud & DevOps','Dev IDEs','Large Language Models'
 ]);
+
+function bmSetMode(btn, mode) {
+  document.querySelectorAll('.an-pill[data-mode]').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  _curMode = mode;
+  // Admired & Desired: OS toggle not relevant
+  if (mode === 'admired') {
+    document.getElementById('bm-os-toggle').style.display = 'none';
+    document.getElementById('bm-ad-info').style.display = '';
+  } else {
+    document.getElementById('bm-ad-info').style.display = 'none';
+  }
+  bmLoad();
+}
 
 function bmSwitchTab(btn, cat) {
   document.querySelectorAll('.an-tab').forEach(b => b.classList.remove('active'));
@@ -132,16 +169,21 @@ async function bmLoad() {
     const res  = await fetch('/api/admin/benchmarks?' + p.toString());
     const data = await res.json();
 
-    // OS toggle visibility
+    // OS toggle visibility (only in popular mode)
     const osToggle = document.getElementById('bm-os-toggle');
-    osToggle.style.display = _curCat === 'Operating Systems' ? '' : 'none';
+    osToggle.style.display = (_curMode === 'popular' && _curCat === 'Operating Systems') ? '' : 'none';
 
     // Overlay legend
     const legend = document.getElementById('bm-overlay-legend');
-    legend.style.display = co && SKILL_CATS.has(_curCat) ? '' : 'none';
+    legend.style.display = co && SKILL_CATS.has(_curCat) && _curMode === 'popular' ? '' : 'none';
 
-    _renderChart(data);
-    _renderTable(data);
+    if (_curMode === 'admired') {
+      _renderAdmiredChart(data);
+      _renderAdmiredTable(data);
+    } else {
+      _renderChart(data);
+      _renderTable(data);
+    }
 
     load.style.display = 'none'; body.style.display = '';
   } catch (e) {
@@ -260,6 +302,125 @@ function _renderTable(data) {
   document.getElementById('bm-table-title').textContent = data.category + ' (' + rows.length + ' technologies)';
   document.getElementById('bm-source-note').textContent =
     'Source: Stack Overflow Developer Survey ' + data.year + ' · All Respondents';
+}
+
+// ── Admired & Desired chart ──────────────────────────────────────────────────
+function _renderAdmiredChart(data) {
+  if (_bmChart) { _bmChart.destroy(); _bmChart = null; }
+
+  // Filter rows that have admired/desired data; sort by desired desc
+  const rows = data.rows
+    .filter(r => r.desired_pct != null)
+    .sort((a, b) => b.desired_pct - a.desired_pct);
+
+  if (!rows.length) {
+    document.getElementById('bm-chart').style.height = '80px';
+    if (_bmChart) _bmChart.destroy();
+    document.getElementById('bm-chart').getContext('2d')
+      .fillText('No Admired & Desired data for this category', 10, 40);
+    return;
+  }
+
+  const labels    = rows.map(r => r.technology);
+  const desired   = rows.map(r => parseFloat(r.desired_pct || 0));
+  const admired   = rows.map(r => parseFloat(r.admired_pct || 0));
+
+  const height = Math.max(300, labels.length * 28);
+  document.getElementById('bm-chart').style.height = height + 'px';
+
+  const ctx = document.getElementById('bm-chart').getContext('2d');
+  _bmChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Desired — want to use it (% all respondents)',
+          data: desired,
+          backgroundColor: '#3b82f6',
+          borderRadius: 3,
+        },
+        {
+          label: 'Admired — used it & love it (% satisfaction)',
+          data: admired,
+          backgroundColor: '#ef4444',
+          borderRadius: 3,
+        },
+      ],
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: true, position: 'top',
+                  labels: { boxWidth: 12, font: { size: 11 } } },
+        tooltip: {
+          callbacks: {
+            label: ctx => ` ${ctx.dataset.label.split('—')[0].trim()}: ${ctx.parsed.x}%`,
+            afterLabel: (ctx) => {
+              const i   = ctx.dataIndex;
+              const des = desired[i];
+              const adm = admired[i];
+              const gap = (adm - des).toFixed(1);
+              return `Gap (admired − desired): ${gap > 0 ? '+' : ''}${gap}%`;
+            },
+          }
+        }
+      },
+      scales: {
+        x: { beginAtZero: true, max: 100,
+             ticks: { callback: v => v + '%', font: { size: 10 } } },
+        y: { ticks: { font: { size: 10 } }, grid: { display: false } }
+      }
+    }
+  });
+}
+
+function _renderAdmiredTable(data) {
+  const rows = data.rows
+    .filter(r => r.desired_pct != null)
+    .sort((a, b) => b.desired_pct - a.desired_pct);
+
+  const thead = document.getElementById('bm-thead');
+  thead.innerHTML = '<tr>' +
+    '<th style="width:28px">#</th>' +
+    '<th>Technology</th>' +
+    '<th style="text-align:right;color:#3b82f6">● Desired %</th>' +
+    '<th style="text-align:right;color:#ef4444">● Admired %</th>' +
+    '<th style="text-align:right">Gap (Admired − Desired)</th>' +
+    '<th>Signal</th>' +
+    '</tr>';
+
+  const tbody = document.getElementById('bm-tbody');
+  tbody.innerHTML = rows.map((r, i) => {
+    const des = parseFloat(r.desired_pct || 0);
+    const adm = parseFloat(r.admired_pct || 0);
+    const gap = (adm - des).toFixed(1);
+    const gapNum = parseFloat(gap);
+    let signal = '', signalColor = '';
+    if (gapNum >= 30)       { signal = '🔥 Hidden gem';       signalColor = '#16a34a'; }
+    else if (gapNum >= 15)  { signal = '✅ Loved by users';   signalColor = '#2563eb'; }
+    else if (gapNum >= 5)   { signal = '👍 Solid adoption';   signalColor = '#64748b'; }
+    else if (gapNum >= -5)  { signal = '⚖ Balanced';          signalColor = '#94a3b8'; }
+    else                    { signal = '⚠ Hype risk';          signalColor = '#dc2626'; }
+
+    const gapColor = gapNum >= 10 ? '#16a34a' : gapNum >= 0 ? '#2563eb' : '#dc2626';
+
+    return '<tr>' +
+      `<td style="color:#94a3b8;font-size:.72rem">${i + 1}</td>` +
+      `<td style="font-weight:600">${escH(r.technology)}</td>` +
+      `<td style="text-align:right;color:#3b82f6;font-weight:600">${des}%</td>` +
+      `<td style="text-align:right;color:#ef4444;font-weight:600">${adm}%</td>` +
+      `<td style="text-align:right;font-weight:700;color:${gapColor}">${gapNum >= 0 ? '+' : ''}${gap}%</td>` +
+      `<td style="font-size:.72rem;color:${signalColor};font-weight:600">${signal}</td>` +
+      '</tr>';
+  }).join('');
+
+  document.getElementById('bm-table-title').textContent =
+    data.category + ' — Admired & Desired (' + rows.length + ' technologies)';
+  document.getElementById('bm-source-note').textContent =
+    'Source: Stack Overflow Developer Survey ' + data.year + ' · Desired & Admired';
 }
 
 function escH(s) {
