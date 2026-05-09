@@ -218,6 +218,22 @@
   </div>
   {% endif %}
 
+  <!-- ── Pending vacation approvals (managers) ──────────────── -->
+  {% if stats.team_size is defined %}
+  <div class="card" style="margin-bottom:20px" id="pending-approvals-card">
+    <div class="card-header" style="display:flex;align-items:center;justify-content:space-between">
+      <h2 style="margin:0;font-size:.9rem;font-weight:700">
+        ⏳ Pending Vacation Approvals
+        <span id="dash-pending-count" class="bell-badge" style="position:static;display:none;margin-left:6px;font-size:.65rem"></span>
+      </h2>
+      <a href="{{ url_for('vacation_team') }}" class="btn btn-ghost btn-sm">View all →</a>
+    </div>
+    <div class="card-body" style="padding:0" id="dash-pending-list">
+      <p style="padding:16px;color:#94a3b8;font-size:.82rem">Loading…</p>
+    </div>
+  </div>
+  {% endif %}
+
   <!-- ── Own profile card ───────────────────────────────────── -->
   {% if stats.own %}
   <div class="card" style="max-width:560px">
@@ -367,9 +383,62 @@ function tickLastUpdated() {
   document.getElementById('refresh-text').textContent = 'Live · refreshes every ' + label;
 })();
 
+// ── Pending approvals widget ────────────────────────────────
+async function refreshPendingWidget() {
+  const list = document.getElementById('dash-pending-list');
+  const cntEl = document.getElementById('dash-pending-count');
+  if (!list) return;
+
+  try {
+    const res  = await fetch('/api/vacation/team-pending');
+    if (!res.ok) return;
+    const data = await res.json();
+
+    if (cntEl) {
+      if (data.length) { cntEl.textContent = data.length; cntEl.style.display='flex'; }
+      else             { cntEl.style.display='none'; }
+    }
+
+    if (!data.length) {
+      list.innerHTML = '<p style="padding:16px;color:#94a3b8;font-size:.82rem;margin:0">No pending requests ✓</p>';
+      return;
+    }
+
+    list.innerHTML = data.map(r => `
+      <div class="dash-pending-row" id="dpr-${r.id}">
+        <div class="dash-pending-av" style="background:${escH(r.color||'#3b82f6')}">${(r.employee_name||'?')[0].toUpperCase()}</div>
+        <div style="flex:1;min-width:0">
+          <div class="dash-pending-name">${escH(r.employee_name||'')}</div>
+          <div class="dash-pending-meta">
+            <span style="background:${escH(r.color||'#3b82f6')}20;color:${escH(r.color||'#3b82f6')};padding:1px 6px;border-radius:4px;font-size:.68rem;font-weight:700">${escH(r.type_name||'')}</span>
+            ${escH(String(r.start_date))} → ${escH(String(r.end_date))}
+            <span style="color:#94a3b8">· ${r.working_days}d</span>
+            ${r.notes ? `<span style="color:#64748b;font-style:italic"> · "${escH(r.notes)}"</span>` : ''}
+          </div>
+        </div>
+        <div class="dash-pending-btns">
+          <button class="btn-approve-sm" onclick="dashReview('${r.id}','approve',this)">✓ Approve</button>
+          <button class="btn-reject-sm"  onclick="openRejectModal('${r.id}','${escH(r.employee_name||'')}')">✗ Reject</button>
+        </div>
+      </div>`).join('');
+  } catch(_) {}
+}
+
+async function dashReview(reqId, action, btn) {
+  if (btn) { btn.disabled=true; btn.textContent='…'; }
+  await quickReview(reqId, action, null);
+  refreshPendingWidget();
+}
+
+function escH(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
 // Kick off
 refreshStats();
+refreshPendingWidget();
 setInterval(refreshStats,       REFRESH_MS);
+setInterval(refreshPendingWidget, REFRESH_MS);
 setInterval(tickLastUpdated,    1000);
 
 const COMPANIES_DATA = {{ companies_json | safe }};

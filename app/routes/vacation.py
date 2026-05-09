@@ -388,3 +388,16 @@ def api_vacation_review(req_id):
         pass
 
     return jsonify({'ok': True, 'status': new_status})
+
+
+@app.route('/api/vacation/pending-count')
+@login_required
+def api_vacation_pending_count():
+    """Unseen pending requests waiting for the logged-in manager's review."""
+    mgr_id = session['employee_id']
+    row = query("""
+        SELECT COUNT(*)::int AS cnt
+        FROM vacation_requests
+        WHERE manager_id = %s::uuid AND status = 'PENDING'
+    """, (mgr_id,), one=True)
+    return jsonify({'count': row['cnt'] if row else 0})

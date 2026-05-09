@@ -33,6 +33,24 @@
     </div>
   </div>
 
+  <!-- Calendar approval modal -->
+  <div id="cal-approve-modal" style="display:none;position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.45);align-items:center;justify-content:center">
+    <div style="background:#fff;border-radius:14px;padding:28px;width:380px;max-width:90vw;box-shadow:0 20px 60px rgba(0,0,0,.2)">
+      <h3 style="font-size:.95rem;font-weight:700;margin:0 0 4px">Review vacation request</h3>
+      <p style="font-size:.83rem;color:#64748b;margin:0 0 14px">
+        <strong id="cal-modal-name"></strong> · <span id="cal-modal-type"></span><br>
+        <span id="cal-modal-dates" style="font-size:.8rem"></span>
+      </p>
+      <textarea id="cal-modal-note" rows="2" class="form-control"
+                placeholder="Optional note…" style="font-size:.85rem;resize:vertical;margin-bottom:14px"></textarea>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button class="btn btn-ghost btn-sm" onclick="closeCalModal()">Cancel</button>
+        <button class="btn btn-danger btn-sm" onclick="calReview('reject')">✗ Reject</button>
+        <button class="btn btn-primary btn-sm" onclick="calReview('approve')">✓ Approve</button>
+      </div>
+    </div>
+  </div>
+
 </div>
 {% endblock %}
 
@@ -114,10 +132,16 @@ function renderGrid(data) {
     const events = data.events_by_date[isoDate] || [];
     events.forEach(ev => {
       const chip = document.createElement('div');
-      chip.className = 'cal-event' + (ev.status === 'PENDING' ? ' cal-event--pending' : '');
+      chip.className = 'cal-event' + (ev.status === 'PENDING' ? ' cal-event--pending cal-event--clickable' : '');
       chip.style.background = ev.color;
       chip.textContent = ev.employee_name.split(' ')[0];
-      chip.title = `${ev.employee_name} · ${ev.type_name} (${ev.status})`;
+      chip.title = ev.status === 'PENDING'
+        ? `${ev.employee_name} · ${ev.type_name} — PENDING (click to review)`
+        : `${ev.employee_name} · ${ev.type_name} (${ev.status})`;
+
+      if (ev.status === 'PENDING') {
+        chip.onclick = () => openCalApproveModal(ev);
+      }
       cell.appendChild(chip);
       colorMap[ev.type_name] = ev.color;
     });
@@ -137,6 +161,33 @@ function renderGrid(data) {
     <span style="width:10px;height:10px;border-radius:2px;background:repeating-linear-gradient(45deg,#94a3b8 0,#94a3b8 2px,transparent 2px,transparent 6px);display:inline-block"></span>
     Pending
   </span>`;
+}
+
+// ── Calendar approval modal ──────────────────────────────────
+let _calReqId = null;
+
+function openCalApproveModal(ev) {
+  _calReqId = ev.id;
+  document.getElementById('cal-modal-name').textContent = ev.employee_name;
+  document.getElementById('cal-modal-type').textContent = ev.type_name;
+  document.getElementById('cal-modal-dates').textContent =
+    `${ev.start_date || ''} → ${ev.end_date || ''}`;
+  document.getElementById('cal-modal-note').value = '';
+  document.getElementById('cal-approve-modal').style.display = 'flex';
+}
+function closeCalModal() {
+  document.getElementById('cal-approve-modal').style.display = 'none';
+  _calReqId = null;
+}
+async function calReview(action) {
+  if (!_calReqId) return;
+  const note = document.getElementById('cal-modal-note').value.trim();
+  const res  = await fetch(`/api/vacation/review/${_calReqId}`, {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ action, note: note || null }),
+  });
+  if (res.ok) { closeCalModal(); loadCalendar(); }
 }
 
 // Initial load

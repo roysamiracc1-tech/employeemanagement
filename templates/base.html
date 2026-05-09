@@ -223,6 +223,28 @@
     </form>
 
     <div class="topbar-user" style="gap:12px">
+
+      <!-- ── Pending approvals bell (managers only) ──────── -->
+      {% if has_role('SOLID_LINE_MANAGER','DOTTED_LINE_MANAGER','HR_ADMIN','SYSTEM_ADMIN','PORTAL_ADMIN') %}
+      <div class="bell-wrap" id="bell-wrap">
+        <button class="bell-btn" id="bell-btn" onclick="toggleBell()" title="Pending vacation approvals">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+            <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+          </svg>
+          <span class="bell-badge" id="bell-badge" style="display:none">0</span>
+        </button>
+
+        <div class="bell-dropdown" id="bell-dropdown">
+          <div class="bell-drop-hdr">
+            <span style="font-weight:700;font-size:.85rem">Pending Approvals</span>
+            <a href="{{ url_for('vacation_team') }}" style="font-size:.74rem;color:var(--primary)">View all →</a>
+          </div>
+          <div id="bell-list"><p class="bell-empty">Loading…</p></div>
+        </div>
+      </div>
+      {% endif %}
+
       <button class="theme-toggle" id="theme-toggle-btn" onclick="toggleTheme()" title="Switch light/dark mode">
         <span id="theme-icon">
           {% if theme_pref == 'dark' %}
@@ -308,7 +330,133 @@ async function toggleTheme() {
     body: JSON.stringify({theme: next})
   });
 }
+
+// ── Bell / pending approvals ───────────────────────────────────────────────
+let _bellLoaded = false;
+
+async function loadBellCount() {
+  try {
+    const res = await fetch('/api/vacation/pending-count');
+    if (!res.ok) return;
+    const { count } = await res.json();
+    const badge = document.getElementById('bell-badge');
+    if (!badge) return;
+    if (count > 0) {
+      badge.textContent = count > 99 ? '99+' : count;
+      badge.style.display = 'flex';
+    } else {
+      badge.style.display = 'none';
+    }
+  } catch (_) {}
+}
+
+async function loadBellList() {
+  const list = document.getElementById('bell-list');
+  if (!list) return;
+  list.innerHTML = '<p class="bell-empty">Loading…</p>';
+  try {
+    const res  = await fetch('/api/vacation/team-pending');
+    if (!res.ok) { list.innerHTML = '<p class="bell-empty">Unable to load.</p>'; return; }
+    const data = await res.json();
+    if (!data.length) {
+      list.innerHTML = '<p class="bell-empty">No pending approvals 🎉</p>';
+      return;
+    }
+    list.innerHTML = data.map(r => `
+      <div class="bell-item" id="bell-item-${r.id}">
+        <div class="bell-item-top">
+          <span class="bell-item-name">${escH(r.employee_name)}</span>
+          <span class="bell-item-type" style="background:${escH(r.color||'#3b82f6')}20;color:${escH(r.color||'#3b82f6')}">${escH(r.type_name)}</span>
+        </div>
+        <div class="bell-item-dates">${escH(String(r.start_date))} → ${escH(String(r.end_date))} · ${r.working_days}d</div>
+        <div class="bell-item-actions">
+          <button class="bell-approve" onclick="quickReview('${r.id}','approve',this)">✓ Approve</button>
+          <button class="bell-reject"  onclick="openRejectModal('${r.id}', '${escH(r.employee_name)}')">✗ Reject</button>
+        </div>
+      </div>`).join('');
+  } catch (_) {
+    list.innerHTML = '<p class="bell-empty">Error loading.</p>';
+  }
+}
+
+function toggleBell() {
+  const dd = document.getElementById('bell-dropdown');
+  const open = dd.classList.toggle('bell-open');
+  if (open && !_bellLoaded) { _bellLoaded = true; loadBellList(); }
+}
+
+document.addEventListener('click', function(e) {
+  const wrap = document.getElementById('bell-wrap');
+  if (wrap && !wrap.contains(e.target)) {
+    document.getElementById('bell-dropdown')?.classList.remove('bell-open');
+  }
+});
+
+// ── Shared approve/reject modal (available on every page) ─────────────────
+function openRejectModal(reqId, employeeName) {
+  document.getElementById('reject-modal-name').textContent = employeeName || '';
+  document.getElementById('reject-modal-note').value = '';
+  document.getElementById('reject-req-id').value = reqId;
+  document.getElementById('reject-modal').style.display = 'flex';
+}
+function closeRejectModal() {
+  document.getElementById('reject-modal').style.display = 'none';
+}
+async function submitReject() {
+  const reqId = document.getElementById('reject-req-id').value;
+  const note  = document.getElementById('reject-modal-note').value.trim();
+  await quickReview(reqId, 'reject', null, note);
+  closeRejectModal();
+}
+
+async function quickReview(reqId, action, triggerEl, note) {
+  if (triggerEl) { triggerEl.disabled = true; triggerEl.textContent = '…'; }
+  try {
+    const res = await fetch(`/api/vacation/review/${reqId}`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ action, note: note || null }),
+    });
+    if (!res.ok) { if (triggerEl) { triggerEl.disabled=false; triggerEl.textContent = action==='approve'?'✓ Approve':'✗ Reject'; } return; }
+
+    // Remove the item from bell list
+    document.getElementById(`bell-item-${reqId}`)?.remove();
+    // Reload badge count
+    _bellLoaded = false;
+    await loadBellCount();
+
+    // If a global refresh function exists on the page, call it
+    if (typeof refreshPendingWidget === 'function') refreshPendingWidget();
+    if (typeof loadCalendar === 'function') loadCalendar();
+  } catch (_) {
+    if (triggerEl) { triggerEl.disabled=false; }
+  }
+}
+
+function escH(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// Poll badge count every 60 s on all pages
+loadBellCount();
+setInterval(loadBellCount, 60000);
 </script>
+
+<!-- Shared reject modal -->
+<div id="reject-modal" style="display:none;position:fixed;inset:0;z-index:999;background:rgba(0,0,0,.45);align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:14px;padding:28px;width:360px;max-width:90vw;box-shadow:0 20px 60px rgba(0,0,0,.2)">
+    <h3 style="font-size:.95rem;font-weight:700;margin:0 0 6px">Reject vacation request</h3>
+    <p style="font-size:.82rem;color:#64748b;margin:0 0 16px">For: <strong id="reject-modal-name"></strong></p>
+    <textarea id="reject-modal-note" rows="3" class="form-control"
+              placeholder="Optional note to employee…" style="font-size:.85rem;resize:vertical"></textarea>
+    <input type="hidden" id="reject-req-id">
+    <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end">
+      <button class="btn btn-ghost btn-sm" onclick="closeRejectModal()">Cancel</button>
+      <button class="btn btn-danger btn-sm" onclick="submitReject()">Reject</button>
+    </div>
+  </div>
+</div>
+
 {% block scripts %}{% endblock %}
 </body>
 </html>
