@@ -733,3 +733,160 @@ python scripts/setup_db.py
 
 The raw SQL seed (`telia_seed.sql`) uses hardcoded UUIDs and requires the Telia company to exist with exactly those UUIDs. The Python script (`setup_db.py`) is the recommended path as it dynamically looks up the actual Telia company UUID from the database.
 
+
+---
+
+## 19. In-App Notification System
+
+### 19.1 Data Model
+
+```sql
+CREATE TABLE user_notifications (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    event_type  VARCHAR(60) NOT NULL,   -- VACATION_APPROVED | VACATION_REJECTED | VACATION_CANCELLED
+    message     TEXT NOT NULL,
+    link        TEXT,                   -- /vacation or /vacation/team
+    is_read     BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX idx_user_notif_user_unread ON user_notifications(user_id, is_read, created_at DESC);
+```
+
+### 19.2 Service Layer (`app/services/notification_service.py`)
+
+| Function | Purpose |
+|---|---|
+| `create_user_notification(user_id, event_type, message, link)` | Inserts one unread notification row |
+| `get_unread_notifications(user_id, limit=20)` | Returns list of unread rows |
+| `get_unread_count(user_id)` | Returns integer count of unread rows |
+| `mark_all_read(user_id)` | Sets `is_read=TRUE` for all unread rows |
+
+### 19.3 Bell Notification (base.html)
+
+The topbar bell is shown to **all authenticated users** (not just managers). Badge count = pending approvals + unread notifications.
+
+```javascript
+const [pendingRes, notifRes] = await Promise.all([
+    fetch('/api/vacation/pending-count'),
+    fetch('/api/my-notifications'),
+]);
+const total = pending + notifCount;
+```
+
+Dropdown has two sections:
+- **Pending Approvals** (managers only, rendered in Jinja2 with `{% if has_role(...) %}`)
+- **My Notifications** (everyone — approved/rejected/cancelled alerts)
+
+Notifications auto-mark as read 2 s after dropdown opens.
+
+### 19.4 Trigger Points
+
+| Event | Where triggered | Recipient |
+|---|---|---|
+| Vacation APPROVED | `api_vacation_review` (approve) | Employee |
+| Vacation REJECTED | `api_vacation_review` (reject) | Employee |
+| Vacation CANCELLED/WITHDRAWN | `api_vacation_cancel` | Manager |
+
+All triggers are best-effort (`try/except Exception: pass`) so they never break the core action.
+
+### 19.5 API Endpoints
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/api/my-notifications` | GET | Returns `{count, notifications:[]}` for current user |
+| `/api/my-notifications/mark-read` | POST | Marks all as read for current user |
+
+---
+
+## 20. Vacation Cancellation & Withdrawal
+
+### 20.1 Rules
+
+| Request Status | Start Date | Action allowed |
+|---|---|---|
+| PENDING | Any | Cancel (always) |
+| APPROVED | > today | Withdraw |
+| APPROVED | ≤ today | Blocked (400) |
+| REJECTED / CANCELLED | Any | Blocked (400) |
+
+### 20.2 Endpoint
+
+`DELETE /api/vacation/request/<req_id>`
+
+The single endpoint handles both cancel and withdraw. The business rule check:
+
+```python
+if status == 'PENDING':
+    pass  # always cancellable
+elif status == 'APPROVED':
+    if start <= datetime.date.today():
+        return jsonify({'error': 'Cannot withdraw a request that has already started.'}), 400
+else:
+    return jsonify({'error': 'Only PENDING or future APPROVED requests can be cancelled.'}), 400
+```
+
+### 20.3 UI
+
+- PENDING rows: red `btn btn-danger btn-sm` "✕ Cancel" button
+- APPROVED future rows: ghost danger "Withdraw" button
+- Both show confirmation dialogs mentioning manager notification
+- `today` passed from Flask route to template for Jinja comparison
+
+---
+
+## 21. Analytics & Reporting Dashboard
+
+### 21.1 Data Collection
+
+**Page Views** (`page_views` table):
+- Logged by `app/services/page_tracker.py` via `@app.after_request`
+- Background thread — zero request latency added
+- Skips: `/api/`, `/static/`, login/logout, unauthenticated requests
+- Normalises dynamic routes (e.g. `/profile/123` → `/profile`)
+
+**Search Queries** (`search_logs` table):
+- Logged in `app/routes/search.py::api_search()` via background thread
+- Stores: `query`, `result_count`, `role`, `company_id`
+
+### 21.2 Service Layer (`app/services/analytics_service.py`)
+
+| Function | Returns |
+|---|---|
+| `get_overview(company_id, start, end)` | DAU, top pages, feature adoption %, bulk import stats |
+| `get_vacation_analytics(company_id, start, end, group_by)` | KPIs, over-time series, by-type, utilisation, drilldown |
+| `get_skills_analytics(company_id, start, end)` | Completeness %, validation rate, top skills, per-employee table |
+| `get_org_analytics(company_id, start, end)` | Headcount KPIs, span of control, org depth, org chart usage |
+| `get_search_analytics(company_id, start, end)` | Top terms, zero-result rate, volume over time |
+
+### 21.3 API Routes (`app/routes/analytics.py`)
+
+| Route | Access |
+|---|---|
+| `GET /admin/analytics` | Page — SYSTEM_ADMIN, PORTAL_ADMIN, HR_ADMIN |
+| `GET /api/analytics/overview` | SYSTEM_ADMIN, PORTAL_ADMIN, HR_ADMIN |
+| `GET /api/analytics/vacation?group_by=company\|department\|location\|manager` | Same |
+| `GET /api/analytics/skills` | Same |
+| `GET /api/analytics/org` | Same |
+| `GET /api/analytics/search` | Same |
+| `GET /api/analytics/export/csv?section=<tab>` | Same |
+
+Company scoping: PORTAL_ADMIN and HR_ADMIN always use `session['company_id']`; SYSTEM_ADMIN uses `?company_id=` param.
+
+### 21.4 Date Range
+
+`?range=30d|90d|365d` or `?start=YYYY-MM-DD&end=YYYY-MM-DD`. Falls back to 30d on invalid custom dates.
+
+### 21.5 Frontend
+
+- Chart.js 4.4.3 via CDN
+- Tab switching is JS-driven; each tab fetches data once (cached per filter state)
+- Filter changes (`_loaded = {}`) force full reload
+- All filter params in URL via `history.replaceState` (shareable links)
+- Print CSS hides navigation; all tab content visible in print mode
+
+### 21.6 Export
+
+- **CSV**: `GET /api/analytics/export/csv?section=<tab>&range=<range>` — Python `csv.DictWriter` → `text/csv` response with `Content-Disposition: attachment`
+- **PDF**: Browser `window.print()` with `@media print` CSS
+

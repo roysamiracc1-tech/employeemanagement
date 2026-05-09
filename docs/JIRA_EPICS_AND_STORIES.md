@@ -26,6 +26,15 @@
 | [KAN-68](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-68) | EP14 — Test Automation & Quality Gates | Stories below |
 | [KAN-69](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-69) | EP15 — Login Page Redesign | Stories below |
 | [KAN-70](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-70) | EP16 — Multi-Company Seed Data (Telia) | Stories below |
+| EP17 | Family Tree Org Chart & Employee-Centric Navigation | KAN-81 · KAN-82 · KAN-83 · KAN-84 · KAN-85 · KAN-86 · KAN-87 |
+| EP18 | Email Notification System | KAN-88 · KAN-89 · KAN-90 · KAN-91 |
+| EP19 | Full-Text Search | KAN-92 · KAN-93 · KAN-94 · KAN-95 |
+| EP20 | Vacation Calendar | KAN-96 · KAN-97 · KAN-98 |
+| EP21 | Bulk Employee Import | KAN-99 · KAN-100 · KAN-101 · KAN-102 |
+| EP22 | Mobile Responsive Design | KAN-103 · KAN-104 · KAN-105 · KAN-106 |
+| EP23 | In-App Notification System | KAN-107 · KAN-108 · KAN-109 · KAN-110 · KAN-111 · KAN-112 · KAN-113 |
+| EP24 | Vacation Cancellation & Withdrawal UI | KAN-114 · KAN-115 · KAN-116 · KAN-117 · KAN-118 |
+| EP25 | Analytics & Reporting Dashboard | KAN-119 · KAN-120 · KAN-121 · KAN-122 · KAN-123 · KAN-124 · KAN-125 · KAN-126 · KAN-127 · KAN-128 · KAN-129 · KAN-130 · KAN-131 · KAN-132 |
 
 ---
 
@@ -316,3 +325,56 @@
 | KAN-104 | As a **Mobile User**, I want data tables to show as labelled cards so I can read them without horizontal scroll. | .data-table td becomes display:flex with ::before content:attr(data-label). | Must Have |
 | KAN-105 | As a **Mobile User**, I want the org tree to scroll horizontally with touch momentum. | .ftree-wrap: overflow-x:auto; -webkit-overflow-scrolling:touch. | Should Have |
 | KAN-106 | As a **Mobile User**, I want the login page to stack vertically so it's usable on a small screen. | .login-wrap flex-direction:column at <768px; hero collapses to 180px. | Should Have |
+
+---
+
+## EP23 — In-App Notification System
+**Jira:** KAN-107 · **Label:** `notifications` `ux` `bell`
+**Description:** Every user gets a bell icon in the topbar. Managers see pending vacation approvals; employees see real-time alerts when their requests are approved, rejected, or when they cancel. Notifications persist in a `user_notifications` table and auto-mark as read.
+
+| Story ID | User Story | Acceptance Criteria | Priority |
+|----------|-----------|---------------------|----------|
+| KAN-107 | As an **employee**, I want a bell notification when my vacation is approved so I know without checking my history. | `user_notifications` row inserted for employee on every approve/reject; bell badge count > 0 after approval; message includes type, dates. | Must Have |
+| KAN-108 | As an **employee**, I want to see the approval notification in the bell dropdown so I can read the outcome without navigating away. | Bell dropdown renders "My Notifications" section; shows ✅/❌ icon, message text, timestamp, and "View →" link to `/vacation`. | Must Have |
+| KAN-109 | As a **manager**, I want a bell notification when an employee cancels their vacation so I can replan team capacity. | `VACATION_CANCELLED` event creates `user_notifications` row for manager's user_id; message names the employee and dates; link `/vacation/team`. | Must Have |
+| KAN-110 | As any **user**, I want the bell badge to show the total of pending approvals plus unread notifications so one badge covers everything. | `loadBellCount()` fetches `/api/vacation/pending-count` and `/api/my-notifications` in parallel; badge = sum of both. | Must Have |
+| KAN-111 | As any **user**, I want notifications to auto-mark as read after I open the dropdown so the badge clears without a manual action. | `setTimeout(() => fetch('/api/my-notifications/mark-read', {method:'POST'}), 2000)` fires after dropdown opens. | Should Have |
+| KAN-112 | As a **developer**, I want `/api/my-notifications` and `/api/my-notifications/mark-read` endpoints so the frontend can fetch and clear alerts. | GET returns `{count, notifications:[]}` with `event_type`, `message`, `link`, `created_at`; POST marks all read for current user. | Must Have |
+| KAN-113 | As a **developer**, I want unit tests verifying notifications are created on approve, reject, and cancel so regressions are caught pre-commit. | `test_approve_sets_approved_status` asserts `create_user_notification` called with correct user_id, event, message; same for reject and cancel; no-crash test when user account missing. | Must Have |
+
+---
+
+## EP24 — Vacation Cancellation & Withdrawal UI
+**Jira:** KAN-114 · **Label:** `vacation` `ux` `cancel`
+**Description:** The cancel button was always present in the vacation history table but was completely invisible (grey text, no border). This epic makes it a visible action, extends it to allow withdrawal of future approved vacations, and ensures managers are notified on every cancellation.
+
+| Story ID | User Story | Acceptance Criteria | Priority |
+|----------|-----------|---------------------|----------|
+| KAN-114 | As an **employee**, I want a clearly visible "✕ Cancel" button next to PENDING requests so I can cancel without hunting for a hidden control. | Button styled as `btn btn-danger btn-sm`; red background, white text; visible in request history table; confirmation dialog says "Your manager will be notified." | Must Have |
+| KAN-115 | As an **employee**, I want to withdraw an approved vacation that hasn't started yet so I can change my plans. | "Withdraw" button appears on APPROVED rows where `start_date > today`; DELETE endpoint accepts APPROVED + future; confirmation warns "This cannot be undone." | Should Have |
+| KAN-116 | As the **system**, I want to block withdrawal of already-started vacations so approved leave cannot be retroactively removed. | DELETE returns 400 "Cannot withdraw a request that has already started" if `start_date <= today`. | Must Have |
+| KAN-117 | As a **manager**, I want a bell notification and email when an employee cancels or withdraws so I can adjust team plans. | `VACATION_CANCELLED` dispatch + `create_user_notification` called from `api_vacation_cancel`; manager's user_id resolved from vacation_requests.manager_id; link = `/vacation/team`. | Must Have |
+| KAN-118 | As a **developer**, I want unit tests for all cancellation/withdrawal paths so edge cases are covered. | Tests: cancel PENDING succeeds; withdraw future APPROVED succeeds; already-started APPROVED blocked (400); REJECTED blocked (400); no-crash when manager has no user account; notification link is `/vacation/team`. | Must Have |
+
+---
+
+## EP25 — Analytics & Reporting Dashboard
+**Jira:** KAN-119 · **Label:** `analytics` `admin` `reporting`
+**Description:** A full analytics dashboard under `/admin/analytics` giving Company Admins, Portal Admins, and HR Admins actionable insight into feature adoption, vacation behaviour, skills coverage, org structure health, and search patterns. Every page visit and search query is logged non-blocking in Postgres, giving a rolling 1-year behavioural dataset.
+
+| Story ID | User Story | Acceptance Criteria | Priority |
+|----------|-----------|---------------------|----------|
+| KAN-119 | As an **admin**, I want page-visit tracking so I know which features employees actually use. | `page_views` table; `@after_request` hook logs `user_id`, `company_id`, `role`, `route`, `page_label` in a background thread; skips `/api/`, `/static/`, login, unauthenticated requests. | Must Have |
+| KAN-120 | As an **admin**, I want search-query logging so I can identify what employees can't find. | `search_logs` table; every `/api/search` call logs `query`, `result_count`, `role`, `company_id` in background thread. | Must Have |
+| KAN-121 | As an **admin**, I want an Overview tab showing daily active users, most-visited pages, and feature adoption % so I understand portal engagement. | Chart.js line chart for DAU; horizontal bar for feature adoption (% of employees who visited each feature); top-pages table; bulk-import usage widget. | Must Have |
+| KAN-122 | As an **admin**, I want a Vacation tab with KPIs (approval rate, avg decision time, pending backlog), time-series chart, status doughnut, and per-employee drilldown. | Approval/rejection/cancellation rates; avg manager decision hours; requests-over-time line chart; status doughnut; leave utilisation grouped by Company/Dept/Location/Manager; sortable employee table with used-days column. | Must Have |
+| KAN-123 | As an **admin**, I want a Skills tab showing profile completeness %, validation rate, top skills, and skills-added trend so I understand the talent data quality. | KPI: employees with ≥1 skill / total; validation rate; bar chart of skills added per month; horizontal bar of top 15 skills; per-employee skill-count table. | Must Have |
+| KAN-124 | As an **admin**, I want an Org Chart tab with headcount KPIs, org depth, span of control, headcount growth line chart, and org-chart page view trend so I understand structure health and feature usage. | KPIs: active headcount, manager count, avg span, max depth, org-chart views in period; headcount by department bar; headcount growth line; manager span-of-control sortable table. | Must Have |
+| KAN-125 | As an **admin**, I want a Search tab showing top queries, zero-result rate, and a "zero-result terms" table so I can act on content gaps. | KPIs: total searches, unique searchers, zero-result rate; search volume over time; top-10 terms bar; full terms table; dedicated zero-result table. | Must Have |
+| KAN-126 | As an **admin**, I want to filter all analytics by date preset (30d / 90d / 1yr) or a custom range so I can compare periods. | Pill buttons for presets; custom date range reveals two date inputs; filter change invalidates cache and reloads current tab data. | Must Have |
+| KAN-127 | As a **Super Admin**, I want a company dropdown so I can view analytics for any onboarded company. | Company `<select>` shown only for `SYSTEM_ADMIN`; resolves to `?company_id=`; `PORTAL_ADMIN` and `HR_ADMIN` always see their own company. | Must Have |
+| KAN-128 | As an **admin**, I want to download any tab's data as a CSV so I can share it in board meetings. | `/api/analytics/export/csv?section=<tab>` returns `text/csv` with correct filename; tested for vacation (employee drilldown) and search (top terms). | Must Have |
+| KAN-129 | As an **admin**, I want to print any analytics view as a PDF using the browser print dialog. | Print button calls `window.print()`; `@media print` CSS hides sidebar, topbar, bell, and filter bar; all tab content visible; chart cards break-inside: avoid. | Should Have |
+| KAN-130 | As an **admin**, I want filter state to be reflected in the URL so I can share a specific view with a colleague. | All filter params (`tab`, `range`, `start`, `end`, `company_id`, `group_by`) in query string via `history.replaceState`; page restores state on load. | Should Have |
+| KAN-131 | As an **HR Admin**, I want read-only access to my company's analytics so I can track leave and skills without needing Company Admin rights. | `HR_ADMIN` added to `_ROLES` tuple in analytics route; sidebar "Analytics" link visible for HR_ADMIN; company always scoped to session. | Must Have |
+| KAN-132 | As a **developer**, I want 24 unit tests covering all analytics endpoints so access control, data shape, CSV export, and date parsing are verified. | `TestAnalyticsPageAccess` (5), `TestAnalyticsOverview` (5), `TestAnalyticsVacation` (3), `TestAnalyticsSkills` (2), `TestAnalyticsOrg` (2), `TestAnalyticsSearch` (2), `TestAnalyticsExport` (3), `TestAnalyticsDateParsing` (2) — all passing. | Must Have |

@@ -358,3 +358,92 @@ The portal is fully usable on mobile devices (phones and tablets).
 | < 768px | Login panels stack vertically |
 | < 480px | Search bar hidden from topbar (use /search page) |
 | All sizes | Org tree is horizontally scrollable with touch momentum |
+
+---
+
+### 3.16 In-App Notification System
+
+Every user has a bell icon (🔔) in the top-right corner of every page. The number on the badge is the total of two things: pending vacation approvals waiting for the manager's action, and unread personal alerts for the logged-in user.
+
+**What triggers a notification:**
+
+| Event | Who gets notified | What the message says |
+|---|---|---|
+| Manager approves a vacation | The employee | "Your Annual Leave request (25 May → 26 May) has been approved." |
+| Manager rejects a vacation | The employee | "Your Annual Leave request (25 May → 26 May) has been rejected. Note: …" |
+| Employee cancels or withdraws | The employee's manager | "Sven Becker cancelled their Annual Leave request (25 May → 26 May)." |
+
+Notifications are stored permanently and show in the bell dropdown under **My Notifications**. They auto-clear from the badge 2 seconds after the employee opens the dropdown. The link on each notification goes directly to the relevant page (employee → My Vacation, manager → Team Vacation).
+
+---
+
+### 3.17 Vacation Cancellation & Withdrawal
+
+Employees can cancel or withdraw vacation requests directly from their **My Vacation** page in the Request History table:
+
+| Situation | Button shown | What happens |
+|---|---|---|
+| Request is PENDING | Red "✕ Cancel" button | Request cancelled; manager receives bell notification + email |
+| Request is APPROVED and start date is in the future | "Withdraw" button | Request cancelled; manager receives bell notification + email |
+| Request is APPROVED and already started | No button | Cannot be withdrawn (vacation already in progress) |
+| Request is REJECTED or CANCELLED | No button | Already resolved |
+
+A confirmation dialog appears before any cancellation, reminding the employee that their manager will be notified.
+
+---
+
+### 3.18 Analytics & Reporting Dashboard
+
+Available to **Company Admins**, **Portal Admins**, and **HR Admins** via the **Analytics** link in the left sidebar under Administration.
+
+**Super Admins (Tech Admin)** see a company dropdown at the top to switch between any onboarded company.
+
+The dashboard has five tabs:
+
+#### Overview Tab
+Answers: *Which features are employees actually using? Is our onboarding investment paying off?*
+
+- Daily Active Users chart — see usage spikes and dips over the selected period
+- Feature Adoption — what % of employees used each feature (Vacation, Org Chart, Search, etc.)
+- Most Visited Pages — ranked table of every page, with view counts and unique visitors
+- Bulk Import Usage — how many CSV imports ran in the last 6 months and when was the last one
+
+#### Vacation Tab
+Answers: *Are managers approving quickly? Which teams are burning leave? Who hasn't taken a day off?*
+
+- KPI cards: approval rate, rejection rate, cancellation rate, average manager decision time, pending backlog
+- Requests over time — monthly line chart showing approved, rejected, cancelled, pending
+- Status breakdown — doughnut chart
+- Leave utilisation grouped by **Company / Department / Location / Manager** — identify teams where employees are not using their entitlement (potential wellbeing concern)
+- Employee drilldown table — sortable; shows every active employee's leave days used this year
+
+#### Skills Tab
+Answers: *How complete is our talent data? What skills do we actually have?*
+
+- Profile completeness rate — % of employees with at least one skill entered
+- Skills validation rate — % of listed skills verified by a manager
+- Top 15 skills — shows depth of skill per competency
+- Skills added over time — are employees engaging with their profiles?
+- Per-employee completeness table — spot who has 0 skills entered
+
+#### Org Chart Tab
+Answers: *Is our hierarchy healthy? Are managers overloaded? Are employees using the org chart?*
+
+- Active headcount, manager count, manager-to-employee ratio
+- Average span of control (direct reports per manager) and maximum org depth
+- Headcount growth — how the team has grown over the selected period
+- Headcount by department — see imbalances
+- Manager span-of-control table — find overloaded managers
+- Org chart page views — is the feature being used at all?
+
+#### Search Tab
+Answers: *What are employees looking for? What can they not find?*
+
+- Search volume over time and zero-result rate
+- Top search terms — what employees look for most
+- **Zero-result searches** — terms that returned nothing; these are content gaps HR should address (e.g. "parental leave" returning zero results means that vacation type should be added)
+
+**Date filtering:** All tabs support date presets (Last 30 days / 90 days / 1 Year) or a custom date range picker. The filter state is in the URL, so a specific report view can be shared with a colleague by copying the link.
+
+**Export:** Each tab has a "↓ CSV" download button. The "⎙ Print" button opens the browser print dialog, which can save any view as a PDF — suitable for board presentations.
+
