@@ -128,3 +128,28 @@ def api_my_mutes():
         (session['user_id'],),
     )
     return jsonify([r['event_type'] for r in rows])
+
+
+# ── In-app user notification endpoints ───────────────────────────────────────
+
+from app.services import notification_service as _ns  # noqa: E402 (local import avoids circular)
+
+
+@app.route('/api/my-notifications')
+@login_required
+def api_my_notifications():
+    """Return unread in-app notification count and list for the current user."""
+    user_id = session['user_id']
+    notifications = _ns.get_unread_notifications(user_id)
+    for n in notifications:
+        if n.get('created_at'):
+            n['created_at'] = str(n['created_at'])
+    return jsonify({'count': len(notifications), 'notifications': notifications})
+
+
+@app.route('/api/my-notifications/mark-read', methods=['POST'])
+@login_required
+def api_my_notifications_mark_read():
+    """Mark all in-app notifications for the current user as read."""
+    _ns.mark_all_read(session['user_id'])
+    return jsonify({'ok': True})

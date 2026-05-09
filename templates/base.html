@@ -126,7 +126,7 @@
     </a>
     {% endif %}
 
-    {% if has_role('SYSTEM_ADMIN', 'PORTAL_ADMIN') %}
+    {% if has_role('SYSTEM_ADMIN', 'PORTAL_ADMIN', 'HR_ADMIN') %}
     <span class="sidebar-section-title">Administration</span>
     <a href="{{ url_for('admin') }}"
        class="nav-link {% if request.endpoint == 'admin' %}active{% endif %}">
@@ -166,6 +166,14 @@
       <span class="nav-label">Company Settings</span>
     </a>
     {% endif %}
+    <a href="{{ url_for('admin_analytics') }}"
+       class="nav-link {% if request.endpoint == 'admin_analytics' %}active{% endif %}">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/>
+        <line x1="6"  y1="20" x2="6"  y2="14"/>
+      </svg>
+      <span class="nav-label">Analytics</span>
+    </a>
     {% endif %}
   </nav>
 
@@ -224,10 +232,10 @@
 
     <div class="topbar-user" style="gap:12px">
 
-      <!-- ── Pending approvals bell (managers only) ──────── -->
-      {% if has_role('SOLID_LINE_MANAGER','DOTTED_LINE_MANAGER','HR_ADMIN','SYSTEM_ADMIN','PORTAL_ADMIN') %}
+      <!-- ── Bell: pending approvals (managers) + my notifications (everyone) ── -->
+      {% if session.user_id %}
       <div class="bell-wrap" id="bell-wrap">
-        <button class="bell-btn" id="bell-btn" onclick="toggleBell()" title="Pending vacation approvals">
+        <button class="bell-btn" id="bell-btn" onclick="toggleBell()" title="Notifications">
           <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
             <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
@@ -236,11 +244,22 @@
         </button>
 
         <div class="bell-dropdown" id="bell-dropdown">
+          <!-- Section A: pending approvals (only rendered for managers) -->
+          {% if has_role('SOLID_LINE_MANAGER','DOTTED_LINE_MANAGER','HR_ADMIN','SYSTEM_ADMIN','PORTAL_ADMIN') %}
           <div class="bell-drop-hdr">
             <span style="font-weight:700;font-size:.85rem">Pending Approvals</span>
             <a href="{{ url_for('vacation_team') }}" style="font-size:.74rem;color:var(--primary)">View all →</a>
           </div>
           <div id="bell-list"><p class="bell-empty">Loading…</p></div>
+          <div class="bell-divider" id="bell-divider" style="display:none"></div>
+          {% endif %}
+
+          <!-- Section B: my in-app notifications (everyone) -->
+          <div class="bell-drop-hdr" id="bell-notif-hdr" style="display:none">
+            <span style="font-weight:700;font-size:.85rem">My Notifications</span>
+            <a href="/vacation" style="font-size:.74rem;color:var(--primary)">View history →</a>
+          </div>
+          <div id="bell-notif-list"></div>
         </div>
       </div>
       {% endif %}
@@ -331,18 +350,27 @@ async function toggleTheme() {
   });
 }
 
-// ── Bell / pending approvals ───────────────────────────────────────────────
+// ── Bell: pending approvals (managers) + my notifications (everyone) ─────────
 let _bellLoaded = false;
 
 async function loadBellCount() {
   try {
-    const res = await fetch('/api/vacation/pending-count');
-    if (!res.ok) return;
-    const { count } = await res.json();
     const badge = document.getElementById('bell-badge');
     if (!badge) return;
-    if (count > 0) {
-      badge.textContent = count > 99 ? '99+' : count;
+
+    // Fetch both counts in parallel
+    const [pendingRes, notifRes] = await Promise.all([
+      fetch('/api/vacation/pending-count').catch(() => null),
+      fetch('/api/my-notifications').catch(() => null),
+    ]);
+
+    let pending = 0, notifCount = 0;
+    if (pendingRes?.ok) { const d = await pendingRes.json(); pending = d.count || 0; }
+    if (notifRes?.ok)   { const d = await notifRes.json();   notifCount = d.count || 0; }
+
+    const total = pending + notifCount;
+    if (total > 0) {
+      badge.textContent = total > 99 ? '99+' : total;
       badge.style.display = 'flex';
     } else {
       badge.style.display = 'none';
@@ -351,31 +379,71 @@ async function loadBellCount() {
 }
 
 async function loadBellList() {
+  // ── Section A: pending approvals (managers) ──────────────────────────────
   const list = document.getElementById('bell-list');
-  if (!list) return;
-  list.innerHTML = '<p class="bell-empty">Loading…</p>';
-  try {
-    const res  = await fetch('/api/vacation/team-pending');
-    if (!res.ok) { list.innerHTML = '<p class="bell-empty">Unable to load.</p>'; return; }
-    const data = await res.json();
-    if (!data.length) {
-      list.innerHTML = '<p class="bell-empty">No pending approvals 🎉</p>';
-      return;
+  if (list) {
+    list.innerHTML = '<p class="bell-empty">Loading…</p>';
+    try {
+      const res  = await fetch('/api/vacation/team-pending');
+      if (!res.ok) {
+        list.innerHTML = '<p class="bell-empty">Unable to load.</p>';
+      } else {
+        const data = await res.json();
+        if (!data.length) {
+          list.innerHTML = '<p class="bell-empty">No pending approvals ✓</p>';
+        } else {
+          list.innerHTML = data.map(r => `
+            <div class="bell-item" id="bell-item-${r.id}">
+              <div class="bell-item-top">
+                <span class="bell-item-name">${escH(r.employee_name)}</span>
+                <span class="bell-item-type" style="background:${escH(r.color||'#3b82f6')}20;color:${escH(r.color||'#3b82f6')}">${escH(r.type_name)}</span>
+              </div>
+              <div class="bell-item-dates">${escH(String(r.start_date))} → ${escH(String(r.end_date))} · ${r.working_days}d</div>
+              <div class="bell-item-actions">
+                <button class="bell-approve" onclick="quickReview('${r.id}','approve',this)">✓ Approve</button>
+                <button class="bell-reject"  onclick="openRejectModal('${r.id}', '${escH(r.employee_name)}')">✗ Reject</button>
+              </div>
+            </div>`).join('');
+        }
+      }
+    } catch (_) {
+      list.innerHTML = '<p class="bell-empty">Error loading.</p>';
     }
-    list.innerHTML = data.map(r => `
-      <div class="bell-item" id="bell-item-${r.id}">
-        <div class="bell-item-top">
-          <span class="bell-item-name">${escH(r.employee_name)}</span>
-          <span class="bell-item-type" style="background:${escH(r.color||'#3b82f6')}20;color:${escH(r.color||'#3b82f6')}">${escH(r.type_name)}</span>
-        </div>
-        <div class="bell-item-dates">${escH(String(r.start_date))} → ${escH(String(r.end_date))} · ${r.working_days}d</div>
-        <div class="bell-item-actions">
-          <button class="bell-approve" onclick="quickReview('${r.id}','approve',this)">✓ Approve</button>
-          <button class="bell-reject"  onclick="openRejectModal('${r.id}', '${escH(r.employee_name)}')">✗ Reject</button>
-        </div>
-      </div>`).join('');
-  } catch (_) {
-    list.innerHTML = '<p class="bell-empty">Error loading.</p>';
+  }
+
+  // ── Section B: my in-app notifications (everyone) ────────────────────────
+  const notifList = document.getElementById('bell-notif-list');
+  const notifHdr  = document.getElementById('bell-notif-hdr');
+  const divider   = document.getElementById('bell-divider');
+  if (notifList) {
+    try {
+      const res  = await fetch('/api/my-notifications');
+      if (res.ok) {
+        const { notifications } = await res.json();
+        if (notifications.length) {
+          if (notifHdr) notifHdr.style.display = '';
+          if (divider)  divider.style.display  = '';
+          notifList.innerHTML = notifications.map(n => `
+            <div class="bell-item bell-notif-item" id="bell-notif-${n.id}">
+              <div class="bell-item-top">
+                <span class="bell-notif-icon">${n.event_type === 'VACATION_APPROVED' ? '✅' : '❌'}</span>
+                <span class="bell-item-name" style="font-size:.83rem">${escH(n.message)}</span>
+              </div>
+              <div class="bell-item-dates" style="margin-top:2px">${escH(String(n.created_at||'').slice(0,16).replace('T',' '))}</div>
+              ${n.link ? `<a href="${escH(n.link)}" class="bell-notif-link" style="font-size:.74rem;color:var(--primary);display:block;margin-top:4px">View →</a>` : ''}
+            </div>`).join('');
+          // Mark as read after a short delay so user has time to see badge
+          setTimeout(() => fetch('/api/my-notifications/mark-read', {method:'POST'})
+            .then(() => loadBellCount()), 2000);
+        } else {
+          if (notifHdr) notifHdr.style.display = list ? 'none' : '';
+          if (!list && notifHdr) {
+            notifHdr.style.display = '';
+            notifList.innerHTML = '<p class="bell-empty">No new notifications</p>';
+          }
+        }
+      }
+    } catch (_) {}
   }
 }
 

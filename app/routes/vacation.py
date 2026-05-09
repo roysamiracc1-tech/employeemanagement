@@ -193,7 +193,8 @@ def vacation_page():
                            vacation_types=vt,
                            requests=requests,
                            has_manager=bool(mgr_id),
-                           year=year)
+                           year=year,
+                           today=str(datetime.date.today()))
 
 
 @app.route('/api/vacation/request', methods=['POST'])
@@ -265,13 +266,82 @@ def api_vacation_submit():
 @login_required
 def api_vacation_cancel(req_id):
     emp_id = session['employee_id']
-    row = query("SELECT status FROM vacation_requests WHERE id=%s::uuid AND employee_id=%s::uuid",
-                (req_id, emp_id), one=True)
+    row = query(
+        "SELECT status, start_date FROM vacation_requests "
+        "WHERE id=%s::uuid AND employee_id=%s::uuid",
+        (req_id, emp_id), one=True,
+    )
     if not row:
         return jsonify({'error': 'Not found'}), 404
-    if row['status'] != 'PENDING':
-        return jsonify({'error': 'Only PENDING requests can be cancelled.'}), 400
+
+    status = row['status']
+    if status == 'PENDING':
+        pass  # always cancellable
+    elif status == 'APPROVED':
+        # Allow withdrawal only if the vacation hasn't started yet
+        start = row['start_date']
+        if isinstance(start, str):
+            start = datetime.date.fromisoformat(start)
+        if start <= datetime.date.today():
+            return jsonify({'error': 'Cannot withdraw a request that has already started.'}), 400
+    else:
+        return jsonify({'error': 'Only PENDING or future APPROVED requests can be cancelled.'}), 400
+
     execute("UPDATE vacation_requests SET status='CANCELLED', updated_at=NOW() WHERE id=%s::uuid", (req_id,))
+
+    # Notify manager — email + in-app bell (best-effort)
+    try:
+        full_req = query("""
+            SELECT vr.manager_id::text,
+                   vr.start_date, vr.end_date, vr.working_days,
+                   vt.name AS vacation_type,
+                   e.company_id::text AS company_id,
+                   e.first_name || ' ' || e.last_name AS employee_name
+            FROM vacation_requests vr
+            JOIN vacation_types vt ON vt.id = vr.vacation_type_id
+            JOIN employees e ON e.id = vr.employee_id
+            WHERE vr.id=%s::uuid
+        """, (req_id,), one=True)
+
+        if full_req and full_req.get('company_id') and full_req.get('manager_id'):
+            mgr_id = full_req['manager_id']
+
+            # ① Email notification (async SMTP) to manager / HR
+            notification_service.dispatch(
+                'VACATION_CANCELLED',
+                company_id=full_req['company_id'],
+                employee_id=emp_id,
+                manager_id=mgr_id,
+                extra_ctx={
+                    'vacation_type':  full_req.get('vacation_type', ''),
+                    'start_date':     str(full_req['start_date']),
+                    'end_date':       str(full_req['end_date']),
+                    'working_days':   full_req.get('working_days'),
+                    'employee_name':  full_req.get('employee_name', ''),
+                },
+            )
+
+            # ② In-app bell notification for the manager
+            mgr_user = query(
+                "SELECT id::text FROM users WHERE employee_id=%s::uuid AND is_active LIMIT 1",
+                (mgr_id,), one=True,
+            )
+            if mgr_user:
+                vtype   = full_req.get('vacation_type', 'Vacation')
+                s_date  = str(full_req['start_date'])
+                e_date  = str(full_req['end_date'])
+                emp_name = full_req.get('employee_name', 'An employee')
+                message = (
+                    f"{emp_name} cancelled their {vtype} request "
+                    f"({s_date} → {e_date})."
+                )
+                notification_service.create_user_notification(
+                    mgr_user['id'], 'VACATION_CANCELLED', message,
+                    link='/vacation/team',
+                )
+    except Exception:
+        pass
+
     return jsonify({'ok': True})
 
 
@@ -362,7 +432,7 @@ def api_vacation_review(req_id):
         WHERE id=%s::uuid
     """, (new_status, note, req_id))
 
-    # Notify employee (best-effort)
+    # Notify employee — email + in-app (best-effort, never breaks the response)
     try:
         full_req = query("""
             SELECT vr.employee_id::text, vr.start_date, vr.end_date, vr.working_days,
@@ -374,6 +444,8 @@ def api_vacation_review(req_id):
         """, (req_id,), one=True)
         if full_req and full_req.get('company_id'):
             event = 'VACATION_APPROVED' if new_status == 'APPROVED' else 'VACATION_REJECTED'
+
+            # ① Email notification (async SMTP)
             notification_service.dispatch(
                 event, company_id=full_req['company_id'],
                 employee_id=full_req['employee_id'], manager_id=mgr_id,
@@ -384,6 +456,25 @@ def api_vacation_review(req_id):
                     'working_days':  full_req.get('working_days'),
                     'manager_note':  note or '',
                 })
+
+            # ② In-app bell notification for the employee
+            emp_user = query(
+                "SELECT id::text FROM users WHERE employee_id=%s::uuid AND is_active LIMIT 1",
+                (full_req['employee_id'],), one=True,
+            )
+            if emp_user:
+                verb    = 'approved' if new_status == 'APPROVED' else 'rejected'
+                vtype   = full_req.get('vacation_type', 'Vacation')
+                s_date  = str(full_req['start_date'])
+                e_date  = str(full_req['end_date'])
+                message = (
+                    f"Your {vtype} request ({s_date} → {e_date}) "
+                    f"has been {verb}."
+                    + (f" Note: {note}" if note else "")
+                )
+                notification_service.create_user_notification(
+                    emp_user['id'], event, message, link='/vacation',
+                )
     except Exception:
         pass
 

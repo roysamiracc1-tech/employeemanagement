@@ -84,9 +84,13 @@
               <td style="font-size:.75rem;color:#64748b;max-width:180px">{{ r.manager_note or '—' }}</td>
               <td>
                 {% if r.status == 'PENDING' %}
-                <button onclick="cancelRequest('{{ r.id }}')"
-                        style="background:none;border:none;cursor:pointer;color:#94a3b8;font-size:.8rem"
-                        title="Cancel">✕ Cancel</button>
+                <button class="btn btn-danger btn-sm" onclick="cancelRequest('{{ r.id }}')"
+                        title="Cancel this pending request">✕ Cancel</button>
+                {% elif r.status == 'APPROVED' and r.start_date and r.start_date[:10] > today %}
+                <button class="btn btn-ghost btn-sm"
+                        style="color:#dc2626;border-color:#fca5a5"
+                        onclick="withdrawRequest('{{ r.id }}')"
+                        title="Withdraw — removes this approved request">Withdraw</button>
                 {% endif %}
               </td>
             </tr>
@@ -208,10 +212,27 @@ async function submitRequest() {
 }
 
 async function cancelRequest(id) {
-  if (!confirm('Cancel this vacation request?')) return;
+  if (!confirm('Cancel this pending request?\nYour manager will be notified.')) return;
+  const btn = event.target;
+  btn.disabled = true; btn.textContent = '…';
   const res = await fetch('/api/vacation/request/'+id, {method:'DELETE'});
   if (res.ok) location.reload();
-  else { const d=await res.json(); alert(d.error||'Failed.'); }
+  else {
+    btn.disabled = false; btn.textContent = '✕ Cancel';
+    const d = await res.json(); alert(d.error || 'Failed.');
+  }
+}
+
+async function withdrawRequest(id) {
+  if (!confirm('Withdraw this approved request?\nThis cannot be undone and your manager will be notified.')) return;
+  const btn = event.target;
+  btn.disabled = true; btn.textContent = '…';
+  const res = await fetch('/api/vacation/request/'+id, {method:'DELETE'});
+  if (res.ok) location.reload();
+  else {
+    btn.disabled = false; btn.textContent = 'Withdraw';
+    const d = await res.json(); alert(d.error || 'Failed.');
+  }
 }
 </script>
 {% endblock %}

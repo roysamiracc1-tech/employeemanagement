@@ -1,0 +1,771 @@
+{% extends 'base.html' %}
+{% block title %}Analytics — HR Portal{% endblock %}
+{% block page_title %}Analytics{% endblock %}
+
+{% block content %}
+<div class="page" style="max-width:1200px">
+
+<!-- ── Filter bar ──────────────────────────────────────────────────────────── -->
+<div class="an-filter-bar" id="an-filter-bar">
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;flex:1">
+    {% if companies %}
+    <select id="an-company" class="form-control" style="min-width:180px;max-width:240px"
+            onchange="anLoad()">
+      <option value="">— Select Company —</option>
+      {% for c in companies %}
+      <option value="{{ c.id }}">{{ c.name }}</option>
+      {% endfor %}
+    </select>
+    {% endif %}
+
+    <!-- Preset range pills -->
+    <div class="an-range-pills">
+      <button class="an-pill active" data-range="30d"  onclick="setRange(this,'30d')">30 Days</button>
+      <button class="an-pill"        data-range="90d"  onclick="setRange(this,'90d')">90 Days</button>
+      <button class="an-pill"        data-range="365d" onclick="setRange(this,'365d')">1 Year</button>
+      <button class="an-pill"        data-range="custom" onclick="setRange(this,'custom')">Custom</button>
+    </div>
+    <div id="an-custom-dates" style="display:none;display:flex;gap:6px;align-items:center">
+      <input type="date" id="an-start" class="form-control" style="width:140px" onchange="anLoad()">
+      <span style="color:#64748b;font-size:.8rem">→</span>
+      <input type="date" id="an-end"   class="form-control" style="width:140px" onchange="anLoad()">
+    </div>
+  </div>
+
+  <div style="display:flex;gap:8px">
+    <button class="btn btn-ghost btn-sm" onclick="anExportCSV()" title="Download CSV">
+      ↓ CSV
+    </button>
+    <button class="btn btn-ghost btn-sm" onclick="window.print()" title="Print / Save as PDF">
+      ⎙ Print
+    </button>
+  </div>
+</div>
+
+<!-- ── Tabs ────────────────────────────────────────────────────────────────── -->
+<div class="an-tabs" id="an-tabs">
+  <button class="an-tab active" data-tab="overview"  onclick="switchTab(this,'overview')">📊 Overview</button>
+  <button class="an-tab"        data-tab="vacation"  onclick="switchTab(this,'vacation')">🏖 Vacation</button>
+  <button class="an-tab"        data-tab="skills"    onclick="switchTab(this,'skills')">🎯 Skills</button>
+  <button class="an-tab"        data-tab="org"       onclick="switchTab(this,'org')">🌳 Org Chart</button>
+  <button class="an-tab"        data-tab="search"    onclick="switchTab(this,'search')">🔍 Search</button>
+</div>
+
+<div id="an-error" class="an-error" style="display:none"></div>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<!--  TAB: OVERVIEW                                                          -->
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<div id="tab-overview" class="an-tab-content">
+  <div id="ov-loading" class="an-loading">Loading…</div>
+  <div id="ov-body" style="display:none">
+
+    <!-- KPI row -->
+    <div class="an-kpi-row" id="ov-kpis"></div>
+
+    <!-- Charts row -->
+    <div class="an-chart-row">
+      <div class="an-chart-card" style="flex:2">
+        <div class="an-chart-title">Daily Active Users</div>
+        <canvas id="ch-dau" height="90"></canvas>
+      </div>
+      <div class="an-chart-card" style="flex:1">
+        <div class="an-chart-title">Bulk Import (last 6 months)</div>
+        <div id="ov-bulk" style="font-size:.85rem;padding:16px 0"></div>
+      </div>
+    </div>
+
+    <!-- Feature adoption -->
+    <div class="an-card" style="margin-top:20px">
+      <div class="an-card-hdr">
+        <span style="font-weight:700">Feature Adoption — % of employees who used each feature</span>
+      </div>
+      <canvas id="ch-adoption" height="60"></canvas>
+    </div>
+
+    <!-- Top pages table -->
+    <div class="an-card" style="margin-top:20px">
+      <div class="an-card-hdr"><span style="font-weight:700">Most Visited Pages</span></div>
+      <div class="table-wrap"><table id="tbl-pages" class="an-table">
+        <thead><tr><th>Page</th><th>Total Views</th><th>Unique Users</th></tr></thead>
+        <tbody></tbody>
+      </table></div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<!--  TAB: VACATION                                                          -->
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<div id="tab-vacation" class="an-tab-content" style="display:none">
+  <div id="vac-loading" class="an-loading">Loading…</div>
+  <div id="vac-body" style="display:none">
+
+    <!-- KPI row -->
+    <div class="an-kpi-row" id="vac-kpis"></div>
+
+    <!-- Charts row -->
+    <div class="an-chart-row">
+      <div class="an-chart-card" style="flex:2">
+        <div class="an-chart-title">Requests Over Time</div>
+        <canvas id="ch-vac-time" height="90"></canvas>
+      </div>
+      <div class="an-chart-card" style="flex:1">
+        <div class="an-chart-title">Status Breakdown</div>
+        <canvas id="ch-vac-status" height="90"></canvas>
+      </div>
+    </div>
+
+    <div class="an-chart-row" style="margin-top:16px">
+      <div class="an-chart-card" style="flex:1">
+        <div class="an-chart-title">Requests by Type</div>
+        <canvas id="ch-vac-type" height="100"></canvas>
+      </div>
+    </div>
+
+    <!-- Leave utilisation grouping -->
+    <div class="an-card" style="margin-top:20px">
+      <div class="an-card-hdr" style="justify-content:space-between">
+        <span style="font-weight:700">Leave Utilisation (current year approved days)</span>
+        <div class="an-range-pills" style="gap:4px">
+          <button class="an-pill active" data-gu="company"    onclick="setGroupBy(this,'company')">Company</button>
+          <button class="an-pill"        data-gu="department" onclick="setGroupBy(this,'department')">Dept</button>
+          <button class="an-pill"        data-gu="location"   onclick="setGroupBy(this,'location')">Location</button>
+          <button class="an-pill"        data-gu="manager"    onclick="setGroupBy(this,'manager')">Manager</button>
+        </div>
+      </div>
+      <canvas id="ch-utilisation" height="80"></canvas>
+    </div>
+
+    <!-- Employee drilldown table -->
+    <div class="an-card" style="margin-top:20px">
+      <div class="an-card-hdr"><span style="font-weight:700">Employee Drilldown — Leave Usage (current year)</span></div>
+      <div class="table-wrap"><table id="tbl-vac-drill" class="an-table sortable-table">
+        <thead><tr>
+          <th>Name</th><th>Department</th><th>Location</th>
+          <th>Manager</th><th>Used Days</th><th>Requests (period)</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table></div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<!--  TAB: SKILLS                                                            -->
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<div id="tab-skills" class="an-tab-content" style="display:none">
+  <div id="sk-loading" class="an-loading">Loading…</div>
+  <div id="sk-body" style="display:none">
+
+    <div class="an-kpi-row" id="sk-kpis"></div>
+
+    <div class="an-chart-row">
+      <div class="an-chart-card" style="flex:1">
+        <div class="an-chart-title">Skills Added per Month</div>
+        <canvas id="ch-sk-month" height="100"></canvas>
+      </div>
+      <div class="an-chart-card" style="flex:1">
+        <div class="an-chart-title">Top Skills (by employees who have it)</div>
+        <canvas id="ch-sk-top" height="100"></canvas>
+      </div>
+    </div>
+
+    <div class="an-card" style="margin-top:20px">
+      <div class="an-card-hdr"><span style="font-weight:700">Employee Profile Completeness</span></div>
+      <div class="table-wrap"><table id="tbl-sk-emp" class="an-table sortable-table">
+        <thead><tr>
+          <th>Name</th><th>Job Title</th><th>Department</th>
+          <th>Skills Listed</th><th>Skills Validated</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table></div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<!--  TAB: ORG CHART                                                         -->
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<div id="tab-org" class="an-tab-content" style="display:none">
+  <div id="org-loading" class="an-loading">Loading…</div>
+  <div id="org-body" style="display:none">
+
+    <div class="an-kpi-row" id="org-kpis"></div>
+
+    <div class="an-chart-row">
+      <div class="an-chart-card" style="flex:2">
+        <div class="an-chart-title">Headcount Growth</div>
+        <canvas id="ch-org-hc" height="90"></canvas>
+      </div>
+      <div class="an-chart-card" style="flex:1">
+        <div class="an-chart-title">Headcount by Department</div>
+        <canvas id="ch-org-dept" height="90"></canvas>
+      </div>
+    </div>
+
+    <div class="an-chart-row" style="margin-top:16px">
+      <div class="an-chart-card">
+        <div class="an-chart-title">Org Chart Page Views</div>
+        <canvas id="ch-org-views" height="70"></canvas>
+      </div>
+    </div>
+
+    <div class="an-card" style="margin-top:20px">
+      <div class="an-card-hdr"><span style="font-weight:700">Manager Span of Control</span></div>
+      <div class="table-wrap"><table id="tbl-org-span" class="an-table sortable-table">
+        <thead><tr><th>Manager</th><th>Job Title</th><th>Direct Reports</th></tr></thead>
+        <tbody></tbody>
+      </table></div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<!--  TAB: SEARCH                                                            -->
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<div id="tab-search" class="an-tab-content" style="display:none">
+  <div id="sr-loading" class="an-loading">Loading…</div>
+  <div id="sr-body" style="display:none">
+
+    <div class="an-kpi-row" id="sr-kpis"></div>
+
+    <div class="an-chart-row">
+      <div class="an-chart-card" style="flex:2">
+        <div class="an-chart-title">Search Volume Over Time</div>
+        <canvas id="ch-sr-vol" height="90"></canvas>
+      </div>
+      <div class="an-chart-card" style="flex:1">
+        <div class="an-chart-title">Top Search Terms</div>
+        <canvas id="ch-sr-top" height="90"></canvas>
+      </div>
+    </div>
+
+    <div class="an-card" style="margin-top:20px">
+      <div class="an-card-hdr"><span style="font-weight:700">All Search Terms</span></div>
+      <div class="table-wrap"><table id="tbl-sr-terms" class="an-table sortable-table">
+        <thead><tr><th>Query</th><th>Searches</th><th>Avg Results</th><th>Zero-Result Count</th></tr></thead>
+        <tbody></tbody>
+      </table></div>
+    </div>
+
+    <div class="an-card" style="margin-top:16px">
+      <div class="an-card-hdr" style="color:#dc2626">
+        <span style="font-weight:700">⚠ Zero-Result Searches — terms that found nothing</span>
+      </div>
+      <div class="table-wrap"><table id="tbl-sr-zero" class="an-table">
+        <thead><tr><th>Query</th><th>Times Searched</th></tr></thead>
+        <tbody></tbody>
+      </table></div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /page -->
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script>
+// ── State ─────────────────────────────────────────────────────────────────────
+let _curTab    = 'overview';
+let _curRange  = '30d';
+let _curGroupBy = 'company';
+let _loaded    = {};   // track which tabs have been fetched
+let _charts    = {};   // Chart.js instances keyed by canvas id
+
+// ── URL-sync (shareable links) ────────────────────────────────────────────────
+function _pushState() {
+  const p = new URLSearchParams();
+  const co = document.getElementById('an-company')?.value;
+  if (co) p.set('company_id', co);
+  p.set('tab',   _curTab);
+  p.set('range', _curRange);
+  p.set('group_by', _curGroupBy);
+  if (_curRange === 'custom') {
+    const s = document.getElementById('an-start')?.value;
+    const e = document.getElementById('an-end')?.value;
+    if (s) p.set('start', s);
+    if (e) p.set('end',   e);
+  }
+  history.replaceState(null, '', '?' + p.toString());
+}
+
+function _restoreState() {
+  const p = new URLSearchParams(location.search);
+  if (p.get('company_id')) {
+    const sel = document.getElementById('an-company');
+    if (sel) sel.value = p.get('company_id');
+  }
+  if (p.get('range'))    { _curRange = p.get('range'); }
+  if (p.get('group_by')) { _curGroupBy = p.get('group_by'); }
+  if (p.get('tab'))      {
+    const btn = document.querySelector(`.an-tab[data-tab="${p.get('tab')}"]`);
+    if (btn) switchTab(btn, p.get('tab'), true);
+  }
+  // Sync pills
+  document.querySelectorAll('.an-pill[data-range]').forEach(b => {
+    b.classList.toggle('active', b.dataset.range === _curRange);
+  });
+  document.querySelectorAll('.an-pill[data-gu]').forEach(b => {
+    b.classList.toggle('active', b.dataset.gu === _curGroupBy);
+  });
+  if (_curRange === 'custom') {
+    document.getElementById('an-custom-dates').style.display = 'flex';
+    if (p.get('start')) document.getElementById('an-start').value = p.get('start');
+    if (p.get('end'))   document.getElementById('an-end').value   = p.get('end');
+  }
+}
+
+// ── Tab switching ─────────────────────────────────────────────────────────────
+function switchTab(btn, tab, noLoad) {
+  document.querySelectorAll('.an-tab').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.an-tab-content').forEach(d => d.style.display = 'none');
+  btn.classList.add('active');
+  document.getElementById('tab-' + tab).style.display = '';
+  _curTab = tab;
+  _pushState();
+  if (!noLoad) anLoad();
+}
+
+// ── Range / group-by controls ─────────────────────────────────────────────────
+function setRange(btn, range) {
+  document.querySelectorAll('.an-pill[data-range]').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  _curRange = range;
+  const cd = document.getElementById('an-custom-dates');
+  cd.style.display = range === 'custom' ? 'flex' : 'none';
+  _loaded = {};   // invalidate all cached sections
+  if (range !== 'custom') anLoad();
+}
+
+function setGroupBy(btn, gb) {
+  document.querySelectorAll('.an-pill[data-gu]').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  _curGroupBy = gb;
+  delete _loaded['vacation'];
+  anLoad();
+}
+
+// ── Build query string ────────────────────────────────────────────────────────
+function _qs(extra) {
+  const p = new URLSearchParams();
+  const co = document.getElementById('an-company')?.value;
+  if (co) p.set('company_id', co);
+  p.set('range', _curRange);
+  if (_curRange === 'custom') {
+    const s = document.getElementById('an-start')?.value;
+    const e = document.getElementById('an-end')?.value;
+    if (s) p.set('start', s);
+    if (e) p.set('end',   e);
+  }
+  Object.entries(extra || {}).forEach(([k,v]) => p.set(k,v));
+  return p.toString();
+}
+
+// ── Main load dispatcher ──────────────────────────────────────────────────────
+async function anLoad() {
+  _pushState();
+  const isSA = {{ 'true' if companies else 'false' }};
+  const co   = document.getElementById('an-company')?.value;
+  const err  = document.getElementById('an-error');
+  err.style.display = 'none';
+  if (isSA && !co) {
+    err.textContent = 'Please select a company to view analytics.';
+    err.style.display = '';
+    return;
+  }
+  switch (_curTab) {
+    case 'overview': await _loadOverview(); break;
+    case 'vacation': await _loadVacation(); break;
+    case 'skills':   await _loadSkills();   break;
+    case 'org':      await _loadOrg();      break;
+    case 'search':   await _loadSearch();   break;
+  }
+}
+
+// ── Generic fetch ─────────────────────────────────────────────────────────────
+async function _fetch(url) {
+  const r = await fetch(url);
+  if (!r.ok) {
+    const d = await r.json().catch(() => ({}));
+    throw new Error(d.error || 'Request failed');
+  }
+  return r.json();
+}
+
+// ── Chart helpers ─────────────────────────────────────────────────────────────
+const COLORS = ['#3b82f6','#22c55e','#f59e0b','#ef4444','#8b5cf6',
+                '#06b6d4','#ec4899','#84cc16','#f97316','#14b8a6'];
+
+function _destroyChart(id) {
+  if (_charts[id]) { _charts[id].destroy(); delete _charts[id]; }
+}
+
+function _lineChart(id, labels, datasets) {
+  _destroyChart(id);
+  _charts[id] = new Chart(document.getElementById(id).getContext('2d'), {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      plugins: { legend: { position: 'top', labels: { boxWidth: 10, font: { size: 11 } } } },
+      scales: { y: { beginAtZero: true } },
+    }
+  });
+}
+
+function _barChart(id, labels, datasets, horizontal) {
+  _destroyChart(id);
+  _charts[id] = new Chart(document.getElementById(id).getContext('2d'), {
+    type: 'bar',
+    data: { labels, datasets },
+    options: {
+      indexAxis: horizontal ? 'y' : 'x',
+      responsive: true, maintainAspectRatio: true,
+      plugins: { legend: { position: 'top', labels: { boxWidth: 10, font: { size: 11 } } } },
+      scales: { x: { beginAtZero: true }, y: { beginAtZero: true } },
+    }
+  });
+}
+
+function _doughnutChart(id, labels, data) {
+  _destroyChart(id);
+  _charts[id] = new Chart(document.getElementById(id).getContext('2d'), {
+    type: 'doughnut',
+    data: { labels, datasets: [{ data, backgroundColor: COLORS }] },
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } },
+    }
+  });
+}
+
+// ── KPI card renderer ─────────────────────────────────────────────────────────
+function _kpiCards(containerId, cards) {
+  document.getElementById(containerId).innerHTML = cards.map(c => `
+    <div class="an-kpi-card">
+      <div class="an-kpi-label">${escH(c.label)}</div>
+      <div class="an-kpi-value">${escH(String(c.value ?? '—'))}</div>
+      ${c.sub ? `<div class="an-kpi-sub">${escH(c.sub)}</div>` : ''}
+    </div>`).join('');
+}
+
+// ── Table renderer ────────────────────────────────────────────────────────────
+function _fillTable(tableId, rows) {
+  const tbody = document.querySelector(`#${tableId} tbody`);
+  if (!rows || !rows.length) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="99">No data for this period.</td></tr>';
+    return;
+  }
+  const keys = Object.keys(rows[0]);
+  tbody.innerHTML = rows.map(r =>
+    '<tr>' + keys.map(k => `<td>${escH(String(r[k] ?? ''))}</td>`).join('') + '</tr>'
+  ).join('');
+}
+
+// ── Section loaders ───────────────────────────────────────────────────────────
+
+async function _loadOverview() {
+  if (_loaded.overview) return;
+  const load = document.getElementById('ov-loading');
+  const body = document.getElementById('ov-body');
+  load.style.display = ''; body.style.display = 'none';
+  try {
+    const d = await _fetch('/api/analytics/overview?' + _qs());
+    _loaded.overview = true;
+
+    _kpiCards('ov-kpis', [
+      { label: 'Total Page Views',  value: d.totals?.total_views  ?? 0 },
+      { label: 'Unique Users',       value: d.totals?.unique_users ?? 0 },
+      { label: 'Features Tracked',   value: d.feature_adoption?.length ?? 0 },
+      { label: 'Bulk Imports (6m)',  value: d.bulk_import?.imports ?? 0,
+        sub: d.bulk_import?.last_used ? 'Last: ' + d.bulk_import.last_used : 'Never used' },
+    ]);
+
+    // DAU line chart
+    _lineChart('ch-dau',
+      d.dau.map(r => r.day),
+      [{ label: 'Active Users', data: d.dau.map(r => r.users),
+         borderColor: '#3b82f6', backgroundColor: '#3b82f620', fill: true, tension: 0.3 }]
+    );
+
+    // Feature adoption bar chart
+    _barChart('ch-adoption',
+      d.feature_adoption.map(r => r.feature),
+      [{ label: '% Adoption', data: d.feature_adoption.map(r => r.pct),
+         backgroundColor: COLORS }],
+      true
+    );
+
+    // Bulk import card
+    const bi = d.bulk_import;
+    document.getElementById('ov-bulk').innerHTML = `
+      <div style="display:flex;flex-direction:column;gap:8px;padding:8px 0">
+        <div class="an-kpi-card" style="flex:1"><div class="an-kpi-label">Imports Run</div>
+          <div class="an-kpi-value">${bi.imports ?? 0}</div></div>
+        <div class="an-kpi-card" style="flex:1"><div class="an-kpi-label">Applied</div>
+          <div class="an-kpi-value">${bi.applied ?? 0}</div></div>
+        <div style="font-size:.75rem;color:#64748b;margin-top:4px">
+          ${bi.last_used ? 'Last used: ' + bi.last_used : 'Feature never used in last 6 months'}
+        </div>
+      </div>`;
+
+    // Top pages table
+    _fillTable('tbl-pages', d.top_pages.map(r => ({
+      Page: r.page_label, 'Total Views': r.views, 'Unique Users': r.unique_users })));
+
+    load.style.display = 'none'; body.style.display = '';
+  } catch (e) {
+    load.textContent = 'Error: ' + e.message;
+  }
+}
+
+async function _loadVacation() {
+  if (_loaded.vacation) return;
+  const load = document.getElementById('vac-loading');
+  const body = document.getElementById('vac-body');
+  load.style.display = ''; body.style.display = 'none';
+  try {
+    const d = await _fetch('/api/analytics/vacation?' + _qs({ group_by: _curGroupBy }));
+    _loaded.vacation = true;
+    const k = d.kpis;
+
+    _kpiCards('vac-kpis', [
+      { label: 'Total Requests',     value: k.total ?? 0 },
+      { label: 'Approval Rate',      value: (k.approval_rate ?? 0) + '%' },
+      { label: 'Rejection Rate',     value: (k.rejection_rate ?? 0) + '%' },
+      { label: 'Cancellation Rate',  value: (k.cancellation_rate ?? 0) + '%' },
+      { label: 'Avg Decision Time',  value: (k.avg_decision_h ?? '—') + ' hrs' },
+      { label: 'Pending Backlog',    value: k.pending ?? 0,
+        sub: k.oldest_pending_days ? 'Oldest: ' + k.oldest_pending_days + 'd' : '' },
+    ]);
+
+    // Over time line chart
+    _lineChart('ch-vac-time',
+      d.over_time.map(r => r.period),
+      [
+        { label: 'Approved',   data: d.over_time.map(r => r.approved),  borderColor: '#22c55e', tension: 0.3 },
+        { label: 'Rejected',   data: d.over_time.map(r => r.rejected),  borderColor: '#ef4444', tension: 0.3 },
+        { label: 'Cancelled',  data: d.over_time.map(r => r.cancelled), borderColor: '#f59e0b', tension: 0.3 },
+        { label: 'Pending',    data: d.over_time.map(r => r.pending),   borderColor: '#94a3b8', tension: 0.3 },
+      ]
+    );
+
+    // Status doughnut
+    _doughnutChart('ch-vac-status',
+      ['Approved', 'Rejected', 'Cancelled', 'Pending'],
+      [k.approved, k.rejected, k.cancelled, k.pending]
+    );
+
+    // By type bar
+    _barChart('ch-vac-type',
+      d.by_type.map(r => r.type_name),
+      [
+        { label: 'Total',    data: d.by_type.map(r => r.total),    backgroundColor: '#3b82f6' },
+        { label: 'Approved', data: d.by_type.map(r => r.approved), backgroundColor: '#22c55e' },
+      ],
+      false
+    );
+
+    // Utilisation bar
+    _barChart('ch-utilisation',
+      d.utilisation.map(r => r.group_name),
+      [{ label: 'Approved Days Used',
+         data: d.utilisation.map(r => r.used_days),
+         backgroundColor: COLORS }],
+      true
+    );
+
+    // Drilldown table
+    _fillTable('tbl-vac-drill', d.drilldown.map(r => ({
+      Name: r.name, Department: r.department, Location: r.location,
+      Manager: r.manager_name ?? '—', 'Used Days': r.used_days,
+      'Requests (period)': r.period_requests })));
+
+    load.style.display = 'none'; body.style.display = '';
+  } catch (e) {
+    load.textContent = 'Error: ' + e.message;
+  }
+}
+
+async function _loadSkills() {
+  if (_loaded.skills) return;
+  const load = document.getElementById('sk-loading');
+  const body = document.getElementById('sk-body');
+  load.style.display = ''; body.style.display = 'none';
+  try {
+    const d = await _fetch('/api/analytics/skills?' + _qs());
+    _loaded.skills = true;
+    const k = d.kpis;
+
+    _kpiCards('sk-kpis', [
+      { label: 'Total Employees',    value: k.total_employees },
+      { label: 'With Skills',        value: k.with_skills,
+        sub: k.completeness_pct + '% completeness' },
+      { label: 'Skill Entries',      value: k.total_skill_entries },
+      { label: 'Validated Skills',   value: k.validated_entries,
+        sub: k.validation_rate_pct + '% validation rate' },
+    ]);
+
+    _barChart('ch-sk-month',
+      d.per_month.map(r => r.period),
+      [{ label: 'Skills Added', data: d.per_month.map(r => r.added),
+         backgroundColor: '#3b82f6' }]
+    );
+
+    _barChart('ch-sk-top',
+      d.top_skills.map(r => r.skill_name),
+      [
+        { label: 'Total',     data: d.top_skills.map(r => r.employees),  backgroundColor: '#3b82f6' },
+        { label: 'Validated', data: d.top_skills.map(r => r.validated),  backgroundColor: '#22c55e' },
+      ],
+      true
+    );
+
+    _fillTable('tbl-sk-emp', d.emp_completeness.map(r => ({
+      Name: r.name, 'Job Title': r.job_title ?? '—', Department: r.department,
+      'Skills Listed': r.skill_count, 'Skills Validated': r.validated_count })));
+
+    load.style.display = 'none'; body.style.display = '';
+  } catch (e) {
+    load.textContent = 'Error: ' + e.message;
+  }
+}
+
+async function _loadOrg() {
+  if (_loaded.org) return;
+  const load = document.getElementById('org-loading');
+  const body = document.getElementById('org-body');
+  load.style.display = ''; body.style.display = 'none';
+  try {
+    const d = await _fetch('/api/analytics/org?' + _qs());
+    _loaded.org = true;
+    const k = d.kpis;
+
+    _kpiCards('org-kpis', [
+      { label: 'Active Employees',  value: k.active ?? 0 },
+      { label: 'Managers',          value: k.managers ?? 0,
+        sub: k.mgr_ratio + '% of headcount' },
+      { label: 'Avg Span of Control', value: k.avg_span ?? 0,
+        sub: 'direct reports / manager' },
+      { label: 'Max Org Depth',     value: k.max_depth ?? 0, sub: 'levels' },
+      { label: 'Org Chart Views',   value: d.org_view_total?.total ?? 0,
+        sub: (d.org_view_total?.unique_users ?? 0) + ' unique users' },
+    ]);
+
+    _lineChart('ch-org-hc',
+      d.hc_over_time.map(r => r.period),
+      [
+        { label: 'Joined',      data: d.hc_over_time.map(r => r.joined),     borderColor: '#3b82f6', tension: 0.3 },
+        { label: 'Cumulative',  data: d.hc_over_time.map(r => r.cumulative), borderColor: '#22c55e', tension: 0.3 },
+      ]
+    );
+
+    _barChart('ch-org-dept',
+      d.by_dept.map(r => r.department),
+      [{ label: 'Employees', data: d.by_dept.map(r => r.employees),
+         backgroundColor: COLORS }],
+      true
+    );
+
+    _lineChart('ch-org-views',
+      d.org_views.map(r => r.day),
+      [{ label: 'Page Views', data: d.org_views.map(r => r.views),
+         borderColor: '#8b5cf6', backgroundColor: '#8b5cf620', fill: true, tension: 0.3 }]
+    );
+
+    _fillTable('tbl-org-span', d.span_table.map(r => ({
+      Manager: r.manager_name, 'Job Title': r.job_title ?? '—',
+      'Direct Reports': r.direct_reports })));
+
+    load.style.display = 'none'; body.style.display = '';
+  } catch (e) {
+    load.textContent = 'Error: ' + e.message;
+  }
+}
+
+async function _loadSearch() {
+  if (_loaded.search) return;
+  const load = document.getElementById('sr-loading');
+  const body = document.getElementById('sr-body');
+  load.style.display = ''; body.style.display = 'none';
+  try {
+    const d = await _fetch('/api/analytics/search?' + _qs());
+    _loaded.search = true;
+    const k = d.kpis;
+
+    _kpiCards('sr-kpis', [
+      { label: 'Total Searches',     value: k.total_searches ?? 0 },
+      { label: 'Unique Searchers',   value: k.unique_searchers ?? 0 },
+      { label: 'Zero-Result Rate',   value: (k.zero_result_rate ?? 0) + '%',
+        sub: (k.zero_results ?? 0) + ' searches returned nothing' },
+      { label: 'Avg Results',        value: k.avg_results ?? 0 },
+    ]);
+
+    _lineChart('ch-sr-vol',
+      d.volume.map(r => r.day),
+      [
+        { label: 'Searches',      data: d.volume.map(r => r.searches),     borderColor: '#3b82f6', tension: 0.3 },
+        { label: 'Zero Results',  data: d.volume.map(r => r.zero_results), borderColor: '#ef4444', tension: 0.3 },
+      ]
+    );
+
+    const top10 = d.top_terms.slice(0, 10);
+    _barChart('ch-sr-top',
+      top10.map(r => r.query),
+      [{ label: 'Searches', data: top10.map(r => r.searches),
+         backgroundColor: '#3b82f6' }],
+      true
+    );
+
+    _fillTable('tbl-sr-terms', d.top_terms.map(r => ({
+      Query: r.query, Searches: r.searches,
+      'Avg Results': r.avg_results, 'Zero-Result Count': r.zero_count })));
+
+    _fillTable('tbl-sr-zero', d.zero_results.map(r => ({
+      Query: r.query, 'Times Searched': r.searches })));
+
+    load.style.display = 'none'; body.style.display = '';
+  } catch (e) {
+    load.textContent = 'Error: ' + e.message;
+  }
+}
+
+// ── Sortable tables ───────────────────────────────────────────────────────────
+document.addEventListener('click', function(e) {
+  const th = e.target.closest('th');
+  if (!th) return;
+  const table = th.closest('.sortable-table');
+  if (!table) return;
+  const idx   = Array.from(th.parentElement.children).indexOf(th);
+  const asc   = th.dataset.sort !== 'asc';
+  th.dataset.sort = asc ? 'asc' : 'desc';
+  const rows  = Array.from(table.querySelectorAll('tbody tr'));
+  rows.sort((a, b) => {
+    const av = a.cells[idx]?.textContent.trim() ?? '';
+    const bv = b.cells[idx]?.textContent.trim() ?? '';
+    const an = parseFloat(av), bn = parseFloat(bv);
+    const cmp = !isNaN(an) && !isNaN(bn) ? an - bn : av.localeCompare(bv);
+    return asc ? cmp : -cmp;
+  });
+  rows.forEach(r => table.querySelector('tbody').appendChild(r));
+});
+
+// ── CSV Export ────────────────────────────────────────────────────────────────
+function anExportCSV() {
+  const url = '/api/analytics/export/csv?' + _qs({ section: _curTab });
+  window.location.href = url;
+}
+
+// ── XSS safe ─────────────────────────────────────────────────────────────────
+function escH(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+                  .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+_restoreState();
+anLoad();
+</script>
+{% endblock %}

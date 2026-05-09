@@ -8,7 +8,7 @@ Usage (from a route after a state change):
 """
 import logging
 
-from app.db import query
+from app.db import query, execute, to_dict
 from app.services import email_service
 
 log = logging.getLogger(__name__)
@@ -96,6 +96,48 @@ def _user_email(employee_id):
     )
     return (row['user_id'], row['email']) if row else (None, None)
 
+
+# ── In-app user notifications ────────────────────────────────────────────────
+
+def create_user_notification(user_id: str, event_type: str, message: str,
+                              link: str = None) -> None:
+    """Insert one unread in-app notification row for *user_id*."""
+    execute(
+        "INSERT INTO user_notifications (user_id, event_type, message, link) "
+        "VALUES (%s::uuid, %s, %s, %s)",
+        (user_id, event_type, message, link),
+    )
+
+
+def get_unread_count(user_id: str) -> int:
+    row = query(
+        "SELECT COUNT(*)::int AS cnt FROM user_notifications "
+        "WHERE user_id=%s::uuid AND NOT is_read",
+        (user_id,), one=True,
+    )
+    return row['cnt'] if row else 0
+
+
+def get_unread_notifications(user_id: str, limit: int = 20) -> list:
+    rows = query(
+        "SELECT id::text, event_type, message, link, created_at "
+        "FROM user_notifications "
+        "WHERE user_id=%s::uuid AND NOT is_read "
+        "ORDER BY created_at DESC LIMIT %s",
+        (user_id, limit),
+    )
+    return [to_dict(r) for r in rows]
+
+
+def mark_all_read(user_id: str) -> None:
+    execute(
+        "UPDATE user_notifications SET is_read=TRUE "
+        "WHERE user_id=%s::uuid AND NOT is_read",
+        (user_id,),
+    )
+
+
+# ── Email notifications ───────────────────────────────────────────────────────
 
 def dispatch(event_type: str, *, company_id: str, extra_ctx: dict = None,
              employee_id: str = None, manager_id: str = None):

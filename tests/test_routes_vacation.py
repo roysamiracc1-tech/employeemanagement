@@ -120,18 +120,134 @@ class TestVacationCancel:
             response = auth_client.delete('/api/vacation/request/req-999')
             assert response.status_code == 404
 
-    def test_cancel_non_pending_returns_400(self, auth_client):
-        with patch('app.routes.vacation.query', return_value={'status': 'APPROVED'}):
+    def test_cancel_already_started_approved_returns_400(self, auth_client):
+        import datetime
+        yesterday = (datetime.date.today() - datetime.timedelta(days=1)).isoformat()
+        with patch('app.routes.vacation.query',
+                   return_value={'status': 'APPROVED', 'start_date': yesterday}):
             response = auth_client.delete('/api/vacation/request/req-001')
             assert response.status_code == 400
-            assert 'PENDING' in json.loads(response.data)['error']
+            assert 'started' in json.loads(response.data)['error'].lower()
+
+    def test_cancel_rejected_returns_400(self, auth_client):
+        with patch('app.routes.vacation.query',
+                   return_value={'status': 'REJECTED', 'start_date': '2026-12-01'}):
+            response = auth_client.delete('/api/vacation/request/req-001')
+            assert response.status_code == 400
+
+    def test_withdraw_future_approved_succeeds(self, auth_client):
+        import datetime
+        future = (datetime.date.today() + datetime.timedelta(days=30)).isoformat()
+        call_count = {'n': 0}
+
+        def side(sql, *args, **kwargs):
+            call_count['n'] += 1
+            if call_count['n'] == 1:
+                return {'status': 'APPROVED', 'start_date': future}
+            if call_count['n'] == 2:
+                return {
+                    'manager_id': 'mgr-001', 'start_date': future,
+                    'end_date': future, 'working_days': 1,
+                    'vacation_type': 'Annual Leave', 'company_id': 'co-001',
+                    'employee_name': 'Sven Becker',
+                }
+            if call_count['n'] == 3:
+                return {'id': 'user-mgr-001'}
+            return None
+
+        with patch('app.routes.vacation.query', side_effect=side), \
+             patch('app.routes.vacation.execute'), \
+             patch('app.services.notification_service.dispatch'), \
+             patch('app.services.notification_service.create_user_notification'):
+            response = auth_client.delete('/api/vacation/request/req-001')
+            assert response.status_code == 200
+            assert json.loads(response.data)['ok'] is True
+
+    def _cancel_query_side(self):
+        """Return mock rows for the three queries in api_vacation_cancel."""
+        call_count = {'n': 0}
+
+        def side(sql, *args, **kwargs):
+            call_count['n'] += 1
+            if call_count['n'] == 1:
+                # First query: ownership + status check
+                return {'status': 'PENDING', 'start_date': '2026-06-02'}
+            if call_count['n'] == 2:
+                # Second query: full request for notification
+                return {
+                    'manager_id':    'mgr-001',
+                    'start_date':    '2026-06-02',
+                    'end_date':      '2026-06-03',
+                    'working_days':  2,
+                    'vacation_type': 'Annual Leave',
+                    'company_id':    'co-001',
+                    'employee_name': 'Sven Becker',
+                }
+            if call_count['n'] == 3:
+                # Third query: manager's user_id
+                return {'id': 'user-mgr-001'}
+            return None
+
+        return side
 
     def test_cancel_pending_succeeds(self, auth_client):
-        with patch('app.routes.vacation.query', return_value={'status': 'PENDING'}), \
+        with patch('app.routes.vacation.query',
+                   return_value={'status': 'PENDING', 'start_date': '2026-06-02'}), \
              patch('app.routes.vacation.execute'):
             response = auth_client.delete('/api/vacation/request/req-001')
             assert response.status_code == 200
             assert json.loads(response.data)['ok'] is True
+
+    def test_cancel_triggers_manager_notification(self, auth_client):
+        side = self._cancel_query_side()
+        with patch('app.routes.vacation.query', side_effect=side), \
+             patch('app.routes.vacation.execute'), \
+             patch('app.services.notification_service.dispatch'), \
+             patch('app.services.notification_service.create_user_notification') as mock_notif:
+            response = auth_client.delete('/api/vacation/request/req-001')
+            assert response.status_code == 200
+            # Manager must receive an in-app notification
+            mock_notif.assert_called_once()
+            args = mock_notif.call_args[0]
+            assert args[0] == 'user-mgr-001'           # correct manager user_id
+            assert args[1] == 'VACATION_CANCELLED'      # correct event
+            assert 'cancelled' in args[2].lower()       # message says cancelled
+            assert 'Sven Becker' in args[2]             # names the employee
+
+    def test_cancel_manager_notification_link_is_team_page(self, auth_client):
+        side = self._cancel_query_side()
+        with patch('app.routes.vacation.query', side_effect=side), \
+             patch('app.routes.vacation.execute'), \
+             patch('app.services.notification_service.dispatch'), \
+             patch('app.services.notification_service.create_user_notification') as mock_notif:
+            auth_client.delete('/api/vacation/request/req-001')
+            kwargs = mock_notif.call_args[1]
+            assert kwargs.get('link') == '/vacation/team'
+
+    def test_cancel_without_manager_user_still_succeeds(self, auth_client):
+        """Cancellation must succeed even when manager has no user account."""
+        call_count = {'n': 0}
+
+        def side(sql, *args, **kwargs):
+            call_count['n'] += 1
+            if call_count['n'] == 1:
+                return {'status': 'PENDING'}
+            if call_count['n'] == 2:
+                return {
+                    'manager_id': 'mgr-no-user', 'start_date': '2026-06-02',
+                    'end_date': '2026-06-03', 'working_days': 2,
+                    'vacation_type': 'Annual Leave', 'company_id': 'co-001',
+                    'employee_name': 'Test User',
+                }
+            return None  # no user row for this manager
+
+        with patch('app.routes.vacation.query', side_effect=side), \
+             patch('app.routes.vacation.execute'), \
+             patch('app.services.notification_service.dispatch'), \
+             patch('app.services.notification_service.create_user_notification') as mock_notif:
+            response = auth_client.delete('/api/vacation/request/req-001')
+            assert response.status_code == 200
+            mock_notif.assert_not_called()  # no user → no notification, no crash
 
 
 class TestVacationReview:
@@ -160,18 +276,136 @@ class TestVacationReview:
             response = self._review(manager_client, 'req-001', 'approve')
             assert response.status_code == 400
 
+    def _query_side_effect_for_review(self, new_status):
+        """Return the correct mock row depending on which query is called."""
+        call_count = {'n': 0}
+
+        def side(sql, *args, **kwargs):
+            call_count['n'] += 1
+            if call_count['n'] == 1:
+                # First query: check request status + ownership
+                return {'status': 'PENDING'}
+            if call_count['n'] == 2:
+                # Second query: fetch full request for notification
+                return {
+                    'employee_id': 'emp-002',
+                    'start_date':  '2026-06-02',
+                    'end_date':    '2026-06-03',
+                    'working_days': 2,
+                    'vacation_type': 'Annual Leave',
+                    'company_id': 'co-001',
+                }
+            if call_count['n'] == 3:
+                # Third query: look up employee user_id for in-app notification
+                return {'id': 'user-emp-002'}
+            return None
+
+        return side
+
     def test_approve_sets_approved_status(self, manager_client):
-        with patch('app.routes.vacation.query', return_value={'status': 'PENDING'}), \
-             patch('app.routes.vacation.execute') as mock_exec:
+        side = self._query_side_effect_for_review('APPROVED')
+        with patch('app.routes.vacation.query', side_effect=side), \
+             patch('app.routes.vacation.execute'), \
+             patch('app.services.notification_service.dispatch'), \
+             patch('app.services.notification_service.create_user_notification') as mock_notif:
             response = self._review(manager_client, 'req-001', 'approve', note='Approved!')
             assert response.status_code == 200
             data = json.loads(response.data)
             assert data['status'] == 'APPROVED'
+            # Employee must receive an in-app notification
+            mock_notif.assert_called_once()
+            args = mock_notif.call_args[0]
+            assert args[0] == 'user-emp-002'          # correct user_id
+            assert args[1] == 'VACATION_APPROVED'      # correct event
+            assert 'approved' in args[2].lower()       # message says approved
 
     def test_reject_sets_rejected_status(self, manager_client):
-        with patch('app.routes.vacation.query', return_value={'status': 'PENDING'}), \
-             patch('app.routes.vacation.execute'):
+        side = self._query_side_effect_for_review('REJECTED')
+        with patch('app.routes.vacation.query', side_effect=side), \
+             patch('app.routes.vacation.execute'), \
+             patch('app.services.notification_service.dispatch'), \
+             patch('app.services.notification_service.create_user_notification') as mock_notif:
             response = self._review(manager_client, 'req-001', 'reject', note='Too short notice')
             assert response.status_code == 200
             data = json.loads(response.data)
             assert data['status'] == 'REJECTED'
+            mock_notif.assert_called_once()
+            args = mock_notif.call_args[0]
+            assert args[0] == 'user-emp-002'
+            assert args[1] == 'VACATION_REJECTED'
+            assert 'rejected' in args[2].lower()
+
+    def test_approve_without_employee_user_still_succeeds(self, manager_client):
+        """Approval must succeed even if the employee has no user account."""
+        call_count = {'n': 0}
+
+        def side(sql, *args, **kwargs):
+            call_count['n'] += 1
+            if call_count['n'] == 1:
+                return {'status': 'PENDING'}
+            if call_count['n'] == 2:
+                return {
+                    'employee_id': 'emp-no-user',
+                    'start_date': '2026-06-02', 'end_date': '2026-06-03',
+                    'working_days': 2, 'vacation_type': 'Annual Leave',
+                    'company_id': 'co-001',
+                }
+            return None  # no user row found
+
+        with patch('app.routes.vacation.query', side_effect=side), \
+             patch('app.routes.vacation.execute'), \
+             patch('app.services.notification_service.dispatch'), \
+             patch('app.services.notification_service.create_user_notification') as mock_notif:
+            response = self._review(manager_client, 'req-001', 'approve')
+            assert response.status_code == 200
+            mock_notif.assert_not_called()  # no user → no notification, but no crash
+
+
+class TestMyNotificationsAPI:
+    """Tests for GET /api/my-notifications and POST /api/my-notifications/mark-read."""
+
+    def test_my_notifications_requires_login(self, app):
+        client = app.test_client()
+        response = client.get('/api/my-notifications')
+        assert response.status_code in (302, 401)
+
+    def test_my_notifications_returns_empty_list(self, auth_client):
+        with patch('app.services.notification_service.get_unread_notifications',
+                   return_value=[]):
+            response = auth_client.get('/api/my-notifications')
+            assert response.status_code == 200
+            data = json.loads(response.data)
+            assert data['count'] == 0
+            assert data['notifications'] == []
+
+    def test_my_notifications_returns_unread_items(self, auth_client):
+        fake_notifs = [
+            {
+                'id': 'notif-001',
+                'event_type': 'VACATION_APPROVED',
+                'message': 'Your Annual Leave (2026-06-02 → 2026-06-03) has been approved.',
+                'link': '/vacation',
+                'created_at': '2026-06-01 10:00:00',
+            }
+        ]
+        with patch('app.services.notification_service.get_unread_notifications',
+                   return_value=fake_notifs):
+            response = auth_client.get('/api/my-notifications')
+            assert response.status_code == 200
+            data = json.loads(response.data)
+            assert data['count'] == 1
+            assert data['notifications'][0]['event_type'] == 'VACATION_APPROVED'
+            assert 'approved' in data['notifications'][0]['message'].lower()
+
+    def test_mark_read_requires_login(self, app):
+        client = app.test_client()
+        response = client.post('/api/my-notifications/mark-read')
+        assert response.status_code in (302, 401)
+
+    def test_mark_read_calls_service(self, auth_client):
+        with patch('app.services.notification_service.mark_all_read') as mock_mark:
+            response = auth_client.post('/api/my-notifications/mark-read')
+            assert response.status_code == 200
+            data = json.loads(response.data)
+            assert data['ok'] is True
+            mock_mark.assert_called_once()
