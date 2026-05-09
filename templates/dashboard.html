@@ -218,18 +218,29 @@
   </div>
   {% endif %}
 
-  <!-- ── Pending vacation approvals (managers) ──────────────── -->
+  <!-- ── Pending vacation approvals carousel (managers) ──────── -->
   {% if stats.team_size is defined %}
   <div class="card" style="margin-bottom:20px" id="pending-approvals-card">
-    <div class="card-header" style="display:flex;align-items:center;justify-content:space-between">
-      <h2 style="margin:0;font-size:.9rem;font-weight:700">
+    <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+      <h2 style="margin:0;font-size:.9rem;font-weight:700;display:flex;align-items:center;gap:8px">
         ⏳ Pending Vacation Approvals
-        <span id="dash-pending-count" class="bell-badge" style="position:static;display:none;margin-left:6px;font-size:.65rem"></span>
+        <span id="dash-pending-count" style="display:none;background:#ef4444;color:#fff;border-radius:999px;font-size:.62rem;font-weight:700;padding:1px 8px"></span>
       </h2>
-      <a href="{{ url_for('vacation_team') }}" class="btn btn-ghost btn-sm">View all →</a>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span id="carousel-pos" style="font-size:.75rem;color:#94a3b8"></span>
+        <button class="btn btn-ghost btn-sm" id="carousel-prev" onclick="carouselMove(-1)" title="Previous">‹</button>
+        <button class="btn btn-ghost btn-sm" id="carousel-next" onclick="carouselMove(1)"  title="Next">›</button>
+        <a href="{{ url_for('vacation_team') }}" class="btn btn-ghost btn-sm">All →</a>
+      </div>
     </div>
-    <div class="card-body" style="padding:0" id="dash-pending-list">
-      <p style="padding:16px;color:#94a3b8;font-size:.82rem">Loading…</p>
+    <!-- Carousel viewport -->
+    <div class="carousel-viewport" id="carousel-viewport">
+      <div class="carousel-track" id="carousel-track">
+        <!-- cards injected by JS -->
+      </div>
+    </div>
+    <div id="dash-pending-empty" style="display:none;padding:20px;text-align:center;color:#94a3b8;font-size:.85rem">
+      No pending approvals ✓
     </div>
   </div>
   {% endif %}
@@ -383,51 +394,115 @@ function tickLastUpdated() {
   document.getElementById('refresh-text').textContent = 'Live · refreshes every ' + label;
 })();
 
-// ── Pending approvals widget ────────────────────────────────
-async function refreshPendingWidget() {
-  const list = document.getElementById('dash-pending-list');
-  const cntEl = document.getElementById('dash-pending-count');
-  if (!list) return;
+// ── Pending approvals carousel ──────────────────────────────
+let _carouselData  = [];
+let _carouselIndex = 0;
 
+async function refreshPendingWidget() {
+  if (!document.getElementById('carousel-viewport')) return;
   try {
     const res  = await fetch('/api/vacation/team-pending');
     if (!res.ok) return;
-    const data = await res.json();
-
-    if (cntEl) {
-      if (data.length) { cntEl.textContent = data.length; cntEl.style.display='flex'; }
-      else             { cntEl.style.display='none'; }
-    }
-
-    if (!data.length) {
-      list.innerHTML = '<p style="padding:16px;color:#94a3b8;font-size:.82rem;margin:0">No pending requests ✓</p>';
-      return;
-    }
-
-    list.innerHTML = data.map(r => `
-      <div class="dash-pending-row" id="dpr-${r.id}">
-        <div class="dash-pending-av" style="background:${escH(r.color||'#3b82f6')}">${(r.employee_name||'?')[0].toUpperCase()}</div>
-        <div style="flex:1;min-width:0">
-          <div class="dash-pending-name">${escH(r.employee_name||'')}</div>
-          <div class="dash-pending-meta">
-            <span style="background:${escH(r.color||'#3b82f6')}20;color:${escH(r.color||'#3b82f6')};padding:1px 6px;border-radius:4px;font-size:.68rem;font-weight:700">${escH(r.type_name||'')}</span>
-            ${escH(String(r.start_date))} → ${escH(String(r.end_date))}
-            <span style="color:#94a3b8">· ${r.working_days}d</span>
-            ${r.notes ? `<span style="color:#64748b;font-style:italic"> · "${escH(r.notes)}"</span>` : ''}
-          </div>
-        </div>
-        <div class="dash-pending-btns">
-          <button class="btn-approve-sm" onclick="dashReview('${r.id}','approve',this)">✓ Approve</button>
-          <button class="btn-reject-sm"  onclick="openRejectModal('${r.id}','${escH(r.employee_name||'')}')">✗ Reject</button>
-        </div>
-      </div>`).join('');
+    _carouselData  = await res.json();
+    _carouselIndex = 0;
+    renderCarousel();
   } catch(_) {}
 }
 
-async function dashReview(reqId, action, btn) {
-  if (btn) { btn.disabled=true; btn.textContent='…'; }
-  await quickReview(reqId, action, null);
-  refreshPendingWidget();
+function renderCarousel() {
+  const track   = document.getElementById('carousel-track');
+  const empty   = document.getElementById('dash-pending-empty');
+  const cntEl   = document.getElementById('dash-pending-count');
+  const posEl   = document.getElementById('carousel-pos');
+  const prevBtn = document.getElementById('carousel-prev');
+  const nextBtn = document.getElementById('carousel-next');
+
+  if (!_carouselData.length) {
+    track.innerHTML = '';
+    if (empty)  empty.style.display   = '';
+    if (cntEl)  cntEl.style.display   = 'none';
+    if (posEl)  posEl.textContent     = '';
+    if (prevBtn) prevBtn.disabled     = true;
+    if (nextBtn) nextBtn.disabled     = true;
+    return;
+  }
+
+  if (empty)  empty.style.display  = 'none';
+  if (cntEl) { cntEl.textContent = _carouselData.length; cntEl.style.display = 'inline-block'; }
+  if (posEl)  posEl.textContent    = `${_carouselIndex + 1} of ${_carouselData.length}`;
+  if (prevBtn) prevBtn.disabled    = _carouselIndex === 0;
+  if (nextBtn) nextBtn.disabled    = _carouselIndex === _carouselData.length - 1;
+
+  // Build all card HTML, slide to current index
+  track.innerHTML = _carouselData.map((r, i) => `
+    <div class="carousel-card" id="ccard-${r.id}">
+      <div class="carousel-card-inner">
+        <div class="carousel-avatar" style="background:${escH(r.color||'#3b82f6')}">
+          ${(r.employee_name||'?')[0].toUpperCase()}
+        </div>
+        <div class="carousel-info">
+          <div class="carousel-emp-name">${escH(r.employee_name||'')}</div>
+          <div class="carousel-emp-title" style="color:#94a3b8;font-size:.74rem">${escH(r.job_title||'')}</div>
+          <div class="carousel-type-row">
+            <span class="carousel-type-chip" style="background:${escH(r.color||'#3b82f6')}22;color:${escH(r.color||'#3b82f6')}">${escH(r.type_name||'')}</span>
+            <span class="carousel-dates">${escH(String(r.start_date))} → ${escH(String(r.end_date))}</span>
+            <span class="carousel-days">${r.working_days} day${r.working_days!=1?'s':''}</span>
+          </div>
+          ${r.notes ? `<div class="carousel-notes">"${escH(r.notes)}"</div>` : ''}
+          ${r.location ? `<div style="font-size:.72rem;color:#94a3b8;margin-top:4px">📍 ${escH(r.location)}</div>` : ''}
+        </div>
+      </div>
+      <div class="carousel-actions">
+        <button class="carousel-reject-btn"  onclick="carouselReview('${r.id}','reject','${escH(r.employee_name||'')}')">✗ Reject</button>
+        <button class="carousel-approve-btn" onclick="carouselReview('${r.id}','approve',null)">✓ Approve</button>
+      </div>
+    </div>`).join('');
+
+  // Slide to current index
+  track.style.transform = `translateX(-${_carouselIndex * 100}%)`;
+
+  // Touch/swipe support
+  initCarouselSwipe(track);
+}
+
+function carouselMove(delta) {
+  _carouselIndex = Math.max(0, Math.min(_carouselData.length - 1, _carouselIndex + delta));
+  const track = document.getElementById('carousel-track');
+  if (track) track.style.transform = `translateX(-${_carouselIndex * 100}%)`;
+  // Update controls
+  document.getElementById('carousel-pos').textContent = `${_carouselIndex + 1} of ${_carouselData.length}`;
+  document.getElementById('carousel-prev').disabled = _carouselIndex === 0;
+  document.getElementById('carousel-next').disabled = _carouselIndex === _carouselData.length - 1;
+}
+
+async function carouselReview(reqId, action, employeeName) {
+  if (action === 'reject') {
+    openRejectModal(reqId, employeeName);
+    return;
+  }
+  const res = await fetch(`/api/vacation/review/${reqId}`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ action }),
+  });
+  if (res.ok) {
+    _carouselData = _carouselData.filter(r => r.id !== reqId);
+    _carouselIndex = Math.min(_carouselIndex, Math.max(0, _carouselData.length - 1));
+    renderCarousel();
+    loadBellCount();
+  }
+}
+
+// Touch swipe support
+let _swipeStartX = null;
+function initCarouselSwipe(el) {
+  el.ontouchstart = e => { _swipeStartX = e.touches[0].clientX; };
+  el.ontouchend   = e => {
+    if (_swipeStartX === null) return;
+    const dx = e.changedTouches[0].clientX - _swipeStartX;
+    if (Math.abs(dx) > 40) carouselMove(dx < 0 ? 1 : -1);
+    _swipeStartX = null;
+  };
 }
 
 function escH(s) {

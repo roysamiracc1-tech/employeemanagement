@@ -46,8 +46,22 @@ def api_vacation_calendar():
         JOIN employees e ON e.id = vr.employee_id
     """
 
+    # Extra fields for the pending panel (start_date / end_date / working_days / notes)
+    BASE_FULL = """
+        SELECT vr.id::text, vr.start_date, vr.end_date, vr.status, vr.working_days,
+               vr.notes,
+               vt.name AS type_name, vt.color,
+               e.id::text AS employee_id,
+               e.first_name || ' ' || e.last_name AS employee_name
+        FROM vacation_requests vr
+        JOIN vacation_types vt ON vt.id = vr.vacation_type_id
+        JOIN employees e ON e.id = vr.employee_id
+    """
+
+    pending_all = []   # all pending for team (no date filter)
+
     if scope == 'mine':
-        rows = query(BASE + """
+        rows = query(BASE_FULL + """
             WHERE vr.employee_id = %s::uuid
               AND vr.status IN ('APPROVED','PENDING')
               AND vr.start_date <= %s AND vr.end_date >= %s
@@ -55,7 +69,8 @@ def api_vacation_calendar():
         """, (emp_id, last_day, first_day))
 
     elif scope == 'team':
-        rows = query(BASE + """
+        # Grid: approved + pending within the displayed month
+        rows = query(BASE_FULL + """
             JOIN manager_relationships mr
                  ON mr.employee_id = vr.employee_id
                 AND mr.manager_id  = %s::uuid
@@ -66,9 +81,21 @@ def api_vacation_calendar():
             ORDER BY vr.start_date
         """, (emp_id, last_day, first_day))
 
+        # Pending panel: ALL pending from reports regardless of date
+        pending_rows = query(BASE_FULL + """
+            JOIN manager_relationships mr
+                 ON mr.employee_id = vr.employee_id
+                AND mr.manager_id  = %s::uuid
+                AND mr.relationship_type = 'SOLID_LINE'
+                AND mr.is_current
+            WHERE vr.status = 'PENDING'
+            ORDER BY vr.created_at
+        """, (emp_id,))
+        pending_all = [to_dict(r) for r in pending_rows]
+
     else:  # all — admin/hr scoped to company
         if company_id:
-            rows = query(BASE + """
+            rows = query(BASE_FULL + """
                 WHERE e.company_id = %s::uuid
                   AND vr.status IN ('APPROVED','PENDING')
                   AND vr.start_date <= %s AND vr.end_date >= %s
@@ -86,7 +113,7 @@ def api_vacation_calendar():
         e  = rd['end_date']   if isinstance(rd['end_date'],   datetime.date) \
              else datetime.date.fromisoformat(str(rd['end_date']))
 
-        current = max(s, first_day)
+        current     = max(s, first_day)
         end_clamped = min(e, last_day)
         while current <= end_clamped:
             if current.weekday() < 5:  # Mon–Fri only
@@ -98,11 +125,19 @@ def api_vacation_calendar():
                     'type_name':     rd['type_name'],
                     'color':         rd['color'] or '#3b82f6',
                     'status':        rd['status'],
+                    'start_date':    str(s),
+                    'end_date':      str(e),
                 })
             current += datetime.timedelta(days=1)
 
+    # Serialise dates in pending_all
+    for p in pending_all:
+        p['start_date'] = str(p['start_date'])
+        p['end_date']   = str(p['end_date'])
+
     return jsonify({
-        'year':          year,
-        'month':         month,
+        'year':           year,
+        'month':          month,
         'events_by_date': events_by_date,
+        'pending_all':    pending_all,   # non-empty only for team scope
     })
