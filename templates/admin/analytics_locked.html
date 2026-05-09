@@ -1,0 +1,15 @@
+{% extends 'base.html' %}
+{% block title %}Analytics — Not Enabled{% endblock %}
+{% block page_title %}Analytics{% endblock %}
+
+{% block content %}
+<div class="page" style="max-width:540px;margin:60px auto;text-align:center">
+  <div style="font-size:3rem;margin-bottom:16px">🔒</div>
+  <h2 style="font-size:1.1rem;font-weight:700;margin-bottom:8px">Analytics not enabled</h2>
+  <p style="color:#64748b;font-size:.88rem;line-height:1.6;margin-bottom:24px">
+    The Analytics &amp; Reporting feature is not activated for your company.<br>
+    Contact your <strong>Super Admin</strong> to enable it.
+  </p>
+  <a href="{{ url_for('admin') }}" class="btn btn-ghost btn-sm">← Back to Admin Panel</a>
+</div>
+{% endblock %}

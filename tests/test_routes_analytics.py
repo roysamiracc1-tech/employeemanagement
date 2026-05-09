@@ -161,11 +161,11 @@ class TestAnalyticsOverview:
             assert len(d['feature_adoption']) == 1
 
     def test_overview_portal_admin_uses_own_company(self, portal_admin_client):
-        with patch('app.services.analytics_service.get_overview',
+        with patch('app.routes.analytics._analytics_enabled', return_value=True), \
+             patch('app.services.analytics_service.get_overview',
                    return_value=_OVERVIEW) as mock_svc:
             r = portal_admin_client.get('/api/analytics/overview?range=30d')
             assert r.status_code == 200
-            # company_id should be resolved from session, not query param
             called_co = mock_svc.call_args[0][0]
             assert called_co == 'co-001'
 
@@ -179,7 +179,8 @@ class TestAnalyticsOverview:
 
 class TestAnalyticsVacation:
     def test_vacation_returns_kpis(self, portal_admin_client):
-        with patch('app.services.analytics_service.get_vacation_analytics',
+        with patch('app.routes.analytics._analytics_enabled', return_value=True), \
+             patch('app.services.analytics_service.get_vacation_analytics',
                    return_value=_VACATION):
             r = portal_admin_client.get('/api/analytics/vacation?range=30d')
             assert r.status_code == 200
@@ -188,13 +189,15 @@ class TestAnalyticsVacation:
             assert d['kpis']['approval_rate'] == 77.8
 
     def test_vacation_group_by_passed_to_service(self, portal_admin_client):
-        with patch('app.services.analytics_service.get_vacation_analytics',
+        with patch('app.routes.analytics._analytics_enabled', return_value=True), \
+             patch('app.services.analytics_service.get_vacation_analytics',
                    return_value=_VACATION) as mock_svc:
             portal_admin_client.get('/api/analytics/vacation?range=30d&group_by=department')
             assert mock_svc.call_args[0][3] == 'department'
 
     def test_vacation_hr_admin_allowed(self, hr_client):
-        with patch('app.services.analytics_service.get_vacation_analytics',
+        with patch('app.routes.analytics._analytics_enabled', return_value=True), \
+             patch('app.services.analytics_service.get_vacation_analytics',
                    return_value=_VACATION):
             r = hr_client.get('/api/analytics/vacation?range=30d')
             assert r.status_code == 200
@@ -204,7 +207,8 @@ class TestAnalyticsVacation:
 
 class TestAnalyticsSkills:
     def test_skills_returns_completeness(self, portal_admin_client):
-        with patch('app.services.analytics_service.get_skills_analytics',
+        with patch('app.routes.analytics._analytics_enabled', return_value=True), \
+             patch('app.services.analytics_service.get_skills_analytics',
                    return_value=_SKILLS):
             r = portal_admin_client.get('/api/analytics/skills?range=30d')
             assert r.status_code == 200
@@ -213,7 +217,8 @@ class TestAnalyticsSkills:
             assert d['kpis']['validation_rate_pct'] == 60.0
 
     def test_skills_drilldown_has_employee_names(self, portal_admin_client):
-        with patch('app.services.analytics_service.get_skills_analytics',
+        with patch('app.routes.analytics._analytics_enabled', return_value=True), \
+             patch('app.services.analytics_service.get_skills_analytics',
                    return_value=_SKILLS):
             r = portal_admin_client.get('/api/analytics/skills?range=30d')
             d = json.loads(r.data)
@@ -224,7 +229,8 @@ class TestAnalyticsSkills:
 
 class TestAnalyticsOrg:
     def test_org_returns_headcount_kpis(self, portal_admin_client):
-        with patch('app.services.analytics_service.get_org_analytics',
+        with patch('app.routes.analytics._analytics_enabled', return_value=True), \
+             patch('app.services.analytics_service.get_org_analytics',
                    return_value=_ORG):
             r = portal_admin_client.get('/api/analytics/org?range=30d')
             assert r.status_code == 200
@@ -234,7 +240,8 @@ class TestAnalyticsOrg:
             assert d['kpis']['max_depth'] == 4
 
     def test_org_includes_page_view_stats(self, portal_admin_client):
-        with patch('app.services.analytics_service.get_org_analytics',
+        with patch('app.routes.analytics._analytics_enabled', return_value=True), \
+             patch('app.services.analytics_service.get_org_analytics',
                    return_value=_ORG):
             r = portal_admin_client.get('/api/analytics/org?range=30d')
             d = json.loads(r.data)
@@ -245,7 +252,8 @@ class TestAnalyticsOrg:
 
 class TestAnalyticsSearch:
     def test_search_returns_zero_result_rate(self, portal_admin_client):
-        with patch('app.services.analytics_service.get_search_analytics',
+        with patch('app.routes.analytics._analytics_enabled', return_value=True), \
+             patch('app.services.analytics_service.get_search_analytics',
                    return_value=_SEARCH):
             r = portal_admin_client.get('/api/analytics/search?range=30d')
             assert r.status_code == 200
@@ -253,7 +261,8 @@ class TestAnalyticsSearch:
             assert d['kpis']['zero_result_rate'] == 8.0
 
     def test_search_zero_results_list(self, portal_admin_client):
-        with patch('app.services.analytics_service.get_search_analytics',
+        with patch('app.routes.analytics._analytics_enabled', return_value=True), \
+             patch('app.services.analytics_service.get_search_analytics',
                    return_value=_SEARCH):
             r = portal_admin_client.get('/api/analytics/search?range=30d')
             d = json.loads(r.data)
@@ -264,7 +273,8 @@ class TestAnalyticsSearch:
 
 class TestAnalyticsExport:
     def test_csv_export_vacation_returns_csv(self, portal_admin_client):
-        with patch('app.services.analytics_service.get_vacation_analytics',
+        with patch('app.routes.analytics._analytics_enabled', return_value=True), \
+             patch('app.services.analytics_service.get_vacation_analytics',
                    return_value=_VACATION):
             r = portal_admin_client.get(
                 '/api/analytics/export/csv?section=vacation&range=30d')
@@ -273,7 +283,8 @@ class TestAnalyticsExport:
             assert b'Sven Becker' in r.data
 
     def test_csv_export_search_returns_csv(self, portal_admin_client):
-        with patch('app.services.analytics_service.get_search_analytics',
+        with patch('app.routes.analytics._analytics_enabled', return_value=True), \
+             patch('app.services.analytics_service.get_search_analytics',
                    return_value=_SEARCH):
             r = portal_admin_client.get(
                 '/api/analytics/export/csv?section=search&range=30d')
@@ -289,7 +300,8 @@ class TestAnalyticsExport:
 
 class TestAnalyticsDateParsing:
     def test_custom_date_range_accepted(self, portal_admin_client):
-        with patch('app.services.analytics_service.get_overview',
+        with patch('app.routes.analytics._analytics_enabled', return_value=True), \
+             patch('app.services.analytics_service.get_overview',
                    return_value=_OVERVIEW) as mock_svc:
             portal_admin_client.get(
                 '/api/analytics/overview?range=custom&start=2026-01-01&end=2026-03-31')
@@ -299,12 +311,121 @@ class TestAnalyticsDateParsing:
             assert call_end   == datetime.date(2026, 3, 31)
 
     def test_invalid_custom_dates_fall_back_to_30d(self, portal_admin_client):
-        with patch('app.services.analytics_service.get_overview',
+        with patch('app.routes.analytics._analytics_enabled', return_value=True), \
+             patch('app.services.analytics_service.get_overview',
                    return_value=_OVERVIEW) as mock_svc:
             import datetime
             portal_admin_client.get(
                 '/api/analytics/overview?range=custom&start=bad&end=date')
             call_start = mock_svc.call_args[0][1]
-            # Falls back to 30d: start should be ~30 days ago
             delta = (datetime.date.today() - call_start).days
             assert 28 <= delta <= 32
+
+
+# ── feature gate ──────────────────────────────────────────────────────────────
+
+class TestAnalyticsFeatureGate:
+    """Verify that PORTAL_ADMIN / HR_ADMIN are blocked when feature is disabled,
+    and SYSTEM_ADMIN always has access regardless."""
+
+    def test_portal_admin_blocked_when_feature_disabled(self, portal_admin_client):
+        with patch('app.routes.analytics._analytics_enabled', return_value=False):
+            r = portal_admin_client.get('/api/analytics/overview?range=30d')
+            assert r.status_code == 403
+            assert 'not enabled' in json.loads(r.data)['error'].lower()
+
+    def test_hr_admin_blocked_when_feature_disabled(self, hr_client):
+        with patch('app.routes.analytics._analytics_enabled', return_value=False):
+            r = hr_client.get('/api/analytics/vacation?range=30d')
+            assert r.status_code == 403
+
+    def test_portal_admin_allowed_when_feature_enabled(self, portal_admin_client):
+        with patch('app.routes.analytics._analytics_enabled', return_value=True), \
+             patch('app.services.analytics_service.get_overview',
+                   return_value=_OVERVIEW):
+            r = portal_admin_client.get('/api/analytics/overview?range=30d')
+            assert r.status_code == 200
+
+    def test_system_admin_always_allowed_even_when_feature_disabled(self, admin_client):
+        """SYSTEM_ADMIN bypasses the gate — they manage the toggle."""
+        with patch('app.routes.analytics._analytics_enabled', return_value=False), \
+             patch('app.services.analytics_service.get_overview',
+                   return_value=_OVERVIEW):
+            r = admin_client.get('/api/analytics/overview?company_id=co-001&range=30d')
+            assert r.status_code == 200
+
+    def test_gate_applies_to_all_endpoints(self, portal_admin_client):
+        endpoints = [
+            '/api/analytics/overview?range=30d',
+            '/api/analytics/vacation?range=30d',
+            '/api/analytics/skills?range=30d',
+            '/api/analytics/org?range=30d',
+            '/api/analytics/search?range=30d',
+            '/api/analytics/export/csv?section=vacation&range=30d',
+        ]
+        with patch('app.routes.analytics._analytics_enabled', return_value=False):
+            for ep in endpoints:
+                r = portal_admin_client.get(ep)
+                assert r.status_code == 403, f'{ep} should return 403 when feature disabled'
+
+
+class TestFeatureToggleAPI:
+    """Tests for the SYSTEM_ADMIN feature toggle endpoints."""
+
+    def test_toggle_requires_system_admin(self, portal_admin_client):
+        r = portal_admin_client.post(
+            '/api/admin/company-features/co-001/toggle',
+            data=json.dumps({'feature_code': 'reports', 'enabled': True}),
+            content_type='application/json',
+        )
+        assert r.status_code == 302   # redirected (role check fails)
+
+    def test_toggle_unknown_feature_returns_400(self, admin_client):
+        with patch('app.routes.analytics.query', return_value=None):
+            r = admin_client.post(
+                '/api/admin/company-features/co-001/toggle',
+                data=json.dumps({'feature_code': 'nonexistent', 'enabled': True}),
+                content_type='application/json',
+            )
+            assert r.status_code == 400
+
+    def test_toggle_enable_returns_ok(self, admin_client):
+        with patch('app.routes.analytics.query',
+                   return_value={'id': 'feat-001'}), \
+             patch('app.routes.analytics.execute'):
+            r = admin_client.post(
+                '/api/admin/company-features/co-001/toggle',
+                data=json.dumps({'feature_code': 'reports', 'enabled': True}),
+                content_type='application/json',
+            )
+            assert r.status_code == 200
+            d = json.loads(r.data)
+            assert d['ok'] is True
+            assert d['enabled'] is True
+            assert d['feature_code'] == 'reports'
+
+    def test_toggle_disable_returns_ok(self, admin_client):
+        with patch('app.routes.analytics.query',
+                   return_value={'id': 'feat-001'}), \
+             patch('app.routes.analytics.execute'):
+            r = admin_client.post(
+                '/api/admin/company-features/co-001/toggle',
+                data=json.dumps({'feature_code': 'reports', 'enabled': False}),
+                content_type='application/json',
+            )
+            assert r.status_code == 200
+            assert json.loads(r.data)['enabled'] is False
+
+    def test_get_company_features_requires_system_admin(self, portal_admin_client):
+        r = portal_admin_client.get('/api/admin/company-features/co-001')
+        assert r.status_code == 302
+
+    def test_get_company_features_returns_list(self, admin_client):
+        fake = [{'code': 'reports', 'label': 'Analytics',
+                 'is_enabled': False, 'enabled_at': None,
+                 'enabled_by_email': None}]
+        with patch('app.routes.analytics.query', return_value=fake):
+            r = admin_client.get('/api/admin/company-features/co-001')
+            assert r.status_code == 200
+            data = json.loads(r.data)
+            assert isinstance(data, list)

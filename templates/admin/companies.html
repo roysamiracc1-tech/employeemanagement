@@ -84,6 +84,14 @@
         </div>
         {% endif %}
 
+        <!-- Paid features toggles -->
+        <div style="margin-top:14px;padding-top:12px;border-top:1px solid #f1f5f9">
+          <div style="font-size:.68rem;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Paid Features</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px" id="feat-row-{{ co.id }}">
+            <div style="font-size:.72rem;color:#94a3b8">Loading…</div>
+          </div>
+        </div>
+
         <!-- Actions -->
         <div style="display:flex;gap:8px;margin-top:16px;padding-top:14px;border-top:1px solid #f1f5f9">
           <a href="{{ url_for('company_view', company_id=co.id) }}" class="btn btn-ghost btn-sm" style="flex:1;justify-content:center">
@@ -100,4 +108,100 @@
   {% endif %}
 
 </div>
+{% endblock %}
+
+{% block scripts %}
+{% if companies %}
+<script>
+// Paid features that have a toggle (other features are always on)
+const PAID_FEATURES = ['reports'];
+const PAID_LABELS   = { reports: 'Analytics' };
+
+async function loadFeatures(coId) {
+  const row = document.getElementById('feat-row-' + coId);
+  if (!row) return;
+  try {
+    const res  = await fetch('/api/admin/company-features/' + coId);
+    const data = await res.json();
+    const paid = data.filter(f => PAID_FEATURES.includes(f.code));
+    row.innerHTML = paid.map(f => `
+      <label class="feat-toggle-wrap" title="${f.is_enabled ? 'Enabled — click to disable' : 'Disabled — click to enable'}">
+        <input type="checkbox" class="feat-toggle-cb"
+               data-co="${coId}" data-code="${f.code}"
+               ${f.is_enabled ? 'checked' : ''}
+               onchange="toggleFeature(this)">
+        <span class="feat-toggle-slider"></span>
+        <span class="feat-toggle-label">${PAID_LABELS[f.code] || f.code}</span>
+        <span class="feat-toggle-status" id="feat-status-${coId}-${f.code}">
+          ${f.is_enabled
+            ? '<span style="color:#16a34a">● Enabled</span>'
+            : '<span style="color:#94a3b8">○ Disabled</span>'}
+        </span>
+      </label>`).join('');
+  } catch (_) {
+    row.innerHTML = '<span style="font-size:.72rem;color:#ef4444">Failed to load</span>';
+  }
+}
+
+async function toggleFeature(cb) {
+  const coId = cb.dataset.co;
+  const code = cb.dataset.code;
+  const enabled = cb.checked;
+  cb.disabled = true;
+  const statusEl = document.getElementById(`feat-status-${coId}-${code}`);
+  if (statusEl) statusEl.innerHTML = '<span style="color:#94a3b8">…</span>';
+
+  try {
+    const res = await fetch(`/api/admin/company-features/${coId}/toggle`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ feature_code: code, enabled }),
+    });
+    if (res.ok) {
+      if (statusEl) statusEl.innerHTML = enabled
+        ? '<span style="color:#16a34a">● Enabled</span>'
+        : '<span style="color:#94a3b8">○ Disabled</span>';
+    } else {
+      cb.checked = !enabled;
+      if (statusEl) statusEl.innerHTML = '<span style="color:#ef4444">Error</span>';
+    }
+  } catch (_) {
+    cb.checked = !enabled;
+  }
+  cb.disabled = false;
+}
+
+// Load features for every company card on page load
+document.addEventListener('DOMContentLoaded', () => {
+  {% for co in companies %}
+  loadFeatures('{{ co.id }}');
+  {% endfor %}
+});
+</script>
+
+<style>
+.feat-toggle-wrap {
+  display: inline-flex; align-items: center; gap: 6px;
+  cursor: pointer; user-select: none;
+  background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 20px;
+  padding: 3px 10px 3px 5px; font-size: .72rem;
+  transition: border-color .15s;
+}
+.feat-toggle-wrap:hover { border-color: #3b82f6; }
+.feat-toggle-cb { display: none; }
+.feat-toggle-slider {
+  width: 28px; height: 16px; border-radius: 8px; background: #e2e8f0;
+  position: relative; transition: background .2s; flex-shrink: 0;
+}
+.feat-toggle-slider::after {
+  content: ''; position: absolute; top: 2px; left: 2px;
+  width: 12px; height: 12px; border-radius: 50%; background: #fff;
+  transition: transform .2s; box-shadow: 0 1px 3px rgba(0,0,0,.2);
+}
+.feat-toggle-cb:checked + .feat-toggle-slider { background: #22c55e; }
+.feat-toggle-cb:checked + .feat-toggle-slider::after { transform: translateX(12px); }
+.feat-toggle-label { font-weight: 600; color: #0f172a; }
+.feat-toggle-status { font-size: .68rem; }
+</style>
+{% endif %}
 {% endblock %}
