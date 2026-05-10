@@ -788,6 +788,8 @@ select.filter-sel:focus { border-color: var(--primary); }
 .pm-feature-label { padding:10px 14px !important; }
 .pm-cell { text-align:center; padding:8px 4px !important; width:28px; }
 .pm-cell input[type=checkbox] { width:14px; height:14px; cursor:pointer; accent-color:var(--primary); }
+.pm-cb--dirty { accent-color:#d97706 !important; outline:2px solid #f59e0b; outline-offset:2px; border-radius:2px; }
+.pm-cell:has(.pm-cb--dirty) { background:#fffbeb !important; }
 
 /* company context bar */
 .ctx-bar {
