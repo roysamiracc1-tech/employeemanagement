@@ -114,8 +114,8 @@
 {% if companies %}
 <script>
 // Paid features that have a toggle (other features are always on)
-const PAID_FEATURES = ['reports'];
-const PAID_LABELS   = { reports: 'Analytics' };
+const PAID_FEATURES = ['reports', 'skills_intelligence'];
+const PAID_LABELS   = { reports: 'Analytics', skills_intelligence: 'Skills Intelligence' };
 
 async function loadFeatures(coId) {
   const row = document.getElementById('feat-row-' + coId);
@@ -124,23 +124,52 @@ async function loadFeatures(coId) {
     const res  = await fetch('/api/admin/company-features/' + coId);
     const data = await res.json();
     const paid = data.filter(f => PAID_FEATURES.includes(f.code));
-    row.innerHTML = paid.map(f => `
-      <label class="feat-toggle-wrap" title="${f.is_enabled ? 'Enabled — click to disable' : 'Disabled — click to enable'}">
-        <input type="checkbox" class="feat-toggle-cb"
-               data-co="${coId}" data-code="${f.code}"
-               ${f.is_enabled ? 'checked' : ''}
-               onchange="toggleFeature(this)">
-        <span class="feat-toggle-slider"></span>
-        <span class="feat-toggle-label">${PAID_LABELS[f.code] || f.code}</span>
-        <span class="feat-toggle-status" id="feat-status-${coId}-${f.code}">
-          ${f.is_enabled
-            ? '<span style="color:#16a34a">● Enabled</span>'
-            : '<span style="color:#94a3b8">○ Disabled</span>'}
-        </span>
-      </label>`).join('');
+    row.innerHTML = paid.map(f => {
+      const hrSubToggle = f.code === 'skills_intelligence' ? `
+        <label class="feat-toggle-wrap ms-2" id="hr-wrap-${coId}"
+               style="${f.is_enabled ? '' : 'opacity:.4;pointer-events:none;'}"
+               title="Allow HR Admins to see Skills Intelligence">
+          <input type="checkbox" class="feat-toggle-cb"
+                 data-co="${coId}" data-code="si_hr"
+                 ${f.enabled_for_hr ? 'checked' : ''}
+                 onchange="toggleHrSub(this)">
+          <span class="feat-toggle-slider"></span>
+          <span class="feat-toggle-label" style="font-size:.68rem;color:#6366f1">HR Access</span>
+        </label>` : '';
+      return `
+        <label class="feat-toggle-wrap" title="${f.is_enabled ? 'Enabled — click to disable' : 'Disabled — click to enable'}">
+          <input type="checkbox" class="feat-toggle-cb"
+                 data-co="${coId}" data-code="${f.code}"
+                 ${f.is_enabled ? 'checked' : ''}
+                 onchange="toggleFeature(this)">
+          <span class="feat-toggle-slider"></span>
+          <span class="feat-toggle-label">${PAID_LABELS[f.code] || f.code}</span>
+          <span class="feat-toggle-status" id="feat-status-${coId}-${f.code}">
+            ${f.is_enabled
+              ? '<span style="color:#16a34a">● Enabled</span>'
+              : '<span style="color:#94a3b8">○ Disabled</span>'}
+          </span>
+        </label>${hrSubToggle}`;
+    }).join('');
   } catch (_) {
     row.innerHTML = '<span style="font-size:.72rem;color:#ef4444">Failed to load</span>';
   }
+}
+
+async function toggleHrSub(cb) {
+  const coId = cb.dataset.co;
+  const enabled = cb.checked;
+  cb.disabled = true;
+  try {
+    // Use the company-features toggle endpoint with a special flag
+    const res = await fetch(`/api/admin/company-features/${coId}/toggle`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ feature_code: 'skills_intelligence', enabled: true, enabled_for_hr: enabled }),
+    });
+    if (!res.ok) { cb.checked = !enabled; }
+  } catch (_) { cb.checked = !enabled; }
+  cb.disabled = false;
 }
 
 async function toggleFeature(cb) {

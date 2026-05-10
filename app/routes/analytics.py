@@ -82,10 +82,15 @@ def _resolve_company():
 @app.route('/api/admin/company-features/<company_id>/toggle', methods=['POST'])
 @require_roles('SYSTEM_ADMIN')
 def api_toggle_company_feature(company_id):
-    """Enable or disable a portal feature for a specific company."""
-    data        = request.get_json() or {}
+    """Enable or disable a portal feature for a specific company.
+
+    Also accepts optional enabled_for_hr to update the HR sub-toggle
+    for features that support it (e.g. skills_intelligence).
+    """
+    data         = request.get_json() or {}
     feature_code = data.get('feature_code', _FEATURE_CODE)
-    enabled     = bool(data.get('enabled', False))
+    enabled      = bool(data.get('enabled', False))
+    enabled_for_hr = data.get('enabled_for_hr')  # None means "don't touch"
 
     feature = query(
         "SELECT id FROM portal_features WHERE code = %s",
@@ -103,6 +108,12 @@ def api_toggle_company_feature(company_id):
               enabled_by = EXCLUDED.enabled_by
     """, (company_id, feature['id'], enabled, enabled, session['user_id']))
 
+    if enabled_for_hr is not None:
+        execute("""
+            UPDATE company_features SET enabled_for_hr = %s
+            WHERE company_id = %s::uuid AND feature_id = %s::uuid
+        """, (bool(enabled_for_hr), company_id, feature['id']))
+
     return jsonify({'ok': True, 'company_id': company_id,
                     'feature_code': feature_code, 'enabled': enabled})
 
@@ -113,7 +124,8 @@ def api_get_company_features(company_id):
     """Return all feature flags for a company."""
     rows = query("""
         SELECT pf.code, pf.label, cf.is_enabled,
-               cf.enabled_at, u.email AS enabled_by_email
+               cf.enabled_at, u.email AS enabled_by_email,
+               COALESCE(cf.enabled_for_hr, FALSE) AS enabled_for_hr
         FROM portal_features pf
         LEFT JOIN company_features cf
                ON cf.feature_id = pf.id AND cf.company_id = %s::uuid

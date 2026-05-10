@@ -1,0 +1,820 @@
+{% extends 'base.html' %}
+{% block title %}Skills Intelligence{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+
+  <!-- Header -->
+  <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+    <div>
+      <h3 class="mb-0 fw-bold">Skills Intelligence</h3>
+      <small class="text-muted">Benchmark employee skills against Stack Overflow 2025 survey data</small>
+    </div>
+    <div class="d-flex gap-2 flex-wrap align-items-center">
+      {% if is_sa %}
+      <select id="companySelect" class="form-select form-select-sm" style="min-width:200px;">
+        <option value="">— Select company —</option>
+        {% for c in companies %}
+        <option value="{{ c.id }}" {% if c.id == company_id %}selected{% endif %}>{{ c.name }}</option>
+        {% endfor %}
+      </select>
+      {% endif %}
+      <select id="yearSelect" class="form-select form-select-sm" style="width:100px;">
+        <option value="2025" selected>2025</option>
+      </select>
+      <button class="btn btn-sm btn-outline-secondary" onclick="loadAll()">Refresh</button>
+    </div>
+  </div>
+
+  <!-- No company selected banner (SA only) -->
+  <div id="noBanner" class="alert alert-info d-none">
+    Select a company above to load Skills Intelligence data.
+  </div>
+
+  <!-- Low data warning -->
+  <div id="lowDataBanner" class="alert alert-warning d-none">
+    <strong>Limited data:</strong> Fewer than 5 employees have skills recorded. Some metrics may not be meaningful.
+  </div>
+
+  <!-- KPI cards -->
+  <div class="row g-3 mb-4" id="kpiRow">
+    <div class="col-6 col-md-2">
+      <div class="card text-center h-100 border-0 shadow-sm">
+        <div class="card-body py-3">
+          <div class="fs-2 fw-bold text-primary" id="kpiTotal">—</div>
+          <div class="small text-muted">Total Employees</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-2">
+      <div class="card text-center h-100 border-0 shadow-sm">
+        <div class="card-body py-3">
+          <div class="fs-2 fw-bold text-success" id="kpiCoverage">—</div>
+          <div class="small text-muted">Skill Coverage</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-2">
+      <div class="card text-center h-100 border-0 shadow-sm">
+        <div class="card-body py-3">
+          <div class="fs-2 fw-bold text-info" id="kpiUnique">—</div>
+          <div class="small text-muted">Unique Skills</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-2">
+      <div class="card text-center h-100 border-0 shadow-sm">
+        <div class="card-body py-3">
+          <div class="fs-2 fw-bold text-warning" id="kpiValidation">—</div>
+          <div class="small text-muted">Validation Rate</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-2">
+      <div class="card text-center h-100 border-0 shadow-sm">
+        <div class="card-body py-3">
+          <div class="fs-2 fw-bold text-secondary" id="kpiAvgYoe">—</div>
+          <div class="small text-muted">Avg Years Exp.</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-2">
+      <div class="card text-center h-100 border-0 shadow-sm">
+        <div class="card-body py-3">
+          <div class="fs-2 fw-bold text-danger" id="kpiEntries">—</div>
+          <div class="small text-muted">Skill Entries</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <ul class="nav nav-tabs mb-3" id="siTabs">
+    <li class="nav-item"><a class="nav-link active" data-tab="gaps"      href="#">Gap Analysis</a></li>
+    <li class="nav-item"><a class="nav-link"        data-tab="heatmap"   href="#">Proficiency Heatmap</a></li>
+    <li class="nav-item"><a class="nav-link"        data-tab="trends"    href="#">Trend Alignment</a></li>
+    <li class="nav-item"><a class="nav-link"        data-tab="coverage"  href="#">Category Coverage</a></li>
+    <li class="nav-item"><a class="nav-link"        data-tab="jobtitle"  href="#">Job Title View</a></li>
+    <li class="nav-item"><a class="nav-link"        data-tab="validation" href="#">Validation Funnel</a></li>
+  </ul>
+
+  <!-- ── Gap Analysis ─────────────────────────────────────────────────────── -->
+  <div id="tab-gaps">
+    <div class="row g-3 mb-3">
+      <div class="col-12 col-lg-6">
+        <div class="card border-0 shadow-sm h-100">
+          <div class="card-header bg-white fw-semibold">
+            Top Gaps vs SO 2025 Benchmark
+            <span class="text-muted fw-normal small ms-1">(benchmark % − company %)</span>
+          </div>
+          <div class="card-body">
+            <canvas id="gapChart" height="320"></canvas>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-lg-6">
+        <div class="card border-0 shadow-sm h-100">
+          <div class="card-header bg-white fw-semibold">Company Strengths vs Benchmark</div>
+          <div class="card-body">
+            <canvas id="strengthChart" height="320"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <span class="fw-semibold">Full Benchmark Comparison</span>
+        <div class="d-flex gap-2">
+          <select id="gapCatFilter" class="form-select form-select-sm" style="width:220px;">
+            <option value="">All Categories</option>
+            <option>Programming Languages</option>
+            <option>Databases</option>
+            <option>Web Frameworks</option>
+            <option>Cloud &amp; DevOps</option>
+          </select>
+          <select id="gapSignalFilter" class="form-select form-select-sm" style="width:160px;">
+            <option value="">All Signals</option>
+            <option value="gap">Gap</option>
+            <option value="near">Near Benchmark</option>
+            <option value="strength">Strength</option>
+          </select>
+        </div>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-sm table-hover mb-0" id="gapTable">
+            <thead class="table-light">
+              <tr>
+                <th>Technology</th><th>Category</th>
+                <th class="text-end">Industry %</th>
+                <th class="text-end">Company %</th>
+                <th class="text-end">Gap</th>
+                <th class="text-center">Signal</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Proficiency Heatmap ───────────────────────────────────────────────── -->
+  <div id="tab-heatmap" class="d-none">
+    <div class="row g-3 mb-3">
+      <div class="col-12 col-lg-8">
+        <div class="card border-0 shadow-sm">
+          <div class="card-header bg-white fw-semibold">
+            Proficiency Heatmap — Top 15 Skills
+          </div>
+          <div class="card-body">
+            <canvas id="heatmapChart" height="380"></canvas>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-lg-4">
+        <div class="card border-0 shadow-sm h-100">
+          <div class="card-header bg-white fw-semibold">Top 15 Skills by Headcount</div>
+          <div class="card-body">
+            <canvas id="topSkillsChart" height="380"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="row g-3">
+      <div class="col-12">
+        <div class="card border-0 shadow-sm">
+          <div class="card-header bg-white fw-semibold">Top Skills — Detail Table</div>
+          <div class="card-body p-0">
+            <div class="table-responsive">
+              <table class="table table-sm table-hover mb-0" id="topSkillsTable">
+                <thead class="table-light">
+                  <tr>
+                    <th>#</th><th>Skill</th><th>Category</th>
+                    <th class="text-end">Employees</th>
+                    <th class="text-end">Coverage %</th>
+                    <th class="text-end">Avg YoE</th>
+                    <th class="text-end">Validated</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Trend Alignment ──────────────────────────────────────────────────── -->
+  <div id="tab-trends" class="d-none">
+    <div class="row g-3 mb-3">
+      <div class="col-12 col-lg-7">
+        <div class="card border-0 shadow-sm">
+          <div class="card-header bg-white fw-semibold">
+            Opportunity Matrix — Industry Demand vs Company Adoption
+            <span class="d-block small text-muted fw-normal mt-1">
+              X-axis: company adoption % · Y-axis: developers who want to use it (desired_pct)
+            </span>
+          </div>
+          <div class="card-body">
+            <canvas id="trendScatterChart" height="380"></canvas>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-lg-5">
+        <div class="card border-0 shadow-sm">
+          <div class="card-header bg-white fw-semibold">Top Emerging Opportunities</div>
+          <div class="card-body">
+            <canvas id="opportunityChart" height="380"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white fw-semibold">Trend Alignment Table</div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-sm table-hover mb-0" id="trendTable">
+            <thead class="table-light">
+              <tr>
+                <th>Technology</th><th>Category</th>
+                <th class="text-end">Desired %</th>
+                <th class="text-end">Company %</th>
+                <th class="text-end">Opportunity</th>
+                <th class="text-center">Quadrant</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Category Coverage ────────────────────────────────────────────────── -->
+  <div id="tab-coverage" class="d-none">
+    <div class="row g-3">
+      <div class="col-12 col-md-6">
+        <div class="card border-0 shadow-sm">
+          <div class="card-header bg-white fw-semibold">Coverage by Skill Category</div>
+          <div class="card-body">
+            <canvas id="categoryRadarChart" height="320"></canvas>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-md-6">
+        <div class="card border-0 shadow-sm">
+          <div class="card-header bg-white fw-semibold">Employees with Skills per Category</div>
+          <div class="card-body">
+            <canvas id="categoryBarChart" height="320"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Job Title Coverage ────────────────────────────────────────────────── -->
+  <div id="tab-jobtitle" class="d-none">
+    <div class="row g-3">
+      <div class="col-12 col-lg-7">
+        <div class="card border-0 shadow-sm">
+          <div class="card-header bg-white fw-semibold">Coverage % by Job Title (Top 10)</div>
+          <div class="card-body">
+            <canvas id="jobTitleChart" height="340"></canvas>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-lg-5">
+        <div class="card border-0 shadow-sm">
+          <div class="card-header bg-white fw-semibold">Job Title Details</div>
+          <div class="card-body p-0">
+            <div class="table-responsive">
+              <table class="table table-sm table-hover mb-0" id="jobTitleTable">
+                <thead class="table-light">
+                  <tr>
+                    <th>Job Title</th>
+                    <th class="text-end">Headcount</th>
+                    <th class="text-end">With Skills</th>
+                    <th class="text-end">Coverage %</th>
+                    <th class="text-end">Unique Skills</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Validation Funnel ─────────────────────────────────────────────────── -->
+  <div id="tab-validation" class="d-none">
+    <div class="row g-3">
+      <div class="col-12 col-md-5">
+        <div class="card border-0 shadow-sm">
+          <div class="card-header bg-white fw-semibold">Validation Status Distribution</div>
+          <div class="card-body d-flex justify-content-center">
+            <canvas id="validationDoughnut" height="280" style="max-width:280px;"></canvas>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-md-7">
+        <div class="card border-0 shadow-sm">
+          <div class="card-header bg-white fw-semibold">Skill Entry Growth (Last 12 Months)</div>
+          <div class="card-body">
+            <canvas id="growthLineChart" height="280"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- HR toggle (PORTAL_ADMIN only) -->
+  {% if not is_sa and 'PORTAL_ADMIN' in session.get('roles', []) %}
+  <div class="card border-0 shadow-sm mt-4">
+    <div class="card-header bg-white fw-semibold">HR Admin Access</div>
+    <div class="card-body d-flex align-items-center gap-3">
+      <div class="form-check form-switch mb-0">
+        <input class="form-check-input" type="checkbox" id="hrToggle" onchange="toggleHrAccess(this)">
+        <label class="form-check-label" for="hrToggle">Enable Skills Intelligence for HR Admins</label>
+      </div>
+      <small class="text-muted">HR Admins in your organisation will see this dashboard if enabled.</small>
+    </div>
+  </div>
+  {% endif %}
+
+</div><!-- /container -->
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script>
+/* ── state ──────────────────────────────────────────────────────────────────*/
+let _charts = {};
+let _gapData = [];
+let _topData = [];
+let _trendData = [];
+let _catData = [];
+let _jobData = [];
+let _heatmap = {};
+
+/* ── helpers ────────────────────────────────────────────────────────────────*/
+function companyId() {
+  const sel = document.getElementById('companySelect');
+  return sel ? sel.value : '{{ company_id }}';
+}
+function year() { return document.getElementById('yearSelect').value; }
+
+function qs(id) { return document.getElementById(id); }
+
+function destroyChart(id) {
+  if (_charts[id]) { _charts[id].destroy(); delete _charts[id]; }
+}
+
+const SIGNAL_LABELS = {gap:'🔴 Gap', near:'🟡 Near', strength:'🟢 Strength', not_in_benchmark:'⚪ N/A'};
+const QUAD_LABELS   = {invest:'🚀 Invest', leverage:'💪 Leverage', monitor:'👀 Monitor', maintain:'✅ Maintain'};
+const QUAD_COLOURS  = {invest:'#ef4444', leverage:'#22c55e', monitor:'#f59e0b', maintain:'#3b82f6'};
+
+function pct(v) { return (v || 0).toFixed(1) + '%'; }
+function numFmt(v) { return (v || 0).toLocaleString(); }
+
+/* ── tab switching ──────────────────────────────────────────────────────────*/
+document.querySelectorAll('[data-tab]').forEach(a => {
+  a.addEventListener('click', e => {
+    e.preventDefault();
+    document.querySelectorAll('[data-tab]').forEach(x => x.classList.remove('active'));
+    a.classList.add('active');
+    const tab = a.dataset.tab;
+    ['gaps','heatmap','trends','coverage','jobtitle','validation'].forEach(t =>
+      qs('tab-' + t).classList.toggle('d-none', t !== tab));
+    renderActiveTab(tab);
+  });
+});
+
+/* ── fetch helpers ──────────────────────────────────────────────────────────*/
+async function apiFetch(path) {
+  const cid = companyId(); const yr = year();
+  const params = new URLSearchParams();
+  if (cid) params.set('company_id', cid);
+  params.set('year', yr);
+  const res = await fetch(`${path}?${params}`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+/* ── KPI cards ──────────────────────────────────────────────────────────────*/
+async function loadKpi() {
+  try {
+    const d = await apiFetch('/api/admin/skills-intelligence/kpi');
+    qs('kpiTotal').textContent     = numFmt(d.total_employees);
+    qs('kpiCoverage').textContent  = pct(d.coverage_pct);
+    qs('kpiUnique').textContent    = numFmt(d.unique_skills);
+    qs('kpiValidation').textContent= pct(d.validation_rate);
+    qs('kpiAvgYoe').textContent    = (d.avg_yoe || 0).toFixed(1) + 'y';
+    qs('kpiEntries').textContent   = numFmt(d.total_skill_entries);
+    qs('lowDataBanner').classList.toggle('d-none', d.emps_with_skills >= 5);
+  } catch(e) { console.warn('kpi', e); }
+}
+
+/* ── Gap Analysis ───────────────────────────────────────────────────────────*/
+async function loadGaps() {
+  _gapData = await apiFetch('/api/admin/skills-intelligence/gaps');
+  renderGapTable();
+  renderGapCharts();
+}
+
+function renderGapCharts() {
+  const catF = qs('gapCatFilter').value;
+  let rows = _gapData.filter(r => !catF || r.category === catF);
+  const gaps     = rows.filter(r => r.signal === 'gap')
+                       .sort((a,b) => b.gap - a.gap).slice(0, 12);
+  const strengths = rows.filter(r => r.signal === 'strength')
+                        .sort((a,b) => b.company_pct - a.company_pct).slice(0, 12);
+
+  destroyChart('gapChart');
+  _charts.gapChart = new Chart(qs('gapChart'), {
+    type: 'bar',
+    data: {
+      labels: gaps.map(r => r.technology),
+      datasets: [
+        {label: 'Industry %', data: gaps.map(r => r.bench_pct), backgroundColor: 'rgba(59,130,246,0.7)'},
+        {label: 'Company %',  data: gaps.map(r => r.company_pct), backgroundColor: 'rgba(239,68,68,0.7)'},
+      ]
+    },
+    options: {
+      indexAxis: 'y', responsive: true,
+      plugins: {legend: {position:'bottom'}},
+      scales: {x: {beginAtZero:true, max:80}}
+    }
+  });
+
+  destroyChart('strengthChart');
+  _charts.strengthChart = new Chart(qs('strengthChart'), {
+    type: 'bar',
+    data: {
+      labels: strengths.map(r => r.technology),
+      datasets: [
+        {label: 'Company %',  data: strengths.map(r => r.company_pct), backgroundColor: 'rgba(34,197,94,0.8)'},
+        {label: 'Industry %', data: strengths.map(r => r.bench_pct),   backgroundColor: 'rgba(59,130,246,0.4)'},
+      ]
+    },
+    options: {
+      indexAxis: 'y', responsive: true,
+      plugins: {legend: {position:'bottom'}},
+      scales: {x: {beginAtZero:true, max:80}}
+    }
+  });
+}
+
+function renderGapTable() {
+  const catF = qs('gapCatFilter').value;
+  const sigF = qs('gapSignalFilter').value;
+  const rows = _gapData.filter(r =>
+    (!catF || r.category === catF) && (!sigF || r.signal === sigF));
+  const tbody = qs('gapTable').querySelector('tbody');
+  tbody.innerHTML = rows.map(r => `
+    <tr>
+      <td>${r.technology}</td>
+      <td><span class="badge bg-secondary">${r.category}</span></td>
+      <td class="text-end">${pct(r.bench_pct)}</td>
+      <td class="text-end">${pct(r.company_pct)}</td>
+      <td class="text-end fw-semibold ${r.gap > 10 ? 'text-danger' : r.gap < -5 ? 'text-success' : ''}">${r.gap > 0 ? '+' : ''}${r.gap.toFixed(1)}%</td>
+      <td class="text-center">${SIGNAL_LABELS[r.signal] || r.signal}</td>
+    </tr>`).join('');
+}
+
+qs('gapCatFilter').addEventListener('change', () => { renderGapCharts(); renderGapTable(); });
+qs('gapSignalFilter').addEventListener('change', renderGapTable);
+
+/* ── Proficiency Heatmap ────────────────────────────────────────────────────*/
+async function loadHeatmap() {
+  const [hm, top] = await Promise.all([
+    apiFetch('/api/admin/skills-intelligence/heatmap'),
+    apiFetch('/api/admin/skills-intelligence/top-skills'),
+  ]);
+  _heatmap = hm; _topData = top;
+  renderHeatmapChart();
+  renderTopSkillsChart();
+  renderTopSkillsTable();
+}
+
+function renderHeatmapChart() {
+  const {skills, data} = _heatmap;
+  const colours = ['rgba(191,219,254,0.9)','rgba(96,165,250,0.9)',
+                   'rgba(37,99,235,0.9)','rgba(30,58,138,0.9)'];
+  const levels = ['Beginner','Intermediate','Advanced','Expert'];
+  destroyChart('heatmapChart');
+  _charts.heatmapChart = new Chart(qs('heatmapChart'), {
+    type: 'bar',
+    data: {
+      labels: skills,
+      datasets: levels.map((lvl, i) => ({
+        label: lvl,
+        data: data[lvl],
+        backgroundColor: colours[i],
+      }))
+    },
+    options: {
+      indexAxis: 'y', responsive: true, stacked: true,
+      plugins: {legend:{position:'bottom'}},
+      scales: {x:{stacked:true, beginAtZero:true}, y:{stacked:true}}
+    }
+  });
+}
+
+function renderTopSkillsChart() {
+  const top15 = _topData.slice(0,15);
+  destroyChart('topSkillsChart');
+  _charts.topSkillsChart = new Chart(qs('topSkillsChart'), {
+    type: 'bar',
+    data: {
+      labels: top15.map(r => r.skill),
+      datasets: [{
+        label: 'Employees',
+        data: top15.map(r => r.emp_count),
+        backgroundColor: 'rgba(139,92,246,0.8)',
+      }]
+    },
+    options: {
+      indexAxis: 'y', responsive: true,
+      plugins: {legend:{display:false}},
+      scales: {x:{beginAtZero:true}}
+    }
+  });
+}
+
+function renderTopSkillsTable() {
+  const tbody = qs('topSkillsTable').querySelector('tbody');
+  tbody.innerHTML = _topData.map((r,i) => `
+    <tr>
+      <td class="text-muted">${i+1}</td>
+      <td>${r.skill}</td>
+      <td><span class="badge bg-secondary">${r.category}</span></td>
+      <td class="text-end">${numFmt(r.emp_count)}</td>
+      <td class="text-end">${pct(r.company_pct)}</td>
+      <td class="text-end">${r.avg_yoe ? r.avg_yoe.toFixed(1) + 'y' : '—'}</td>
+      <td class="text-end">${numFmt(r.validated_count)}</td>
+    </tr>`).join('');
+}
+
+/* ── Trend Alignment ────────────────────────────────────────────────────────*/
+async function loadTrends() {
+  _trendData = await apiFetch('/api/admin/skills-intelligence/trends');
+  renderTrendScatter();
+  renderOpportunityChart();
+  renderTrendTable();
+}
+
+function renderTrendScatter() {
+  const quadColours = {invest:'rgba(239,68,68,0.8)', leverage:'rgba(34,197,94,0.8)',
+                       monitor:'rgba(245,158,11,0.8)', maintain:'rgba(59,130,246,0.8)'};
+  const datasets = {};
+  _trendData.forEach(r => {
+    if (!datasets[r.quadrant]) datasets[r.quadrant] = {
+      label: QUAD_LABELS[r.quadrant] || r.quadrant,
+      data: [],
+      backgroundColor: quadColours[r.quadrant] || '#999',
+      pointRadius: 6,
+    };
+    datasets[r.quadrant].data.push({x: r.company_pct, y: r.desired_pct, label: r.technology});
+  });
+
+  destroyChart('trendScatterChart');
+  _charts.trendScatterChart = new Chart(qs('trendScatterChart'), {
+    type: 'scatter',
+    data: {datasets: Object.values(datasets)},
+    options: {
+      responsive: true,
+      plugins: {
+        legend: {position:'bottom'},
+        tooltip: {callbacks: {label: ctx => `${ctx.raw.label}: Company ${ctx.raw.x}% · Desired ${ctx.raw.y}%`}},
+      },
+      scales: {
+        x: {title:{display:true, text:'Company Adoption %'}, beginAtZero:true},
+        y: {title:{display:true, text:'Industry Desired %'}, beginAtZero:true},
+      }
+    }
+  });
+}
+
+function renderOpportunityChart() {
+  const top12 = _trendData.slice(0, 12);
+  destroyChart('opportunityChart');
+  _charts.opportunityChart = new Chart(qs('opportunityChart'), {
+    type: 'bar',
+    data: {
+      labels: top12.map(r => r.technology),
+      datasets: [{
+        label: 'Opportunity Score',
+        data: top12.map(r => r.opportunity_score),
+        backgroundColor: top12.map(r => QUAD_COLOURS[r.quadrant] || '#94a3b8'),
+      }]
+    },
+    options: {
+      indexAxis: 'y', responsive: true,
+      plugins: {legend:{display:false}},
+      scales: {x:{beginAtZero:true}}
+    }
+  });
+}
+
+function renderTrendTable() {
+  const tbody = qs('trendTable').querySelector('tbody');
+  tbody.innerHTML = _trendData.map(r => `
+    <tr>
+      <td>${r.technology}</td>
+      <td><span class="badge bg-secondary">${r.category}</span></td>
+      <td class="text-end">${pct(r.desired_pct)}</td>
+      <td class="text-end">${pct(r.company_pct)}</td>
+      <td class="text-end fw-semibold ${r.opportunity_score > 15 ? 'text-danger' : r.opportunity_score < 0 ? 'text-success' : ''}">${r.opportunity_score > 0 ? '+' : ''}${r.opportunity_score.toFixed(1)}%</td>
+      <td class="text-center">${QUAD_LABELS[r.quadrant] || r.quadrant}</td>
+    </tr>`).join('');
+}
+
+/* ── Category Coverage ──────────────────────────────────────────────────────*/
+async function loadCoverage() {
+  _catData = await apiFetch('/api/admin/skills-intelligence/coverage');
+  renderCategoryCharts();
+}
+
+function renderCategoryCharts() {
+  const labels = _catData.map(r => r.category);
+  const pcts   = _catData.map(r => parseFloat(r.coverage_pct));
+  const counts = _catData.map(r => r.emps_with_skill);
+
+  destroyChart('categoryRadarChart');
+  _charts.categoryRadarChart = new Chart(qs('categoryRadarChart'), {
+    type: 'radar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Coverage %',
+        data: pcts,
+        backgroundColor: 'rgba(59,130,246,0.2)',
+        borderColor: 'rgba(59,130,246,0.9)',
+        pointBackgroundColor: 'rgba(59,130,246,0.9)',
+      }]
+    },
+    options: {
+      responsive: true,
+      scales: {r: {beginAtZero:true, max:100, ticks:{stepSize:25}}},
+      plugins: {legend:{display:false}}
+    }
+  });
+
+  destroyChart('categoryBarChart');
+  _charts.categoryBarChart = new Chart(qs('categoryBarChart'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Employees with skill',
+        data: counts,
+        backgroundColor: 'rgba(139,92,246,0.7)',
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {legend:{display:false}},
+      scales: {y:{beginAtZero:true}}
+    }
+  });
+}
+
+/* ── Job Title Coverage ─────────────────────────────────────────────────────*/
+async function loadJobCoverage() {
+  _jobData = await apiFetch('/api/admin/skills-intelligence/job-coverage');
+  renderJobTitleCharts();
+}
+
+function renderJobTitleCharts() {
+  destroyChart('jobTitleChart');
+  _charts.jobTitleChart = new Chart(qs('jobTitleChart'), {
+    type: 'bar',
+    data: {
+      labels: _jobData.map(r => r.job_title),
+      datasets: [
+        {label: 'Coverage %',  data: _jobData.map(r => parseFloat(r.coverage_pct)),  backgroundColor: 'rgba(34,197,94,0.8)', yAxisID: 'pct'},
+        {label: 'Headcount',   data: _jobData.map(r => r.headcount),                  backgroundColor: 'rgba(59,130,246,0.5)', yAxisID: 'count'},
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: {legend:{position:'bottom'}},
+      scales: {
+        pct:   {position:'left',  beginAtZero:true, max:100, title:{display:true,text:'Coverage %'}},
+        count: {position:'right', beginAtZero:true, grid:{drawOnChartArea:false}, title:{display:true,text:'Headcount'}},
+      }
+    }
+  });
+
+  const tbody = qs('jobTitleTable').querySelector('tbody');
+  tbody.innerHTML = _jobData.map(r => `
+    <tr>
+      <td>${r.job_title}</td>
+      <td class="text-end">${numFmt(r.headcount)}</td>
+      <td class="text-end">${numFmt(r.with_skills)}</td>
+      <td class="text-end">${pct(r.coverage_pct)}</td>
+      <td class="text-end">${numFmt(r.unique_skills)}</td>
+    </tr>`).join('');
+}
+
+/* ── Validation Funnel ──────────────────────────────────────────────────────*/
+async function loadValidation() {
+  const [funnel, growth] = await Promise.all([
+    apiFetch('/api/admin/skills-intelligence/validation'),
+    apiFetch('/api/admin/skills-intelligence/growth'),
+  ]);
+
+  const colours = ['#22c55e','#3b82f6','#f59e0b','#ef4444'];
+  destroyChart('validationDoughnut');
+  _charts.validationDoughnut = new Chart(qs('validationDoughnut'), {
+    type: 'doughnut',
+    data: {
+      labels: funnel.map(r => r.validation_status),
+      datasets: [{data: funnel.map(r => r.cnt), backgroundColor: colours}]
+    },
+    options: {plugins: {legend:{position:'bottom'}}}
+  });
+
+  destroyChart('growthLineChart');
+  _charts.growthLineChart = new Chart(qs('growthLineChart'), {
+    type: 'line',
+    data: {
+      labels: growth.map(r => r.month),
+      datasets: [{
+        label: 'New Skill Entries',
+        data: growth.map(r => r.new_entries),
+        borderColor: '#6366f1',
+        backgroundColor: 'rgba(99,102,241,0.1)',
+        fill: true, tension: 0.4,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {legend:{display:false}},
+      scales: {y:{beginAtZero:true}}
+    }
+  });
+}
+
+/* ── HR toggle (PORTAL_ADMIN) ───────────────────────────────────────────────*/
+async function toggleHrAccess(cb) {
+  try {
+    const res = await fetch('/api/admin/skills-intelligence/toggle-hr', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({enabled: cb.checked})
+    });
+    if (!res.ok) { cb.checked = !cb.checked; alert('Failed to update setting'); }
+  } catch(e) { cb.checked = !cb.checked; }
+}
+
+/* ── render active tab on demand ────────────────────────────────────────────*/
+const _loaded = {};
+function renderActiveTab(tab) {
+  if (_loaded[tab]) return;
+  _loaded[tab] = true;
+  const cid = companyId();
+  if (!cid) return;
+  const loaders = {
+    gaps:       loadGaps,
+    heatmap:    loadHeatmap,
+    trends:     loadTrends,
+    coverage:   loadCoverage,
+    jobtitle:   loadJobCoverage,
+    validation: loadValidation,
+  };
+  if (loaders[tab]) loaders[tab]().catch(e => console.error(tab, e));
+}
+
+/* ── load all (full refresh) ────────────────────────────────────────────────*/
+function loadAll() {
+  const cid = companyId();
+  qs('noBanner').classList.toggle('d-none', !!cid);
+  if (!cid) return;
+  // Reset loaded flags
+  Object.keys(_loaded).forEach(k => delete _loaded[k]);
+  loadKpi().catch(console.error);
+  renderActiveTab('gaps');
+}
+
+/* ── init ────────────────────────────────────────────────────────────────────*/
+document.addEventListener('DOMContentLoaded', () => {
+  const sel = document.getElementById('companySelect');
+  if (sel) sel.addEventListener('change', loadAll);
+
+  {% if not is_sa and company_id %}
+  loadAll();
+  {% elif not is_sa %}
+  loadAll();
+  {% endif %}
+
+  {% if is_sa %}
+  const initCid = '{{ company_id }}';
+  if (initCid) loadAll();
+  else qs('noBanner').classList.remove('d-none');
+  {% endif %}
+});
+</script>
+{% endblock %}
