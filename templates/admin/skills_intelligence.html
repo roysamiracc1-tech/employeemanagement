@@ -332,7 +332,7 @@
   </div>
 
   <!-- HR toggle (PORTAL_ADMIN only) -->
-  {% if not is_sa and 'PORTAL_ADMIN' in session.get('roles', []) %}
+  {% if not is_sa and has_role('PORTAL_ADMIN') %}
   <div class="card border-0 shadow-sm mt-4">
     <div class="card-header bg-white fw-semibold">HR Admin Access</div>
     <div class="card-body d-flex align-items-center gap-3">
@@ -804,16 +804,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const sel = document.getElementById('companySelect');
   if (sel) sel.addEventListener('change', loadAll);
 
-  {% if not is_sa and company_id %}
-  loadAll();
-  {% elif not is_sa %}
-  loadAll();
-  {% endif %}
-
   {% if is_sa %}
   const initCid = '{{ company_id }}';
   if (initCid) loadAll();
   else qs('noBanner').classList.remove('d-none');
+  {% else %}
+  loadAll();
   {% endif %}
 });
 </script>

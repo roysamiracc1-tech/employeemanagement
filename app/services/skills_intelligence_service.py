@@ -208,7 +208,7 @@ def get_proficiency_heatmap(company_id: str) -> dict:
         JOIN proficiency_levels pl ON pl.id = es.self_rating_level_id
         JOIN employees e ON e.id = es.employee_id
         WHERE e.company_id = %s::uuid AND e.employment_status = 'ACTIVE'
-        GROUP BY s.name, pl.level_name
+        GROUP BY s.name, pl.level_name, pl.level_order
         ORDER BY s.name, pl.level_order
     """, (company_id,))
 
