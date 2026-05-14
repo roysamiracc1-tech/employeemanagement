@@ -126,8 +126,10 @@
     </a>
     {% endif %}
 
-    {% if has_role('SYSTEM_ADMIN', 'PORTAL_ADMIN', 'HR_ADMIN') %}
+    {% set _admin_core = has_role('SYSTEM_ADMIN', 'PORTAL_ADMIN', 'HR_ADMIN') %}
+    {% if _admin_core or has_feature_access('reports') or has_feature_access('skills_intelligence') %}
     <span class="sidebar-section-title">Administration</span>
+    {% if _admin_core %}
     <a href="{{ url_for('admin') }}"
        class="nav-link {% if request.endpoint == 'admin' %}active{% endif %}">
       <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -174,6 +176,8 @@
       <span class="nav-label">Company Settings</span>
     </a>
     {% endif %}
+    {% endif %}
+    {% if has_feature_access('reports') %}
     <a href="{{ url_for('admin_analytics') }}"
        class="nav-link {% if request.endpoint == 'admin_analytics' %}active{% endif %}">
       <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -182,6 +186,8 @@
       </svg>
       <span class="nav-label">Analytics</span>
     </a>
+    {% endif %}
+    {% if has_feature_access('skills_intelligence') %}
     <a href="{{ url_for('admin_skills_intelligence') }}"
        class="nav-link {% if request.endpoint == 'admin_skills_intelligence' %}active{% endif %}">
       <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -190,6 +196,7 @@
       </svg>
       <span class="nav-label">Skills Intelligence</span>
     </a>
+    {% endif %}
     {% endif %}
   </nav>
 

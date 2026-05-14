@@ -6,7 +6,7 @@ import io
 from flask import session, request, jsonify, render_template, Response
 
 from app import app
-from app.auth import login_required, require_roles
+from app.auth import login_required, require_roles, require_feature_access
 from app.db import query, execute
 from app.services.company_scope import current_company_id
 from app.services import analytics_service as svc
@@ -144,7 +144,7 @@ def api_get_company_features(company_id):
 # ── page ──────────────────────────────────────────────────────────────────────
 
 @app.route('/admin/analytics')
-@require_roles(*_ROLES)
+@require_feature_access(_FEATURE_CODE)
 def admin_analytics():
     company_id = _resolve_company()
     is_sa = 'SYSTEM_ADMIN' in session.get('roles', [])
@@ -173,7 +173,7 @@ def admin_analytics():
 # ── API — overview ────────────────────────────────────────────────────────────
 
 @app.route('/api/analytics/overview')
-@require_roles(*_ROLES)
+@require_feature_access(_FEATURE_CODE)
 def api_analytics_overview():
     company_id = _resolve_company()
     if not company_id:
@@ -188,7 +188,7 @@ def api_analytics_overview():
 # ── API — vacation ────────────────────────────────────────────────────────────
 
 @app.route('/api/analytics/vacation')
-@require_roles(*_ROLES)
+@require_feature_access(_FEATURE_CODE)
 def api_analytics_vacation():
     company_id = _resolve_company()
     if not company_id:
@@ -204,7 +204,7 @@ def api_analytics_vacation():
 # ── API — skills ──────────────────────────────────────────────────────────────
 
 @app.route('/api/analytics/skills')
-@require_roles(*_ROLES)
+@require_feature_access(_FEATURE_CODE)
 def api_analytics_skills():
     company_id = _resolve_company()
     if not company_id:
@@ -219,7 +219,7 @@ def api_analytics_skills():
 # ── API — org ─────────────────────────────────────────────────────────────────
 
 @app.route('/api/analytics/org')
-@require_roles(*_ROLES)
+@require_feature_access(_FEATURE_CODE)
 def api_analytics_org():
     company_id = _resolve_company()
     if not company_id:
@@ -234,7 +234,7 @@ def api_analytics_org():
 # ── API — search ──────────────────────────────────────────────────────────────
 
 @app.route('/api/analytics/search')
-@require_roles(*_ROLES)
+@require_feature_access(_FEATURE_CODE)
 def api_analytics_search():
     company_id = _resolve_company()
     if not company_id:
@@ -249,7 +249,7 @@ def api_analytics_search():
 # ── API — CSV export ──────────────────────────────────────────────────────────
 
 @app.route('/api/analytics/export/csv')
-@require_roles(*_ROLES)
+@require_feature_access(_FEATURE_CODE)
 def api_analytics_export_csv():
     """Export one analytics section as a downloadable CSV."""
     company_id = _resolve_company()

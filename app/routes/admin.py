@@ -342,6 +342,132 @@ def api_admin_update_feature_access():
     return jsonify({'ok': True})
 
 
+# ── Company-level role feature access (PORTAL_ADMIN) ─────────────────────────
+
+# Roles a PORTAL_ADMIN is allowed to manage (roles below them in the hierarchy)
+_PORTAL_MANAGEABLE_ROLES = [
+    'HR_ADMIN', 'DEPARTMENT_HEAD', 'LOCATION_HEAD',
+    'SOLID_LINE_MANAGER', 'DOTTED_LINE_MANAGER', 'HIRING_MANAGER', 'EMPLOYEE',
+]
+
+
+@app.route('/api/admin/company/role-feature-access')
+@require_roles('SYSTEM_ADMIN', 'PORTAL_ADMIN')
+def api_company_role_feature_access_get():
+    """Return per-company role×feature access matrix for the active company.
+
+    Returns for each feature: which roles have global access (SYSTEM_ADMIN ceiling)
+    and what the company override is (None = inherit global).
+    """
+    company_id = _company_scope()
+    if not company_id:
+        return jsonify({'error': 'No company selected'}), 400
+
+    features = [to_dict(r) for r in query(
+        "SELECT id::text, code, label FROM portal_features ORDER BY sort_order"
+    )]
+    # Global ceiling from SYSTEM_ADMIN
+    global_access = query("""
+        SELECT ro.name AS role_name, ro.id::text AS role_id,
+               pf.id::text AS feature_id,
+               rfa.can_read, rfa.can_write, rfa.can_delete
+        FROM role_feature_access rfa
+        JOIN roles ro ON ro.id = rfa.role_id
+        JOIN portal_features pf ON pf.id = rfa.feature_id
+        WHERE ro.name = ANY(%s)
+    """, (_PORTAL_MANAGEABLE_ROLES,))
+
+    # Company-level overrides
+    overrides = query("""
+        SELECT ro.name AS role_name, pf.id::text AS feature_id, crfa.is_enabled
+        FROM company_role_feature_access crfa
+        JOIN roles ro ON ro.id = crfa.role_id
+        JOIN portal_features pf ON pf.id = crfa.feature_id
+        WHERE crfa.company_id = %s::uuid
+    """, (company_id,))
+    override_map = {(r['role_name'], r['feature_id']): r['is_enabled'] for r in overrides}
+
+    # Build matrix: {feature_id: {role_name: {global_enabled, company_override}}}
+    matrix = {}
+    for row in global_access:
+        fid = row['feature_id']
+        rname = row['role_name']
+        if fid not in matrix:
+            matrix[fid] = {}
+        global_on = bool(row['can_read'])
+        company_override = override_map.get((rname, fid))
+        matrix[fid][rname] = {
+            'global_enabled': global_on,
+            'company_override': company_override,   # None = inherit global
+            'effective': global_on if company_override is None else (global_on and company_override),
+        }
+
+    return jsonify({
+        'company_id': company_id,
+        'features': features,
+        'manageable_roles': _PORTAL_MANAGEABLE_ROLES,
+        'matrix': matrix,
+    })
+
+
+@app.route('/api/admin/company/role-feature-access', methods=['POST'])
+@require_roles('SYSTEM_ADMIN', 'PORTAL_ADMIN')
+def api_company_role_feature_access_set():
+    """Set or clear a company-level override for a role×feature.
+
+    Body: {feature_id, role_name, is_enabled}  (is_enabled=null clears override)
+    """
+    company_id = _company_scope()
+    if not company_id:
+        return jsonify({'error': 'No company selected'}), 400
+
+    data       = request.get_json() or {}
+    feature_id = data.get('feature_id')
+    role_name  = data.get('role_name')
+    is_enabled = data.get('is_enabled')   # True / False / None
+
+    if not feature_id or not role_name:
+        return jsonify({'error': 'feature_id and role_name required'}), 400
+
+    # PORTAL_ADMIN can only manage roles below them
+    if 'PORTAL_ADMIN' in session.get('roles', []) and \
+            'SYSTEM_ADMIN' not in session.get('roles', []) and \
+            role_name not in _PORTAL_MANAGEABLE_ROLES:
+        return jsonify({'error': 'Cannot manage that role'}), 403
+
+    # Verify the role has global access first (can't grant beyond ceiling)
+    global_row = query("""
+        SELECT rfa.can_read FROM role_feature_access rfa
+        JOIN roles ro ON ro.id = rfa.role_id
+        WHERE ro.name = %s AND rfa.feature_id = %s::uuid
+    """, (role_name, feature_id), one=True)
+    if not global_row or not global_row['can_read']:
+        return jsonify({'error': 'Role does not have global access to this feature'}), 403
+
+    role_row = query("SELECT id::text FROM roles WHERE name = %s", (role_name,), one=True)
+    if not role_row:
+        return jsonify({'error': 'Role not found'}), 400
+
+    if is_enabled is None:
+        # Clear override → inherit global
+        execute("""
+            DELETE FROM company_role_feature_access
+            WHERE company_id = %s::uuid AND role_id = %s::uuid AND feature_id = %s::uuid
+        """, (company_id, role_row['id'], feature_id))
+    else:
+        execute("""
+            INSERT INTO company_role_feature_access
+                (company_id, role_id, feature_id, is_enabled, updated_by, updated_at)
+            VALUES (%s::uuid, %s::uuid, %s::uuid, %s, %s::uuid, NOW())
+            ON CONFLICT (company_id, role_id, feature_id) DO UPDATE
+            SET is_enabled  = EXCLUDED.is_enabled,
+                updated_by  = EXCLUDED.updated_by,
+                updated_at  = NOW()
+        """, (company_id, role_row['id'], feature_id, bool(is_enabled), session['user_id']))
+
+    return jsonify({'ok': True})
+
+
 @app.route('/api/admin/org/business-units')
 @require_roles(*_ADMIN_ROLES)
 def api_org_bus():

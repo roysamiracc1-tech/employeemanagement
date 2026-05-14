@@ -2,6 +2,94 @@
 {% block title %}Skills Intelligence{% endblock %}
 {% block page_title %}Skills Intelligence{% endblock %}
 
+{% block head %}
+<style>
+/* ── Tab description banner ──────────────────────────────────────────── */
+.si-tab-banner {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 10px;
+  padding: 14px 18px;
+  margin-bottom: 18px;
+  font-size: .82rem;
+  line-height: 1.6;
+  color: #0c4a6e;
+}
+.si-tab-banner-icon { font-size: 1.5rem; flex-shrink: 0; margin-top: 1px; }
+.si-tab-banner-title { font-weight: 700; font-size: .88rem; margin-bottom: 4px; color: #075985; }
+.si-tab-banner-pills { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.si-tab-banner-pill {
+  background: #e0f2fe; color: #0369a1;
+  border-radius: 20px; padding: 2px 10px;
+  font-size: .71rem; font-weight: 600;
+}
+
+/* ── Info icon + tooltip ─────────────────────────────────────────────── */
+.si-info {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px; height: 15px;
+  border-radius: 50%;
+  background: #e2e8f0;
+  color: #64748b;
+  font-size: .6rem;
+  font-weight: 700;
+  font-style: normal;
+  cursor: help;
+  position: relative;
+  margin-left: 5px;
+  vertical-align: middle;
+  flex-shrink: 0;
+  user-select: none;
+}
+.si-info::before {
+  content: '';
+  position: absolute;
+  bottom: calc(100% + 5px);
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: #1e293b;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .15s;
+  z-index: 201;
+}
+.si-info::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: calc(100% + 15px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1e293b;
+  color: #f1f5f9;
+  font-size: .72rem;
+  font-weight: 400;
+  line-height: 1.55;
+  padding: 10px 13px;
+  border-radius: 8px;
+  width: 290px;
+  white-space: normal;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .15s;
+  z-index: 200;
+  text-align: left;
+  box-shadow: 0 4px 16px rgba(0,0,0,.25);
+}
+.si-info:hover::before, .si-info:hover::after { opacity: 1; }
+.si-info.tip-below::before {
+  bottom: auto; top: calc(100% + 5px);
+  border-top-color: transparent; border-bottom-color: #1e293b;
+}
+.si-info.tip-below::after { bottom: auto; top: calc(100% + 15px); }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="page" style="max-width:1200px">
 
@@ -70,23 +158,46 @@
 
   <!-- ── Gap Analysis ─────────────────────────────────────────────────────── -->
   <div id="tab-gaps" class="an-tab-content">
+    <div class="si-tab-banner">
+      <div class="si-tab-banner-icon">📊</div>
+      <div>
+        <div class="si-tab-banner-title">Gap Analysis — what it measures &amp; how to read it</div>
+        Compares your company's skill adoption rates against the <strong>Stack Overflow 2025 Developer Survey</strong> benchmark.
+        For each technology, <em>Gap = Industry % − Company %</em>. A positive gap means the industry uses that technology more than your team does; a negative gap means your team leads the industry.
+        <div class="si-tab-banner-pills">
+          <span class="si-tab-banner-pill">🔴 Gap (&gt;5 pp) → training or hiring priority</span>
+          <span class="si-tab-banner-pill">🟡 Near (±5 pp) → watch &amp; maintain</span>
+          <span class="si-tab-banner-pill">🟢 Strength (&lt;−5 pp) → competitive advantage</span>
+        </div>
+      </div>
+    </div>
     <div id="gaps-loading" class="an-loading">Loading gap analysis…</div>
     <div id="gaps-body" style="display:none">
 
       <div class="an-chart-row" style="margin-bottom:16px">
         <div class="an-chart-card" style="flex:2">
-          <div class="an-chart-title">Top Skill Gaps vs SO 2025 Benchmark <span style="font-weight:400;color:#94a3b8">(industry % − company %)</span></div>
+          <div class="an-chart-title" style="display:flex;align-items:center;flex-wrap:wrap;gap:4px">
+            Top Skill Gaps vs SO 2025 Benchmark
+            <span style="font-weight:400;color:#94a3b8;font-size:.78rem">(industry % − company %)</span>
+            <i class="si-info tip-below" data-tip="Shows the 10 technologies where your team lags the industry most. Bar length = how many percentage points behind you are. Longer bar = bigger gap = higher urgency to hire or train. Source: SO 2025 respondents who use this technology vs your employees who listed it as a skill.">ℹ</i>
+          </div>
           <canvas id="ch-gap-bar" height="280"></canvas>
         </div>
         <div class="an-chart-card" style="flex:2">
-          <div class="an-chart-title">Company Strengths vs Benchmark</div>
+          <div class="an-chart-title" style="display:flex;align-items:center;gap:4px">
+            Company Strengths vs Benchmark
+            <i class="si-info tip-below" data-tip="Shows the 10 technologies where your team exceeds the industry benchmark. A strong lead here is a competitive advantage — highlight these in job postings and ensure you retain people who carry these skills.">ℹ</i>
+          </div>
           <canvas id="ch-strength-bar" height="280"></canvas>
         </div>
       </div>
 
       <div class="an-card">
         <div class="an-card-hdr" style="justify-content:space-between">
-          <span style="font-weight:700">Full Benchmark Comparison</span>
+          <span style="font-weight:700;display:flex;align-items:center;gap:4px">
+            Full Benchmark Comparison
+            <i class="si-info" data-tip="Complete list of all benchmarked technologies. Industry % = share of SO 2025 respondents who use it. Company % = share of your employees with it as a skill. Gap = difference. Filter by category or signal to focus on specific areas.">ℹ</i>
+          </span>
           <div style="display:flex;gap:8px">
             <select id="gap-cat-filter" class="form-control" style="font-size:.78rem;padding:3px 8px;height:auto;width:210px"
                     onchange="renderGapTable()">
@@ -121,22 +232,45 @@
 
   <!-- ── Proficiency Heatmap ───────────────────────────────────────────────── -->
   <div id="tab-heatmap" class="an-tab-content" style="display:none">
+    <div class="si-tab-banner">
+      <div class="si-tab-banner-icon">🔥</div>
+      <div>
+        <div class="si-tab-banner-title">Proficiency Heatmap — what it measures &amp; how to read it</div>
+        Shows how <strong>deeply</strong> your team knows its most common skills, broken down by proficiency level (Beginner → Expert). Each bar represents a skill; the stacked segments show how many employees sit at each proficiency tier.
+        <div class="si-tab-banner-pills">
+          <span class="si-tab-banner-pill">Beginner-heavy bars → knowledge depth risk</span>
+          <span class="si-tab-banner-pill">High validation % → reliable, manager-confirmed data</span>
+          <span class="si-tab-banner-pill">Low Coverage % on a key skill → training gap</span>
+        </div>
+      </div>
+    </div>
     <div id="heatmap-loading" class="an-loading">Loading heatmap…</div>
     <div id="heatmap-body" style="display:none">
 
       <div class="an-chart-row" style="margin-bottom:16px">
         <div class="an-chart-card" style="flex:3">
-          <div class="an-chart-title">Proficiency Distribution — Top 15 Skills (stacked by level)</div>
+          <div class="an-chart-title" style="display:flex;align-items:center;gap:4px">
+            Proficiency Distribution — Top 15 Skills (stacked by level)
+            <i class="si-info" data-tip="Each horizontal bar is a skill. Segments show how many employees are at each level: Beginner, Intermediate, Advanced, Expert. A bar dominated by Beginner (left) means the team holds the skill but lacks depth. A bar skewed toward Expert means you have strong practitioners.">ℹ</i>
+          </div>
           <canvas id="ch-heatmap" height="320"></canvas>
         </div>
         <div class="an-chart-card" style="flex:1">
-          <div class="an-chart-title">Top 15 Skills by Headcount</div>
+          <div class="an-chart-title" style="display:flex;align-items:center;gap:4px">
+            Top 15 Skills by Headcount
+            <i class="si-info" data-tip="Raw count of employees who have each skill listed (any proficiency level). Use this to identify your team's most widespread technologies. High headcount here means broad coverage; cross-reference with the proficiency chart to check depth.">ℹ</i>
+          </div>
           <canvas id="ch-top-skills" height="320"></canvas>
         </div>
       </div>
 
       <div class="an-card">
-        <div class="an-card-hdr"><span style="font-weight:700">Top Skills — Detail</span></div>
+        <div class="an-card-hdr">
+          <span style="font-weight:700;display:flex;align-items:center;gap:4px">
+            Top Skills — Detail
+            <i class="si-info" data-tip="Employees = headcount with this skill. Coverage % = employees ÷ total headcount × 100. Avg YoE = average years of experience across employees who have it. Validated = % of entries confirmed by a manager. High Validated % = higher data reliability.">ℹ</i>
+          </span>
+        </div>
         <div class="table-wrap"><table class="an-table sortable-table" id="tbl-top-skills">
           <thead><tr>
             <th>#</th><th>Skill</th><th>Category</th>
@@ -153,25 +287,47 @@
 
   <!-- ── Trend Alignment ──────────────────────────────────────────────────── -->
   <div id="tab-trends" class="an-tab-content" style="display:none">
+    <div class="si-tab-banner">
+      <div class="si-tab-banner-icon">🚀</div>
+      <div>
+        <div class="si-tab-banner-title">Trend Alignment — what it measures &amp; how to read it</div>
+        Maps your team's current skills against what the industry <strong>wants to learn next</strong>, drawn from SO 2025 "want to work with" responses. The scatter plot places each technology into one of four strategic quadrants based on industry desire and your company's current coverage.
+        <div class="si-tab-banner-pills">
+          <span class="si-tab-banner-pill">🚀 Invest — high demand, low coverage → hire or train urgently</span>
+          <span class="si-tab-banner-pill">💪 Leverage — strong coverage, high demand → highlight in JDs</span>
+          <span class="si-tab-banner-pill">👀 Monitor — low demand, low coverage → keep an eye</span>
+          <span class="si-tab-banner-pill">✅ Maintain — strong coverage, lower demand → stable, no action</span>
+        </div>
+      </div>
+    </div>
     <div id="trends-loading" class="an-loading">Loading trend alignment…</div>
     <div id="trends-body" style="display:none">
 
       <div class="an-chart-row" style="margin-bottom:16px">
         <div class="an-chart-card" style="flex:2">
-          <div class="an-chart-title">
+          <div class="an-chart-title" style="display:flex;align-items:center;flex-wrap:wrap;gap:4px">
             Opportunity Matrix
-            <span style="font-weight:400;color:#94a3b8"> — X: company adoption · Y: industry desired %</span>
+            <span style="font-weight:400;color:#94a3b8;font-size:.78rem">— X: company adoption · Y: industry desired %</span>
+            <i class="si-info" data-tip="Each dot is a technology. X-axis = % of your employees who have it. Y-axis = % of SO 2025 respondents who want to work with it. Top-left (🚀 Invest): industry craves it but your team lacks it — highest priority. Bottom-right (✅ Maintain): you're well-covered, demand is lower.">ℹ</i>
           </div>
           <canvas id="ch-scatter" height="320"></canvas>
         </div>
         <div class="an-chart-card" style="flex:1">
-          <div class="an-chart-title">Top Opportunities (Desired − Company)</div>
+          <div class="an-chart-title" style="display:flex;align-items:center;gap:4px">
+            Top Opportunities (Desired − Company)
+            <i class="si-info" data-tip="Bar length = how much the industry desires this technology minus how much your team covers it. The longer the bar, the greater the strategic opportunity — either to hire people with this skill or run internal training.">ℹ</i>
+          </div>
           <canvas id="ch-opportunity" height="320"></canvas>
         </div>
       </div>
 
       <div class="an-card">
-        <div class="an-card-hdr"><span style="font-weight:700">Trend Alignment — Full Table</span></div>
+        <div class="an-card-hdr">
+          <span style="font-weight:700;display:flex;align-items:center;gap:4px">
+            Trend Alignment — Full Table
+            <i class="si-info" data-tip="Desired % = SO 2025 respondents who want to work with this tech. Company % = your employee coverage. Opportunity = Desired − Company. Quadrant is assigned based on where the technology sits on the scatter plot.">ℹ</i>
+          </span>
+        </div>
         <div class="table-wrap"><table class="an-table sortable-table" id="tbl-trends">
           <thead><tr>
             <th>Technology</th><th>Category</th>
@@ -188,15 +344,33 @@
 
   <!-- ── Category Coverage ────────────────────────────────────────────────── -->
   <div id="tab-coverage" class="an-tab-content" style="display:none">
+    <div class="si-tab-banner">
+      <div class="si-tab-banner-icon">🎯</div>
+      <div>
+        <div class="si-tab-banner-title">Category Coverage — what it measures &amp; how to read it</div>
+        Shows how broadly your team spans major technology domains (Languages, Databases, Cloud &amp; DevOps, Frameworks, etc.). Coverage % = employees with at least one skill in that category ÷ total headcount × 100.
+        <div class="si-tab-banner-pills">
+          <span class="si-tab-banner-pill">Narrow radar → over-specialised team, exposure risk</span>
+          <span class="si-tab-banner-pill">Low Cloud/DevOps in an eng team → common risk signal</span>
+          <span class="si-tab-banner-pill">Aim for balanced coverage across your key domains</span>
+        </div>
+      </div>
+    </div>
     <div id="coverage-loading" class="an-loading">Loading coverage data…</div>
     <div id="coverage-body" style="display:none">
       <div class="an-chart-row">
         <div class="an-chart-card" style="flex:1">
-          <div class="an-chart-title">Coverage % by Skill Category (Radar)</div>
+          <div class="an-chart-title" style="display:flex;align-items:center;gap:4px">
+            Coverage % by Skill Category (Radar)
+            <i class="si-info" data-tip="Each axis represents a technology domain. The shaded area shows what % of your employees have at least one skill in that domain. A perfectly balanced team fills all axes evenly. A spike in one direction and a flat edge in another signals over-specialisation or a coverage gap.">ℹ</i>
+          </div>
           <canvas id="ch-radar" height="300"></canvas>
         </div>
         <div class="an-chart-card" style="flex:1">
-          <div class="an-chart-title">Employees with Skills per Category</div>
+          <div class="an-chart-title" style="display:flex;align-items:center;gap:4px">
+            Employees with Skills per Category
+            <i class="si-info" data-tip="Absolute headcount (not %) of employees who have at least one skill in each domain. Useful alongside the radar chart: a category may show 100% coverage but only because you have 2 employees. This chart makes the actual numbers visible.">ℹ</i>
+          </div>
           <canvas id="ch-cat-bar" height="300"></canvas>
         </div>
       </div>
@@ -205,15 +379,33 @@
 
   <!-- ── Job Title Coverage ────────────────────────────────────────────────── -->
   <div id="tab-jobtitle" class="an-tab-content" style="display:none">
+    <div class="si-tab-banner">
+      <div class="si-tab-banner-icon">👤</div>
+      <div>
+        <div class="si-tab-banner-title">By Job Title — what it measures &amp; how to read it</div>
+        Breaks down skills coverage by job title, showing which roles have the most and least documented skills. Coverage % = employees in that role with ≥1 skill ÷ total employees in that role × 100.
+        <div class="si-tab-banner-pills">
+          <span class="si-tab-banner-pill">&lt;30% coverage → poor data quality, prompt profile updates</span>
+          <span class="si-tab-banner-pill">Large headcount + low coverage → highest data collection priority</span>
+          <span class="si-tab-banner-pill">Avg skills per person shows depth of profile completeness</span>
+        </div>
+      </div>
+    </div>
     <div id="jobtitle-loading" class="an-loading">Loading job title data…</div>
     <div id="jobtitle-body" style="display:none">
       <div class="an-chart-row" style="margin-bottom:16px">
         <div class="an-chart-card" style="flex:2">
-          <div class="an-chart-title">Coverage % &amp; Headcount by Job Title (Top 10)</div>
+          <div class="an-chart-title" style="display:flex;align-items:center;gap:4px">
+            Coverage % &amp; Headcount by Job Title (Top 10)
+            <i class="si-info" data-tip="Bars show the % of employees in each role who have at least one skill documented. The number above each bar is headcount. Roles with both high headcount and low coverage are the highest priority for a skills data collection campaign.">ℹ</i>
+          </div>
           <canvas id="ch-jobtitle" height="300"></canvas>
         </div>
         <div class="an-chart-card" style="flex:1">
-          <div class="an-chart-title" style="margin-bottom:0"></div>
+          <div class="an-chart-title" style="display:flex;align-items:center;gap:4px;margin-bottom:4px">
+            Job Title Summary
+            <i class="si-info" data-tip="HC = headcount in this role. Skills = average number of distinct skills per employee. Cover % = employees with ≥1 skill ÷ headcount × 100. Sort by Cover % ascending to find the roles most in need of profile updates.">ℹ</i>
+          </div>
           <div class="table-wrap" style="margin-top:4px"><table class="an-table" id="tbl-jobtitle">
             <thead><tr>
               <th>Job Title</th>
@@ -230,16 +422,34 @@
 
   <!-- ── Validation Funnel ─────────────────────────────────────────────────── -->
   <div id="tab-validation" class="an-tab-content" style="display:none">
+    <div class="si-tab-banner">
+      <div class="si-tab-banner-icon">✅</div>
+      <div>
+        <div class="si-tab-banner-title">Validation — what it measures &amp; how to read it</div>
+        Shows how much of your skills data has been <strong>manager-verified</strong> versus self-assessed only, and tracks how actively employees are updating their skill profiles over time.
+        <div class="si-tab-banner-pills">
+          <span class="si-tab-banner-pill">Target: &gt;50% validated → reliable data for decisions</span>
+          <span class="si-tab-banner-pill">Declining growth trend → skills database going stale</span>
+          <span class="si-tab-banner-pill">High self-assessed only → don't use for critical hiring decisions</span>
+        </div>
+      </div>
+    </div>
     <div id="validation-loading" class="an-loading">Loading validation data…</div>
     <div id="validation-body" style="display:none">
       <div class="an-kpi-row" id="val-kpis"></div>
       <div class="an-chart-row">
         <div class="an-chart-card" style="flex:1;max-width:340px">
-          <div class="an-chart-title">Validation Status Distribution</div>
+          <div class="an-chart-title" style="display:flex;align-items:center;gap:4px">
+            Validation Status Distribution
+            <i class="si-info" data-tip="Breaks all skill entries into three statuses: Validated (manager confirmed), Pending (submitted, awaiting review), Self-Assessed (employee-entered, no manager review yet). The higher the Validated slice, the more trustworthy your skills data is for strategic decisions.">ℹ</i>
+          </div>
           <canvas id="ch-val-doughnut" height="260"></canvas>
         </div>
         <div class="an-chart-card" style="flex:2">
-          <div class="an-chart-title">Skill Entry Growth (Last 12 Months)</div>
+          <div class="an-chart-title" style="display:flex;align-items:center;gap:4px">
+            Skill Entry Growth (Last 12 Months)
+            <i class="si-info" data-tip="Counts new skill entries added by employees each month. A rising trend means employees are actively maintaining their profiles. A flat or declining line means the skills database is becoming stale — consider sending a reminder or making profile completion part of performance reviews.">ℹ</i>
+          </div>
           <canvas id="ch-growth" height="260"></canvas>
         </div>
       </div>

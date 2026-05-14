@@ -112,25 +112,23 @@ class TestPageAccess:
             r = pa_client.get('/admin/skills-intelligence')
             assert r.status_code == 200
 
-    def test_hr_admin_blocked_when_si_enabled_but_hr_not(self, hr_client):
-        with patch('app.routes.skills_intelligence._si_enabled', return_value=True), \
-             patch('app.routes.skills_intelligence._si_enabled_for_hr', return_value=False):
+    def test_hr_admin_allowed_when_si_enabled(self, hr_client):
+        with patch('app.routes.skills_intelligence._si_enabled', return_value=True):
+            r = hr_client.get('/admin/skills-intelligence')
+            assert r.status_code == 200
+
+    def test_hr_admin_sees_locked_when_si_disabled(self, hr_client):
+        with patch('app.routes.skills_intelligence._si_enabled', return_value=False):
             r = hr_client.get('/admin/skills-intelligence')
             assert r.status_code == 200
             assert b'not enabled' in r.data.lower() or b'Not Enabled' in r.data
-
-    def test_hr_admin_allowed_when_both_enabled(self, hr_client):
-        with patch('app.routes.skills_intelligence._si_enabled', return_value=True), \
-             patch('app.routes.skills_intelligence._si_enabled_for_hr', return_value=True):
-            r = hr_client.get('/admin/skills-intelligence')
-            assert r.status_code == 200
 
 
 # ── KPI endpoint ──────────────────────────────────────────────────────────────
 
 class TestKpiEndpoint:
     def test_sa_gets_kpi(self, sa_client):
-        with patch('app.routes.skills_intelligence._check_si_access', return_value=(True, None)), \
+        with patch('app.routes.skills_intelligence._check_si_company_access', return_value=(True, None)), \
              patch('app.routes.skills_intelligence.svc.get_kpi_summary', return_value=_FAKE_KPI):
             r = sa_client.get('/api/admin/skills-intelligence/kpi?company_id=co-001')
             assert r.status_code == 200
@@ -143,18 +141,18 @@ class TestKpiEndpoint:
             r = pa_client.get('/api/admin/skills-intelligence/kpi?company_id=co-001')
             assert r.status_code == 403
 
-    def test_hr_blocked_when_hr_not_enabled(self, hr_client):
-        with patch('app.routes.skills_intelligence._si_enabled', return_value=True), \
-             patch('app.routes.skills_intelligence._si_enabled_for_hr', return_value=False):
+    def test_hr_gets_kpi_when_si_enabled(self, hr_client):
+        with patch('app.routes.skills_intelligence._check_si_company_access', return_value=(True, None)), \
+             patch('app.routes.skills_intelligence.svc.get_kpi_summary', return_value=_FAKE_KPI):
             r = hr_client.get('/api/admin/skills-intelligence/kpi?company_id=co-001')
-            assert r.status_code == 403
+            assert r.status_code == 200
 
 
 # ── Gap analysis endpoint ─────────────────────────────────────────────────────
 
 class TestGapsEndpoint:
     def test_returns_gaps(self, sa_client):
-        with patch('app.routes.skills_intelligence._check_si_access', return_value=(True, None)), \
+        with patch('app.routes.skills_intelligence._check_si_company_access', return_value=(True, None)), \
              patch('app.routes.skills_intelligence.svc.get_benchmark_gaps', return_value=_FAKE_GAPS):
             r = sa_client.get('/api/admin/skills-intelligence/gaps?company_id=co-001')
             assert r.status_code == 200
@@ -165,7 +163,7 @@ class TestGapsEndpoint:
             assert d[1]['signal'] == 'gap'
 
     def test_gap_shape(self, sa_client):
-        with patch('app.routes.skills_intelligence._check_si_access', return_value=(True, None)), \
+        with patch('app.routes.skills_intelligence._check_si_company_access', return_value=(True, None)), \
              patch('app.routes.skills_intelligence.svc.get_benchmark_gaps', return_value=_FAKE_GAPS):
             r = sa_client.get('/api/admin/skills-intelligence/gaps?company_id=co-001')
             row = json.loads(r.data)[0]
@@ -180,7 +178,7 @@ class TestGapsEndpoint:
 
 class TestHeatmapEndpoint:
     def test_returns_heatmap(self, sa_client):
-        with patch('app.routes.skills_intelligence._check_si_access', return_value=(True, None)), \
+        with patch('app.routes.skills_intelligence._check_si_company_access', return_value=(True, None)), \
              patch('app.routes.skills_intelligence.svc.get_proficiency_heatmap', return_value=_FAKE_HEATMAP):
             r = sa_client.get('/api/admin/skills-intelligence/heatmap?company_id=co-001')
             assert r.status_code == 200
@@ -193,7 +191,7 @@ class TestHeatmapEndpoint:
 
 class TestTrendsEndpoint:
     def test_returns_trends(self, sa_client):
-        with patch('app.routes.skills_intelligence._check_si_access', return_value=(True, None)), \
+        with patch('app.routes.skills_intelligence._check_si_company_access', return_value=(True, None)), \
              patch('app.routes.skills_intelligence.svc.get_trend_alignment', return_value=_FAKE_TRENDS):
             r = sa_client.get('/api/admin/skills-intelligence/trends?company_id=co-001')
             assert r.status_code == 200
@@ -206,7 +204,7 @@ class TestTrendsEndpoint:
 
 class TestCoverageEndpoint:
     def test_returns_coverage(self, sa_client):
-        with patch('app.routes.skills_intelligence._check_si_access', return_value=(True, None)), \
+        with patch('app.routes.skills_intelligence._check_si_company_access', return_value=(True, None)), \
              patch('app.routes.skills_intelligence.svc.get_category_coverage', return_value=_FAKE_COVERAGE):
             r = sa_client.get('/api/admin/skills-intelligence/coverage?company_id=co-001')
             assert r.status_code == 200
@@ -219,7 +217,7 @@ class TestCoverageEndpoint:
 
 class TestJobCoverageEndpoint:
     def test_returns_job_coverage(self, sa_client):
-        with patch('app.routes.skills_intelligence._check_si_access', return_value=(True, None)), \
+        with patch('app.routes.skills_intelligence._check_si_company_access', return_value=(True, None)), \
              patch('app.routes.skills_intelligence.svc.get_job_title_coverage', return_value=_FAKE_JOB_COVERAGE):
             r = sa_client.get('/api/admin/skills-intelligence/job-coverage?company_id=co-001')
             assert r.status_code == 200
@@ -231,7 +229,7 @@ class TestJobCoverageEndpoint:
 
 class TestValidationEndpoint:
     def test_returns_funnel(self, sa_client):
-        with patch('app.routes.skills_intelligence._check_si_access', return_value=(True, None)), \
+        with patch('app.routes.skills_intelligence._check_si_company_access', return_value=(True, None)), \
              patch('app.routes.skills_intelligence.svc.get_validation_funnel', return_value=_FAKE_VALIDATION):
             r = sa_client.get('/api/admin/skills-intelligence/validation?company_id=co-001')
             assert r.status_code == 200
@@ -244,7 +242,7 @@ class TestValidationEndpoint:
 
 class TestGrowthEndpoint:
     def test_returns_growth(self, sa_client):
-        with patch('app.routes.skills_intelligence._check_si_access', return_value=(True, None)), \
+        with patch('app.routes.skills_intelligence._check_si_company_access', return_value=(True, None)), \
              patch('app.routes.skills_intelligence.svc.get_skill_growth', return_value=_FAKE_GROWTH):
             r = sa_client.get('/api/admin/skills-intelligence/growth?company_id=co-001')
             assert r.status_code == 200
@@ -256,11 +254,11 @@ class TestGrowthEndpoint:
 # ── HR toggle endpoint ────────────────────────────────────────────────────────
 
 class TestHrToggleEndpoint:
-    def test_requires_portal_admin(self, sa_client):
-        # SYSTEM_ADMIN is not PORTAL_ADMIN so should be blocked
-        r = sa_client.post('/api/admin/skills-intelligence/toggle-hr',
-                           json={'enabled': True})
-        assert r.status_code == 302  # redirected (not PORTAL_ADMIN)
+    def test_requires_feature_write_access(self, auth_client):
+        # Plain EMPLOYEE has no SI access at all — should be redirected
+        r = auth_client.post('/api/admin/skills-intelligence/toggle-hr',
+                             json={'enabled': True})
+        assert r.status_code == 302
 
     def test_portal_admin_can_enable(self, pa_client):
         with patch('app.routes.skills_intelligence._si_enabled', return_value=True), \
@@ -289,7 +287,7 @@ class TestFeatureGateHelpers:
             assert _si_enabled('') is False
             assert _si_enabled(None) is False
 
-    def test_si_enabled_for_hr_returns_false_for_no_company(self, app):
+    def test_si_enabled_returns_false_for_none(self, app):
         with app.app_context():
-            from app.routes.skills_intelligence import _si_enabled_for_hr
-            assert _si_enabled_for_hr('') is False
+            from app.routes.skills_intelligence import _si_enabled
+            assert _si_enabled(None) is False

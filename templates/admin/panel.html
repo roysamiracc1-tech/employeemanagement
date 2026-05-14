@@ -86,6 +86,12 @@
     </button>
     <button class="admin-tab" onclick="switchTab('settings',this)">⚙ Widget Settings</button>
     {% endif %}
+    {% if is_portal_admin or is_tech_admin %}
+    <button class="admin-tab" onclick="switchTab('feature-access',this)">
+      <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="display:inline;margin-right:3px;vertical-align:-1px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      Feature Access
+    </button>
+    {% endif %}
   </div>
 
   <!-- ── Users & Roles tab ───────────────────────────────────── -->
@@ -336,6 +342,37 @@
   </div>
   {% endif %}{# is_tech_admin #}
 
+  <!-- ── Feature Access tab (PORTAL_ADMIN + SA) ──────────────── -->
+  {% if is_portal_admin or is_tech_admin %}
+  <div class="admin-panel" id="tab-feature-access" style="display:none">
+    <div class="card">
+      <div class="card-header" style="justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <div>
+          <h2 style="margin:0">Feature Access by Role</h2>
+          <span style="font-size:.75rem;color:#64748b">
+            Control which roles in your company can access each feature.
+            {% if is_tech_admin %}Global defaults are set in Roles &amp; Permissions; these are per-company overrides.{% else %}Roles above your level are locked and managed by your Super Admin.{% endif %}
+          </span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span id="fa-dirty-count" style="display:none;font-size:.75rem;font-weight:600;color:#d97706;background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:3px 10px">
+            <span id="fa-dirty-num">0</span> unsaved change(s)
+          </span>
+          <button class="btn btn-primary btn-sm" id="fa-save-btn" style="display:none" onclick="saveFeatureAccessChanges()">
+            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" style="display:inline;margin-right:4px;vertical-align:-1px">
+              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
+            </svg>
+            Save Changes
+          </button>
+        </div>
+      </div>
+      <div style="padding:0;overflow-x:auto" id="fa-matrix-container">
+        <p style="padding:24px;color:#94a3b8;font-size:.85rem">Loading feature access matrix…</p>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
   <div class="status-bar" id="status-bar">
     <span class="status-dot loading" id="status-dot"></span>
     <span id="status-text">Loading…</span>
@@ -424,9 +461,10 @@ function switchTab(name, btn) {
   document.querySelectorAll('.admin-panel').forEach(p => p.style.display = 'none');
   btn.classList.add('active');
   document.getElementById('tab-' + name).style.display = '';
-  if (name === 'org'      && document.getElementById('bu-list').innerHTML.includes('Loading')) loadOrg();
-  if (name === 'settings' && document.getElementById('refresh-tbody').innerHTML.includes('Loading')) loadRefreshSettings();
-  if (name === 'roles'    && document.getElementById('role-matrix-container').innerHTML.includes('Loading')) loadRoleMatrix();
+  if (name === 'org'            && document.getElementById('bu-list').innerHTML.includes('Loading')) loadOrg();
+  if (name === 'settings'       && document.getElementById('refresh-tbody').innerHTML.includes('Loading')) loadRefreshSettings();
+  if (name === 'roles'          && document.getElementById('role-matrix-container').innerHTML.includes('Loading')) loadRoleMatrix();
+  if (name === 'feature-access' && document.getElementById('fa-matrix-container').innerHTML.includes('Loading')) loadFeatureAccessMatrix();
 }
 
 // ── Company logo picker ───────────────────────────────────────────────────
@@ -1090,6 +1128,137 @@ async function loadRefreshSettings() {
   // Sort by ROLE_ORDER
   data.sort((a,b) => ROLE_ORDER.indexOf(a.role_name) - ROLE_ORDER.indexOf(b.role_name));
   document.getElementById('refresh-tbody').innerHTML = data.map(buildRefreshRow).join('');
+}
+
+// ── Feature Access tab ───────────────────────────────────────────────────────
+let _faData     = null;   // loaded once
+let _faDirty    = {};     // key = "featureId|roleName" → {feature_id, role_name, is_enabled}
+const IS_PORTAL = {{ is_portal_admin | tojson }};
+
+async function loadFeatureAccessMatrix() {
+  const res = await fetch('/api/admin/company/role-feature-access');
+  if (!res.ok) {
+    document.getElementById('fa-matrix-container').innerHTML =
+      '<p style="padding:24px;color:#ef4444">Failed to load feature access data.</p>';
+    return;
+  }
+  _faData = await res.json();
+  _faDirty = {};
+  renderFeatureAccessMatrix();
+}
+
+function renderFeatureAccessMatrix() {
+  const { features, manageable_roles, matrix } = _faData;
+
+  const ROLE_COLORS = {
+    'HR_ADMIN':'#0891b2','DEPARTMENT_HEAD':'#7c3aed','LOCATION_HEAD':'#059669',
+    'SOLID_LINE_MANAGER':'#d97706','DOTTED_LINE_MANAGER':'#db2777',
+    'HIRING_MANAGER':'#6366f1','EMPLOYEE':'#64748b',
+  };
+
+  let html = '<table class="perm-matrix"><thead><tr>';
+  html += '<th class="pm-feature-col">Feature</th>';
+  for (const role of manageable_roles) {
+    const color = ROLE_COLORS[role] || '#64748b';
+    html += `<th class="pm-role-col" colspan="1" style="text-align:center;padding:8px 6px">
+      <div style="font-size:.65rem;font-weight:700;color:${color};white-space:nowrap">${role.replace(/_/g,' ')}</div>
+    </th>`;
+  }
+  html += '</tr></thead><tbody>';
+
+  for (const feat of features) {
+    const fid = feat.id;
+    const featMatrix = matrix[fid] || {};
+    html += `<tr><td class="pm-feature-label">
+      <div style="font-size:.82rem;font-weight:600">${feat.label}</div>
+    </td>`;
+    for (const role of manageable_roles) {
+      const cell = featMatrix[role];
+      if (!cell) {
+        // SYSTEM_ADMIN hasn't granted this role global access — locked off
+        html += `<td class="pm-cell" style="text-align:center">
+          <span title="Not enabled globally by Super Admin" style="color:#cbd5e1;font-size:.75rem">—</span>
+        </td>`;
+        continue;
+      }
+      const effective = cell.effective;
+      const isOverridden = cell.company_override !== null && cell.company_override !== undefined;
+      const key = `${fid}|${role}`;
+      const dirty = _faDirty[key];
+      const checked = dirty !== undefined ? dirty.is_enabled : effective;
+      const isDirtyNow = dirty !== undefined;
+
+      html += `<td class="pm-cell fa-cell${isDirtyNow ? ' pm-cb--dirty' : ''}" style="text-align:center"
+                  data-feature-id="${fid}" data-role="${role}">
+        <label style="display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer">
+          <input type="checkbox" class="fa-cb"
+            data-feature-id="${fid}" data-role="${role}"
+            data-feature-label="${feat.label}"
+            ${checked ? 'checked' : ''}
+            onchange="markFaDirty(this)">
+          ${isOverridden && !isDirtyNow ? `<span style="font-size:.55rem;color:#d97706" title="Overridden by company admin">custom</span>` : ''}
+        </label>
+      </td>`;
+    }
+    html += '</tr>';
+  }
+  html += '</tbody></table>';
+  document.getElementById('fa-matrix-container').innerHTML = html;
+  _updateFaDirtyUI();
+}
+
+function markFaDirty(cb) {
+  const fid  = cb.dataset.featureId;
+  const role = cb.dataset.role;
+  const key  = `${fid}|${role}`;
+  const cell = (_faData.matrix[fid] || {})[role] || {};
+  const orig = cell.effective;
+
+  if (cb.checked !== orig) {
+    _faDirty[key] = { feature_id: fid, role_name: role, is_enabled: cb.checked,
+                      feature_label: cb.dataset.featureLabel };
+  } else {
+    delete _faDirty[key];
+  }
+
+  const td = cb.closest('td');
+  if (td) td.classList.toggle('pm-cb--dirty', key in _faDirty);
+  _updateFaDirtyUI();
+}
+
+function _updateFaDirtyUI() {
+  const count = Object.keys(_faDirty).length;
+  const counter = document.getElementById('fa-dirty-count');
+  const saveBtn = document.getElementById('fa-save-btn');
+  const num     = document.getElementById('fa-dirty-num');
+  if (counter) { counter.style.display = count ? '' : 'none'; if(num) num.textContent = count; }
+  if (saveBtn) saveBtn.style.display = count ? '' : 'none';
+}
+
+async function saveFeatureAccessChanges() {
+  const changes = Object.values(_faDirty);
+  if (!changes.length) return;
+  const saveBtn = document.getElementById('fa-save-btn');
+  saveBtn.disabled = true;
+  saveBtn.textContent = 'Saving…';
+
+  let ok = true;
+  for (const ch of changes) {
+    const res = await fetch('/api/admin/company/role-feature-access', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ feature_id: ch.feature_id, role_name: ch.role_name, is_enabled: ch.is_enabled }),
+    });
+    if (!res.ok) { ok = false; break; }
+  }
+
+  if (ok) {
+    await loadFeatureAccessMatrix();
+  } else {
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'Save Changes';
+    alert('Some changes failed to save. Please try again.');
+  }
 }
 
 // ── Bootstrap ───────────────────────────────────────────────────────────────

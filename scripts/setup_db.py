@@ -102,14 +102,15 @@ def step3_fix_tech_admin(cur):
 def step4_seed_portal_features(cur):
     """Insert the 8 portal feature areas and default role → feature access rows."""
     features = [
-        ('employee_profiles', 'Employee Profiles',      'View and manage employee personal, role and org data',      1),
-        ('org_structure',     'Organisation Structure',  'Manage business units, locations and functional units',     2),
-        ('user_accounts',     'User Accounts',           'Create, enable/disable and assign roles to portal users',   3),
-        ('skills',            'Skills & Certifications', 'View, validate and manage skill profiles',                  4),
-        ('vacations',         'Vacations & Leave',       'Manage vacation types, entitlements and leave requests',    5),
-        ('reports',           'Reports & Analytics',     'Access competency dashboards and analytics',                6),
-        ('company_settings',  'Company Settings',        'Edit company branding, logo, theme and metadata',           7),
-        ('system_config',     'System Configuration',    'Widget settings and global platform config',                8),
+        ('employee_profiles',    'Employee Profiles',       'View and manage employee personal, role and org data',      1),
+        ('org_structure',        'Organisation Structure',   'Manage business units, locations and functional units',     2),
+        ('user_accounts',        'User Accounts',            'Create, enable/disable and assign roles to portal users',   3),
+        ('skills',               'Skills & Certifications',  'View, validate and manage skill profiles',                  4),
+        ('vacations',            'Vacations & Leave',        'Manage vacation types, entitlements and leave requests',    5),
+        ('reports',              'Reports & Analytics',      'Access competency dashboards and analytics',                6),
+        ('company_settings',     'Company Settings',         'Edit company branding, logo, theme and metadata',           7),
+        ('system_config',        'System Configuration',     'Widget settings and global platform config',                8),
+        ('skills_intelligence',  'Skills Intelligence',      'Benchmark company skills against industry trends',          9),
     ]
     for code, label, desc, order in features:
         cur.execute(
@@ -133,18 +134,20 @@ def step4_seed_portal_features(cur):
                                 ('reports',           True, False, False)],
         'LOCATION_HEAD':       [('employee_profiles', True, False, False),
                                 ('reports',           True, False, False)],
-        'HR_ADMIN':            [('employee_profiles', True, True,  True),
-                                ('org_structure',     True, True,  True),
-                                ('skills',            True, True,  True),
-                                ('vacations',         True, True,  True),
-                                ('reports',           True, True,  False)],
-        'PORTAL_ADMIN':        [('employee_profiles', True, True,  True),
-                                ('org_structure',     True, True,  True),
-                                ('user_accounts',     True, True,  True),
-                                ('skills',            True, True,  True),
-                                ('vacations',         True, True,  True),
-                                ('reports',           True, True,  False),
-                                ('company_settings',  True, True,  False)],
+        'HR_ADMIN':            [('employee_profiles',   True, True,  True),
+                                ('org_structure',       True, True,  True),
+                                ('skills',              True, True,  True),
+                                ('vacations',           True, True,  True),
+                                ('reports',             True, True,  False),
+                                ('skills_intelligence', True, False, False)],
+        'PORTAL_ADMIN':        [('employee_profiles',   True, True,  True),
+                                ('org_structure',       True, True,  True),
+                                ('user_accounts',       True, True,  True),
+                                ('skills',              True, True,  True),
+                                ('vacations',           True, True,  True),
+                                ('reports',             True, True,  False),
+                                ('company_settings',    True, True,  False),
+                                ('skills_intelligence', True, True,  False)],
     }
     for role_name, perms in access_map.items():
         for feat_code, r, w, d in perms:
