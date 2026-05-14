@@ -51,6 +51,10 @@
   <button class="an-tab"        data-tab="search"    onclick="switchTab(this,'search')">🔍 Search</button>
 </div>
 
+<div id="an-scope-banner" style="display:none;background:#faf5ff;border:1px solid #d8b4fe;border-radius:10px;padding:10px 16px;margin-bottom:14px;font-size:.82rem;color:#6b21a8;display:flex;align-items:center;gap:8px">
+  <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+  <span><strong>Your Team View</strong> — data is scoped to employees in your team. Organisation-wide data is visible to HR Admin and above.</span>
+</div>
 <div id="an-error" class="an-error" style="display:none"></div>
 
 <!-- ════════════════════════════════════════════════════════════════════════ -->
@@ -474,6 +478,8 @@ async function _loadOverview() {
   try {
     const d = await _fetch('/api/analytics/overview?' + _qs());
     _loaded.overview = true;
+    const scopeBanner = document.getElementById('an-scope-banner');
+    if (scopeBanner) scopeBanner.style.display = d._scoped ? 'flex' : 'none';
 
     _kpiCards('ov-kpis', [
       { label: 'Total Page Views',  value: d.totals?.total_views  ?? 0 },

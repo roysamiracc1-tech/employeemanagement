@@ -56,3 +56,71 @@ def sub_roles(role: str):
                 seen.add(child)
                 queue.append(child)
     return list(seen)
+
+
+def resolve_report_scope(emp_id: str, roles: list) -> list | None:
+    """
+    Returns a list of employee UUIDs the user can see data for.
+    Returns None for full-company scope (SYSTEM_ADMIN / PORTAL_ADMIN / HR_ADMIN).
+    Manager roles get their team subtree only.
+    """
+    from app.db import query
+    if any(r in roles for r in ('SYSTEM_ADMIN', 'PORTAL_ADMIN', 'HR_ADMIN')):
+        return None
+
+    ids: set = set()
+
+    if 'SOLID_LINE_MANAGER' in roles:
+        # Recursive solid-line subtree
+        rows = query("""
+            WITH RECURSIVE sub AS (
+                SELECT employee_id::text FROM manager_relationships
+                WHERE manager_id = %s::uuid AND relationship_type = 'SOLID_LINE' AND is_current
+                UNION ALL
+                SELECT mr.employee_id::text FROM manager_relationships mr
+                JOIN sub ON sub.employee_id = mr.manager_id::text
+                WHERE mr.relationship_type = 'SOLID_LINE' AND mr.is_current
+            ) SELECT employee_id FROM sub
+        """, (emp_id,))
+        ids.update(r['employee_id'] for r in rows)
+
+    if 'DOTTED_LINE_MANAGER' in roles:
+        rows = query(
+            "SELECT employee_id::text FROM manager_relationships "
+            "WHERE manager_id = %s::uuid AND relationship_type = 'DOTTED_LINE' AND is_current",
+            (emp_id,))
+        ids.update(r['employee_id'] for r in rows)
+
+    if 'DEPARTMENT_HEAD' in roles:
+        rows = query("""
+            SELECT DISTINCT e.id::text
+            FROM employees e
+            JOIN employee_org_assignments oa ON oa.employee_id = e.id AND oa.is_current
+            WHERE oa.business_unit_id IN (
+                SELECT oa2.business_unit_id FROM employee_org_assignments oa2
+                WHERE oa2.employee_id = %s::uuid AND oa2.is_current
+            ) AND e.employment_status = 'ACTIVE'
+        """, (emp_id,))
+        ids.update(r['id'] for r in rows)
+
+    if 'LOCATION_HEAD' in roles:
+        rows = query("""
+            SELECT DISTINCT e.id::text
+            FROM employees e
+            JOIN employee_org_assignments oa ON oa.employee_id = e.id AND oa.is_current
+            WHERE oa.location_id IN (
+                SELECT oa2.location_id FROM employee_org_assignments oa2
+                WHERE oa2.employee_id = %s::uuid AND oa2.is_current
+            ) AND e.employment_status = 'ACTIVE'
+        """, (emp_id,))
+        ids.update(r['id'] for r in rows)
+
+    if 'HIRING_MANAGER' in roles:
+        # Hiring managers see their solid-line direct reports only
+        rows = query(
+            "SELECT employee_id::text FROM manager_relationships "
+            "WHERE manager_id = %s::uuid AND relationship_type = 'SOLID_LINE' AND is_current",
+            (emp_id,))
+        ids.update(r['employee_id'] for r in rows)
+
+    return list(ids)

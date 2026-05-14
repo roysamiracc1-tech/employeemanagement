@@ -77,6 +77,22 @@ def _resolve_company():
     return current_company_id() or session.get('company_id')
 
 
+def _resolve_scope():
+    """Returns (company_id, emp_ids, is_scoped) for the current user."""
+    from app.services.company_scope import resolve_report_scope
+    roles = session.get('roles', [])
+    emp_id = session.get('employee_id')
+
+    if 'SYSTEM_ADMIN' in roles:
+        company_id = request.args.get('company_id') or session.get('admin_company_id')
+        return company_id, None, False
+
+    company_id = session.get('company_id') or session.get('admin_company_id')
+    emp_ids = resolve_report_scope(emp_id, roles)
+    is_scoped = emp_ids is not None
+    return company_id, emp_ids, is_scoped
+
+
 # ── feature toggle (SYSTEM_ADMIN only) ───────────────────────────────────────
 
 @app.route('/api/admin/company-features/<company_id>/toggle', methods=['POST'])
@@ -175,14 +191,15 @@ def admin_analytics():
 @app.route('/api/analytics/overview')
 @require_feature_access(_FEATURE_CODE)
 def api_analytics_overview():
-    company_id = _resolve_company()
-    if not company_id:
+    company_id, emp_ids, is_scoped = _resolve_scope()
+    if not company_id and emp_ids is None:
         return jsonify({'error': 'Select a company'}), 400
     blocked = _check_analytics_access(company_id)
     if blocked:
         return blocked
     start, end = _parse_range()
-    return jsonify(svc.get_overview(company_id, start, end))
+    data = svc.get_overview(company_id, start, end, emp_ids=emp_ids)
+    return jsonify({**data, '_scoped': is_scoped})
 
 
 # ── API — vacation ────────────────────────────────────────────────────────────
@@ -190,15 +207,16 @@ def api_analytics_overview():
 @app.route('/api/analytics/vacation')
 @require_feature_access(_FEATURE_CODE)
 def api_analytics_vacation():
-    company_id = _resolve_company()
-    if not company_id:
+    company_id, emp_ids, is_scoped = _resolve_scope()
+    if not company_id and emp_ids is None:
         return jsonify({'error': 'Select a company'}), 400
     blocked = _check_analytics_access(company_id)
     if blocked:
         return blocked
     start, end = _parse_range()
     group_by   = request.args.get('group_by', 'company')
-    return jsonify(svc.get_vacation_analytics(company_id, start, end, group_by))
+    data = svc.get_vacation_analytics(company_id, start, end, group_by, emp_ids=emp_ids)
+    return jsonify({**data, '_scoped': is_scoped})
 
 
 # ── API — skills ──────────────────────────────────────────────────────────────
@@ -206,14 +224,15 @@ def api_analytics_vacation():
 @app.route('/api/analytics/skills')
 @require_feature_access(_FEATURE_CODE)
 def api_analytics_skills():
-    company_id = _resolve_company()
-    if not company_id:
+    company_id, emp_ids, is_scoped = _resolve_scope()
+    if not company_id and emp_ids is None:
         return jsonify({'error': 'Select a company'}), 400
     blocked = _check_analytics_access(company_id)
     if blocked:
         return blocked
     start, end = _parse_range()
-    return jsonify(svc.get_skills_analytics(company_id, start, end))
+    data = svc.get_skills_analytics(company_id, start, end, emp_ids=emp_ids)
+    return jsonify({**data, '_scoped': is_scoped})
 
 
 # ── API — org ─────────────────────────────────────────────────────────────────
@@ -221,14 +240,15 @@ def api_analytics_skills():
 @app.route('/api/analytics/org')
 @require_feature_access(_FEATURE_CODE)
 def api_analytics_org():
-    company_id = _resolve_company()
-    if not company_id:
+    company_id, emp_ids, is_scoped = _resolve_scope()
+    if not company_id and emp_ids is None:
         return jsonify({'error': 'Select a company'}), 400
     blocked = _check_analytics_access(company_id)
     if blocked:
         return blocked
     start, end = _parse_range()
-    return jsonify(svc.get_org_analytics(company_id, start, end))
+    data = svc.get_org_analytics(company_id, start, end, emp_ids=emp_ids)
+    return jsonify({**data, '_scoped': is_scoped})
 
 
 # ── API — search ──────────────────────────────────────────────────────────────
@@ -236,14 +256,15 @@ def api_analytics_org():
 @app.route('/api/analytics/search')
 @require_feature_access(_FEATURE_CODE)
 def api_analytics_search():
-    company_id = _resolve_company()
-    if not company_id:
+    company_id, emp_ids, is_scoped = _resolve_scope()
+    if not company_id and emp_ids is None:
         return jsonify({'error': 'Select a company'}), 400
     blocked = _check_analytics_access(company_id)
     if blocked:
         return blocked
     start, end = _parse_range()
-    return jsonify(svc.get_search_analytics(company_id, start, end))
+    data = svc.get_search_analytics(company_id, start, end, emp_ids=emp_ids)
+    return jsonify({**data, '_scoped': is_scoped})
 
 
 # ── API — CSV export ──────────────────────────────────────────────────────────
@@ -252,8 +273,8 @@ def api_analytics_search():
 @require_feature_access(_FEATURE_CODE)
 def api_analytics_export_csv():
     """Export one analytics section as a downloadable CSV."""
-    company_id = _resolve_company()
-    if not company_id:
+    company_id, emp_ids, is_scoped = _resolve_scope()
+    if not company_id and emp_ids is None:
         return jsonify({'error': 'Select a company'}), 400
     blocked = _check_analytics_access(company_id)
     if blocked:
@@ -266,20 +287,20 @@ def api_analytics_export_csv():
     filename = f'analytics_{section}_{start}_{end}.csv'
 
     if section == 'overview':
-        data = svc.get_overview(company_id, start, end)
+        data = svc.get_overview(company_id, start, end, emp_ids=emp_ids)
         rows = data.get('feature_adoption', [])
     elif section == 'vacation':
         data = svc.get_vacation_analytics(
-            company_id, start, end, request.args.get('group_by', 'company'))
+            company_id, start, end, request.args.get('group_by', 'company'), emp_ids=emp_ids)
         rows = data.get('drilldown', [])
     elif section == 'skills':
-        data = svc.get_skills_analytics(company_id, start, end)
+        data = svc.get_skills_analytics(company_id, start, end, emp_ids=emp_ids)
         rows = data.get('emp_completeness', [])
     elif section == 'org':
-        data = svc.get_org_analytics(company_id, start, end)
+        data = svc.get_org_analytics(company_id, start, end, emp_ids=emp_ids)
         rows = data.get('span_table', [])
     elif section == 'search':
-        data = svc.get_search_analytics(company_id, start, end)
+        data = svc.get_search_analytics(company_id, start, end, emp_ids=emp_ids)
         rows = data.get('top_terms', [])
 
     if not rows:

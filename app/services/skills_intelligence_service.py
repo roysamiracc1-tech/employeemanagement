@@ -45,20 +45,28 @@ _TECH_TO_SKILL = {
 }
 
 
-def _emp_count(company_id: str) -> int:
-    r = query("""
-        SELECT COUNT(*)::int AS n FROM employees
-        WHERE company_id = %s::uuid AND employment_status = 'ACTIVE'
-    """, (company_id,), one=True)
+def _scope(company_id: str | None, emp_ids: list | None):
+    """Return (where_clause, param) for scoping to company or employee list."""
+    if emp_ids is not None:
+        return "e.id = ANY(%s::uuid[])", emp_ids
+    return "e.company_id = %s::uuid", company_id
+
+
+def _emp_count(company_id: str | None, emp_ids: list | None = None) -> int:
+    wh, param = _scope(company_id, emp_ids)
+    wh = wh.replace('e.', '')  # bare table, no alias
+    r = query(f"SELECT COUNT(*)::int AS n FROM employees WHERE {wh} AND employment_status='ACTIVE'",
+              (param,), one=True)
     return (r or {}).get('n', 1) or 1
 
 
 # ── KPI summary ───────────────────────────────────────────────────────────────
 
-def get_kpi_summary(company_id: str) -> dict:
-    total = _emp_count(company_id)
+def get_kpi_summary(company_id: str, emp_ids: list | None = None) -> dict:
+    total = _emp_count(company_id, emp_ids)
+    wh, sc = _scope(company_id, emp_ids)
 
-    r = query("""
+    r = query(f"""
         SELECT
             COUNT(DISTINCT es.employee_id)::int              AS emps_with_skills,
             COUNT(*)::int                                     AS total_entries,
@@ -72,8 +80,8 @@ def get_kpi_summary(company_id: str) -> dict:
             )                                                 AS avg_yoe
         FROM employee_skills es
         JOIN employees e ON e.id = es.employee_id
-        WHERE e.company_id = %s::uuid AND e.employment_status = 'ACTIVE'
-    """, (total, company_id), one=True) or {}
+        WHERE {wh} AND e.employment_status = 'ACTIVE'
+    """, (total, sc), one=True) or {}
 
     val = r.get('validated', 0) or 0
     total_entries = r.get('total_entries', 0) or 0
@@ -90,9 +98,10 @@ def get_kpi_summary(company_id: str) -> dict:
 
 # ── Coverage by skill category ────────────────────────────────────────────────
 
-def get_category_coverage(company_id: str) -> list:
-    total = _emp_count(company_id)
-    rows = query("""
+def get_category_coverage(company_id: str, emp_ids: list | None = None) -> list:
+    total = _emp_count(company_id, emp_ids)
+    wh, sc = _scope(company_id, emp_ids)
+    rows = query(f"""
         SELECT
             sc.name                                           AS category,
             COUNT(DISTINCT es.employee_id)::int               AS emps_with_skill,
@@ -102,18 +111,19 @@ def get_category_coverage(company_id: str) -> list:
         JOIN skills s ON s.skill_category_id = sc.id
         JOIN employee_skills es ON es.skill_id = s.id
         JOIN employees e ON e.id = es.employee_id
-        WHERE e.company_id = %s::uuid AND e.employment_status = 'ACTIVE'
+        WHERE {wh} AND e.employment_status = 'ACTIVE'
         GROUP BY sc.name
         ORDER BY coverage_pct DESC
-    """, (total, company_id))
+    """, (total, sc))
     return [to_dict(r) for r in rows]
 
 
 # ── Top skills (strength) ─────────────────────────────────────────────────────
 
-def get_top_skills(company_id: str, limit: int = 20) -> list:
-    total = _emp_count(company_id)
-    rows = query("""
+def get_top_skills(company_id: str, limit: int = 20, emp_ids: list | None = None) -> list:
+    total = _emp_count(company_id, emp_ids)
+    wh, sc = _scope(company_id, emp_ids)
+    rows = query(f"""
         SELECT
             s.name                                            AS skill,
             sc.name                                           AS category,
@@ -125,19 +135,20 @@ def get_top_skills(company_id: str, limit: int = 20) -> list:
         JOIN skills s ON s.id = es.skill_id
         JOIN skill_categories sc ON sc.id = s.skill_category_id
         JOIN employees e ON e.id = es.employee_id
-        WHERE e.company_id = %s::uuid AND e.employment_status = 'ACTIVE'
+        WHERE {wh} AND e.employment_status = 'ACTIVE'
         GROUP BY s.name, sc.name
         ORDER BY emp_count DESC
         LIMIT %s
-    """, (total, company_id, limit))
+    """, (total, sc, limit))
     return [to_dict(r) for r in rows]
 
 
 # ── Benchmark gap analysis ────────────────────────────────────────────────────
 
-def get_benchmark_gaps(company_id: str, year: int = 2025) -> list:
+def get_benchmark_gaps(company_id: str, year: int = 2025, emp_ids: list | None = None) -> list:
     """For each SO benchmark technology (skill-crossmatchable), compare company % vs industry %."""
-    total = _emp_count(company_id)
+    total = _emp_count(company_id, emp_ids)
+    wh, sc = _scope(company_id, emp_ids)
 
     bench_rows = query("""
         SELECT technology, usage_pct, desired_pct, admired_pct,
@@ -154,15 +165,15 @@ def get_benchmark_gaps(company_id: str, year: int = 2025) -> list:
     bench = [to_dict(r) for r in bench_rows]
 
     # Build company skill counts indexed by lowercase name
-    skill_counts = query("""
+    skill_counts = query(f"""
         SELECT s.name AS skill_name,
                COUNT(DISTINCT es.employee_id)::int AS emp_count
         FROM employee_skills es
         JOIN skills s ON s.id = es.skill_id
         JOIN employees e ON e.id = es.employee_id
-        WHERE e.company_id = %s::uuid AND e.employment_status = 'ACTIVE'
+        WHERE {wh} AND e.employment_status = 'ACTIVE'
         GROUP BY s.name
-    """, (company_id,))
+    """, (sc,))
     company_map = {r['skill_name'].lower(): r['emp_count'] for r in skill_counts}
 
     result = []
@@ -198,19 +209,20 @@ def get_benchmark_gaps(company_id: str, year: int = 2025) -> list:
 
 # ── Proficiency heatmap (skill × proficiency_level) ──────────────────────────
 
-def get_proficiency_heatmap(company_id: str) -> dict:
+def get_proficiency_heatmap(company_id: str, emp_ids: list | None = None) -> dict:
     """Returns skills × proficiency matrix for top 15 skills."""
-    rows = query("""
+    wh, sc = _scope(company_id, emp_ids)
+    rows = query(f"""
         SELECT s.name AS skill, pl.level_name AS level,
                COUNT(DISTINCT es.employee_id)::int AS cnt
         FROM employee_skills es
         JOIN skills s ON s.id = es.skill_id
         JOIN proficiency_levels pl ON pl.id = es.self_rating_level_id
         JOIN employees e ON e.id = es.employee_id
-        WHERE e.company_id = %s::uuid AND e.employment_status = 'ACTIVE'
+        WHERE {wh} AND e.employment_status = 'ACTIVE'
         GROUP BY s.name, pl.level_name, pl.level_order
         ORDER BY s.name, pl.level_order
-    """, (company_id,))
+    """, (sc,))
 
     # Aggregate into {skill: {level: count}}
     matrix = {}
@@ -230,9 +242,10 @@ def get_proficiency_heatmap(company_id: str) -> dict:
 
 # ── Trend alignment — desired vs company adoption ────────────────────────────
 
-def get_trend_alignment(company_id: str, year: int = 2025) -> list:
+def get_trend_alignment(company_id: str, year: int = 2025, emp_ids: list | None = None) -> list:
     """Compare desired_pct (what devs want) vs company adoption — find emerging opportunities."""
-    total = _emp_count(company_id)
+    total = _emp_count(company_id, emp_ids)
+    wh, sc = _scope(company_id, emp_ids)
 
     bench = query("""
         SELECT technology, desired_pct, usage_pct, category, sankey_role
@@ -246,15 +259,15 @@ def get_trend_alignment(company_id: str, year: int = 2025) -> list:
         LIMIT 30
     """, (year,))
 
-    skill_counts = query("""
+    skill_counts = query(f"""
         SELECT s.name AS skill_name,
                COUNT(DISTINCT es.employee_id)::int AS emp_count
         FROM employee_skills es
         JOIN skills s ON s.id = es.skill_id
         JOIN employees e ON e.id = es.employee_id
-        WHERE e.company_id = %s::uuid AND e.employment_status = 'ACTIVE'
+        WHERE {wh} AND e.employment_status = 'ACTIVE'
         GROUP BY s.name
-    """, (company_id,))
+    """, (sc,))
     company_map = {r['skill_name'].lower(): r['emp_count'] for r in skill_counts}
 
     result = []
@@ -285,10 +298,10 @@ def get_trend_alignment(company_id: str, year: int = 2025) -> list:
 
 # ── Department skill coverage ─────────────────────────────────────────────────
 
-def get_job_title_coverage(company_id: str) -> list:
+def get_job_title_coverage(company_id: str, emp_ids: list | None = None) -> list:
     """Top 10 job titles + their skill coverage."""
-    total = _emp_count(company_id)
-    rows = query("""
+    wh, sc = _scope(company_id, emp_ids)
+    rows = query(f"""
         SELECT
             e.job_title,
             COUNT(DISTINCT e.id)::int                          AS headcount,
@@ -298,41 +311,43 @@ def get_job_title_coverage(company_id: str) -> list:
                   NULLIF(COUNT(DISTINCT e.id),0) * 100, 1)    AS coverage_pct
         FROM employees e
         LEFT JOIN employee_skills es ON es.employee_id = e.id
-        WHERE e.company_id = %s::uuid AND e.employment_status = 'ACTIVE'
+        WHERE {wh} AND e.employment_status = 'ACTIVE'
           AND e.job_title IS NOT NULL
         GROUP BY e.job_title
         ORDER BY headcount DESC
         LIMIT 10
-    """, (company_id,))
+    """, (sc,))
     return [to_dict(r) for r in rows]
 
 
 # ── Validation funnel ─────────────────────────────────────────────────────────
 
-def get_validation_funnel(company_id: str) -> list:
-    rows = query("""
+def get_validation_funnel(company_id: str, emp_ids: list | None = None) -> list:
+    wh, sc = _scope(company_id, emp_ids)
+    rows = query(f"""
         SELECT es.validation_status, COUNT(*)::int AS cnt
         FROM employee_skills es
         JOIN employees e ON e.id = es.employee_id
-        WHERE e.company_id = %s::uuid AND e.employment_status = 'ACTIVE'
+        WHERE {wh} AND e.employment_status = 'ACTIVE'
         GROUP BY es.validation_status
         ORDER BY cnt DESC
-    """, (company_id,))
+    """, (sc,))
     return [to_dict(r) for r in rows]
 
 
 # ── Skill growth over time (entries created per month) ───────────────────────
 
-def get_skill_growth(company_id: str) -> list:
-    rows = query("""
+def get_skill_growth(company_id: str, emp_ids: list | None = None) -> list:
+    wh, sc = _scope(company_id, emp_ids)
+    rows = query(f"""
         SELECT
             TO_CHAR(DATE_TRUNC('month', es.created_at), 'YYYY-MM') AS month,
             COUNT(*)::int AS new_entries
         FROM employee_skills es
         JOIN employees e ON e.id = es.employee_id
-        WHERE e.company_id = %s::uuid AND e.employment_status = 'ACTIVE'
+        WHERE {wh} AND e.employment_status = 'ACTIVE'
           AND es.created_at >= NOW() - INTERVAL '12 months'
         GROUP BY DATE_TRUNC('month', es.created_at)
         ORDER BY 1
-    """, (company_id,))
+    """, (sc,))
     return [to_dict(r) for r in rows]

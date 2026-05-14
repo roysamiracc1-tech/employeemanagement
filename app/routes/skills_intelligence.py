@@ -35,6 +35,17 @@ def _check_si_company_access(company_id: str):
     return True, None
 
 
+def _resolve_si_scope():
+    """Returns (company_id, emp_ids, is_scoped) for the current user."""
+    from app.services.company_scope import resolve_report_scope
+    roles = session.get('roles', [])
+    emp_id = session.get('employee_id')
+    company_id = request.args.get('company_id') or current_company_id()
+    emp_ids = resolve_report_scope(emp_id, roles)
+    is_scoped = emp_ids is not None
+    return company_id, emp_ids, is_scoped
+
+
 # ── Page ──────────────────────────────────────────────────────────────────────
 
 @app.route('/admin/skills-intelligence')
@@ -63,11 +74,12 @@ def admin_skills_intelligence():
 @app.route('/api/admin/skills-intelligence/kpi')
 @require_feature_access('skills_intelligence')
 def api_si_kpi():
-    company_id = request.args.get('company_id') or current_company_id()
+    company_id, emp_ids, is_scoped = _resolve_si_scope()
     ok, err = _check_si_company_access(company_id)
     if not ok:
         return err
-    return jsonify(svc.get_kpi_summary(company_id))
+    data = svc.get_kpi_summary(company_id, emp_ids=emp_ids)
+    return jsonify({**data, '_scoped': is_scoped})
 
 
 # ── API: category coverage ────────────────────────────────────────────────────
@@ -75,11 +87,11 @@ def api_si_kpi():
 @app.route('/api/admin/skills-intelligence/coverage')
 @require_feature_access('skills_intelligence')
 def api_si_coverage():
-    company_id = request.args.get('company_id') or current_company_id()
+    company_id, emp_ids, _ = _resolve_si_scope()
     ok, err = _check_si_company_access(company_id)
     if not ok:
         return err
-    return jsonify(svc.get_category_coverage(company_id))
+    return jsonify(svc.get_category_coverage(company_id, emp_ids=emp_ids))
 
 
 # ── API: top skills ───────────────────────────────────────────────────────────
@@ -87,11 +99,11 @@ def api_si_coverage():
 @app.route('/api/admin/skills-intelligence/top-skills')
 @require_feature_access('skills_intelligence')
 def api_si_top_skills():
-    company_id = request.args.get('company_id') or current_company_id()
+    company_id, emp_ids, _ = _resolve_si_scope()
     ok, err = _check_si_company_access(company_id)
     if not ok:
         return err
-    return jsonify(svc.get_top_skills(company_id))
+    return jsonify(svc.get_top_skills(company_id, emp_ids=emp_ids))
 
 
 # ── API: benchmark gaps ───────────────────────────────────────────────────────
@@ -99,12 +111,12 @@ def api_si_top_skills():
 @app.route('/api/admin/skills-intelligence/gaps')
 @require_feature_access('skills_intelligence')
 def api_si_gaps():
-    company_id = request.args.get('company_id') or current_company_id()
+    company_id, emp_ids, _ = _resolve_si_scope()
     year = int(request.args.get('year', 2025))
     ok, err = _check_si_company_access(company_id)
     if not ok:
         return err
-    return jsonify(svc.get_benchmark_gaps(company_id, year))
+    return jsonify(svc.get_benchmark_gaps(company_id, year, emp_ids=emp_ids))
 
 
 # ── API: proficiency heatmap ──────────────────────────────────────────────────
@@ -112,11 +124,11 @@ def api_si_gaps():
 @app.route('/api/admin/skills-intelligence/heatmap')
 @require_feature_access('skills_intelligence')
 def api_si_heatmap():
-    company_id = request.args.get('company_id') or current_company_id()
+    company_id, emp_ids, _ = _resolve_si_scope()
     ok, err = _check_si_company_access(company_id)
     if not ok:
         return err
-    return jsonify(svc.get_proficiency_heatmap(company_id))
+    return jsonify(svc.get_proficiency_heatmap(company_id, emp_ids=emp_ids))
 
 
 # ── API: trend alignment ──────────────────────────────────────────────────────
@@ -124,12 +136,12 @@ def api_si_heatmap():
 @app.route('/api/admin/skills-intelligence/trends')
 @require_feature_access('skills_intelligence')
 def api_si_trends():
-    company_id = request.args.get('company_id') or current_company_id()
+    company_id, emp_ids, _ = _resolve_si_scope()
     year = int(request.args.get('year', 2025))
     ok, err = _check_si_company_access(company_id)
     if not ok:
         return err
-    return jsonify(svc.get_trend_alignment(company_id, year))
+    return jsonify(svc.get_trend_alignment(company_id, year, emp_ids=emp_ids))
 
 
 # ── API: job title coverage ───────────────────────────────────────────────────
@@ -137,11 +149,11 @@ def api_si_trends():
 @app.route('/api/admin/skills-intelligence/job-coverage')
 @require_feature_access('skills_intelligence')
 def api_si_job_coverage():
-    company_id = request.args.get('company_id') or current_company_id()
+    company_id, emp_ids, _ = _resolve_si_scope()
     ok, err = _check_si_company_access(company_id)
     if not ok:
         return err
-    return jsonify(svc.get_job_title_coverage(company_id))
+    return jsonify(svc.get_job_title_coverage(company_id, emp_ids=emp_ids))
 
 
 # ── API: validation funnel ────────────────────────────────────────────────────
@@ -149,11 +161,11 @@ def api_si_job_coverage():
 @app.route('/api/admin/skills-intelligence/validation')
 @require_feature_access('skills_intelligence')
 def api_si_validation():
-    company_id = request.args.get('company_id') or current_company_id()
+    company_id, emp_ids, _ = _resolve_si_scope()
     ok, err = _check_si_company_access(company_id)
     if not ok:
         return err
-    return jsonify(svc.get_validation_funnel(company_id))
+    return jsonify(svc.get_validation_funnel(company_id, emp_ids=emp_ids))
 
 
 # ── API: skill growth ─────────────────────────────────────────────────────────
@@ -161,11 +173,11 @@ def api_si_validation():
 @app.route('/api/admin/skills-intelligence/growth')
 @require_feature_access('skills_intelligence')
 def api_si_growth():
-    company_id = request.args.get('company_id') or current_company_id()
+    company_id, emp_ids, _ = _resolve_si_scope()
     ok, err = _check_si_company_access(company_id)
     if not ok:
         return err
-    return jsonify(svc.get_skill_growth(company_id))
+    return jsonify(svc.get_skill_growth(company_id, emp_ids=emp_ids))
 
 
 # ── API: toggle enabled_for_hr ────────────────────────────────────────────────

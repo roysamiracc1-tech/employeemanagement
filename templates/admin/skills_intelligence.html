@@ -136,6 +136,12 @@
 <!-- ── Main content (shown after company selected) ───────────────────────── -->
 <div id="si-main" style="display:none">
 
+  <!-- Team scope banner -->
+  <div id="si-scope-banner" style="display:none;background:#faf5ff;border:1px solid #d8b4fe;border-radius:10px;padding:10px 16px;margin-bottom:14px;font-size:.82rem;color:#6b21a8;align-items:center;gap:8px">
+    <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    <span><strong>Your Team View</strong> — all metrics are scoped to employees in your team. Organisation-wide data is visible to HR Admin and above.</span>
+  </div>
+
   <!-- Low data warning -->
   <div id="si-low-data" class="an-error" style="display:none;background:#fffbeb;border-color:#fcd34d;color:#92400e">
     ⚠ <strong>Limited data:</strong> Fewer than 5 employees have skills recorded. Some metrics may not be meaningful.
@@ -535,6 +541,8 @@ function _kpiCards(containerId, cards) {
 async function loadKpi() {
   try {
     const d = await apiFetch('/api/admin/skills-intelligence/kpi');
+    const scopeBanner = qs('si-scope-banner');
+    if (scopeBanner) scopeBanner.style.display = d._scoped ? 'flex' : 'none';
     qs('si-low-data').style.display = d.emps_with_skills < 5 ? '' : 'none';
     _kpiCards('si-kpis', [
       { label: 'Total Employees',   value: numFmt(d.total_employees) },
