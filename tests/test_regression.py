@@ -162,6 +162,89 @@ class TestCompanyRolesIsolation:
             assert d['matrix'] == {}, \
                 "When a company has no roles, the access matrix must be empty."
 
+    def test_roles_for_context_never_returns_other_company_roles(self, app):
+        """
+        _roles_for_context() must ONLY return roles WHERE company_id = the active
+        company. It must never return roles from other companies or global template
+        roles (company_id IS NULL like EMPLOYEE, HR_ADMIN, DEPARTMENT_HEAD etc.).
+        This is the bug that caused the register-user form to show duplicate roles
+        from Telia and Acme Corp when SA was managing Sam company.
+        """
+        COMPANY_A = '00000000-0000-0000-0000-000000000001'
+        COMPANY_B = '00000000-0000-0000-0000-000000000002'
+        queries_executed = []
+
+        def mock_query(sql, params=(), one=False):
+            queries_executed.append((sql, params))
+            return []
+
+        with app.test_client() as c:
+            with c.session_transaction() as s:
+                s['user_id']          = 'user-sa'
+                s['employee_id']      = 'emp-sa'
+                s['roles']            = ['SYSTEM_ADMIN']
+                s['admin_company_id'] = COMPANY_A
+                s['branding']         = {}
+
+            with app.app_context():
+                with patch('app.routes.admin.query', side_effect=mock_query):
+                    from app.routes.admin import _roles_for_context
+                    with app.test_request_context('/admin'):
+                        from flask import session
+                        session['roles']            = ['SYSTEM_ADMIN']
+                        session['admin_company_id'] = COMPANY_A
+                        _roles_for_context()
+
+        roles_queries = [(sql, p) for sql, p in queries_executed if 'FROM roles' in sql]
+        for sql, params in roles_queries:
+            assert 'company_id IS NULL' not in sql, (
+                "_roles_for_context must not query global (company_id IS NULL) roles. "
+                f"Bad query: {sql}"
+            )
+            if params:
+                assert COMPANY_B not in str(params), (
+                    f"_roles_for_context must not query Company B roles when Company A is active. "
+                    f"Params: {params}"
+                )
+            assert 'company_id = %s' in sql or 'company_id=%s' in sql, (
+                "_roles_for_context must filter by specific company_id only. "
+                f"Query missing company_id filter: {sql}"
+            )
+
+    def test_register_user_form_uses_scoped_roles(self, app):
+        """
+        The /admin/register-user page must use _roles_for_context() — not a bare
+        'SELECT * FROM roles' — so that only the active company's roles appear
+        in the role checkboxes. Showing roles from other companies in the form
+        is a data-isolation bug that confuses admins and could lead to wrong
+        role assignments.
+        """
+        with app.test_client() as c:
+            with c.session_transaction() as s:
+                s['user_id']          = 'user-pa'
+                s['employee_id']      = 'emp-pa'
+                s['roles']            = ['PORTAL_ADMIN']
+                s['company_id']       = '00000000-0000-0000-0000-000000000001'
+                s['branding']         = {}
+
+            calls = []
+            original = __import__('app.routes.admin', fromlist=['_roles_for_context'])._roles_for_context
+
+            def tracked_roles_for_context():
+                calls.append(True)
+                return []
+
+            with patch('app.routes.admin._roles_for_context', side_effect=tracked_roles_for_context), \
+                 patch('app.routes.admin.query', return_value=[]), \
+                 patch('app.routes.admin.next_employee_number', return_value='EMP-001'), \
+                 patch('app.auth._load_feature_access', return_value={'employee_profiles': {'r': True, 'w': True, 'd': True}}):
+                c.get('/admin/register-user')
+
+            assert len(calls) > 0, (
+                "/admin/register-user must call _roles_for_context() for role list, "
+                "not a bare SELECT * FROM roles query."
+            )
+
     def test_feature_access_never_includes_global_template_roles(self, app):
         """
         SYSTEM_ADMIN must never appear in the feature-access matrix for a company.

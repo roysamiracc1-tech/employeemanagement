@@ -93,27 +93,20 @@ def _companies_with_admins():
 
 
 def _roles_for_context():
-    """Return roles visible in the current user's context for user-role assignment."""
+    """Return ONLY this company's custom roles for user-role assignment.
+    Never return roles belonging to other companies or global template roles.
+    SYSTEM_ADMIN and PORTAL_ADMIN are handled separately via _assign_role.
+    """
     roles_session = session.get('roles', [])
-    is_sa = 'SYSTEM_ADMIN' in roles_session
-    if is_sa:
-        co_id = session.get('admin_company_id')
-        if co_id:
-            return [to_dict(r) for r in query("""
-                SELECT id::text, name, description FROM roles
-                WHERE company_id = %s::uuid OR company_id IS NULL
-                ORDER BY name
-            """, (co_id,))]
-        return [to_dict(r) for r in query(
-            "SELECT id::text, name, description FROM roles WHERE company_id IS NULL ORDER BY name"
-        )]
-    co_id = session.get('company_id')
-    return [to_dict(r) for r in query("""
-        SELECT id::text, name, description FROM roles
-        WHERE (company_id = %s::uuid OR company_id IS NULL)
-          AND name != 'SYSTEM_ADMIN'
-        ORDER BY name
-    """, (co_id,))]
+    is_sa  = 'SYSTEM_ADMIN' in roles_session
+    co_id  = session.get('admin_company_id') if is_sa else session.get('company_id')
+    if not co_id:
+        return []
+    # Only company-specific roles (company_id = this company exactly)
+    return [to_dict(r) for r in query(
+        "SELECT id::text, name, description FROM roles WHERE company_id = %s::uuid ORDER BY name",
+        (co_id,)
+    )]
 
 
 @app.route('/admin')
@@ -250,7 +243,7 @@ def admin_register_user():
         SELECT e.id::text, e.first_name, e.last_name, e.job_title
         FROM employees e WHERE e.employment_status='ACTIVE' {co_filter_and} ORDER BY e.first_name, e.last_name
     """, co_params)]
-    all_roles   = [to_dict(r) for r in query("SELECT id::text, name, description FROM roles ORDER BY name")]
+    all_roles   = _roles_for_context()
     all_skills  = [to_dict(r) for r in query("SELECT id::text, name FROM skills ORDER BY name")]
     prof_levels = [to_dict(r) for r in query("SELECT id::text, level_name, level_order FROM proficiency_levels ORDER BY level_order")]
 
