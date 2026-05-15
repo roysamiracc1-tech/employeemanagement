@@ -73,8 +73,9 @@ def _load_feature_access():
                       AND crfa.feature_id = rfa.feature_id
                       AND crfa.company_id = %s::uuid
                 WHERE ro.name = ANY(%s)
+                  AND (ro.company_id = %s::uuid OR ro.company_id IS NULL)
                 GROUP BY pf.code
-            """, (company_id, roles))
+            """, (company_id, roles, company_id))
         else:
             rows = query("""
                 SELECT pf.code,

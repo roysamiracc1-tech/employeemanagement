@@ -93,11 +93,9 @@ class TestApiUpdateRoles:
         assert response.status_code == 400
 
     def test_valid_update_succeeds(self, admin_client):
-        mock_db = MagicMock()
-        mock_cursor = MagicMock()
-        mock_db.cursor.return_value.__enter__ = lambda s: mock_cursor
-        mock_db.cursor.return_value.__exit__ = MagicMock(return_value=False)
-        with patch('app.routes.admin.get_db', return_value=mock_db):
+        with patch('app.routes.admin.execute') as mock_ex, \
+             patch('app.routes.admin._assign_role'):
+            mock_ex.return_value = None
             response = admin_client.post('/api/admin/update-roles',
                                          data=json.dumps({'user_id': 'u1', 'roles': ['HR_ADMIN']}),
                                          content_type='application/json')

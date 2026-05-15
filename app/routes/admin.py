@@ -9,6 +9,50 @@ from app.helpers import next_employee_number, _EMP_SELECT
 
 _ADMIN_ROLES = ('SYSTEM_ADMIN', 'PORTAL_ADMIN')
 
+# Default roles seeded for every new company (excludes system roles)
+_DEFAULT_ROLE_SEEDS = [
+    ('HR_ADMIN',            'Full employee record access based on HR permissions'),
+    ('DEPARTMENT_HEAD',     'View all employees under their department/BU'),
+    ('LOCATION_HEAD',       'View all employees in their location'),
+    ('SOLID_LINE_MANAGER',  'View and manage solid-line direct reports'),
+    ('DOTTED_LINE_MANAGER', 'View dotted-line reports'),
+    ('HIRING_MANAGER',      'Search employees within assigned hiring scope'),
+    ('EMPLOYEE',            'View and manage own profile only'),
+]
+
+
+def _assign_role(user_id: str, role_name: str, company_id: str | None):
+    """Insert a user_role row, preferring the company-specific role over the global one."""
+    row = query("""
+        SELECT id FROM roles
+        WHERE name = %s AND (company_id = %s::uuid OR company_id IS NULL)
+        ORDER BY company_id NULLS LAST
+        LIMIT 1
+    """, (role_name, company_id), one=True)
+    if row:
+        execute("INSERT INTO user_roles (user_id, role_id) VALUES (%s::uuid, %s::uuid) ON CONFLICT DO NOTHING",
+                (user_id, row['id']))
+
+
+def seed_company_roles(company_id: str):
+    """Create default roles for a newly registered company and seed their feature access."""
+    for name, desc in _DEFAULT_ROLE_SEEDS:
+        existing = query("SELECT id FROM roles WHERE name=%s AND company_id=%s::uuid",
+                         (name, company_id), one=True)
+        if existing:
+            continue
+        new_role = insert_returning(
+            "INSERT INTO roles (name, description, company_id) VALUES (%s,%s,%s::uuid) RETURNING id::text",
+            (name, desc, company_id))
+        # Copy feature access from global template role of the same name
+        execute("""
+            INSERT INTO role_feature_access (role_id, feature_id, can_read, can_write, can_delete)
+            SELECT %s::uuid, rfa.feature_id, rfa.can_read, rfa.can_write, rfa.can_delete
+            FROM role_feature_access rfa
+            JOIN roles gr ON gr.id = rfa.role_id AND gr.company_id IS NULL AND gr.name = %s
+            ON CONFLICT (role_id, feature_id) DO NOTHING
+        """, (new_role['id'], name))
+
 
 def _company_scope():
     """Return active company_id filter, or None (= no filter / all companies).
@@ -55,12 +99,37 @@ def _companies_with_admins():
     return companies
 
 
+def _roles_for_context():
+    """Return roles visible in the current user's context for user-role assignment."""
+    roles_session = session.get('roles', [])
+    is_sa = 'SYSTEM_ADMIN' in roles_session
+    if is_sa:
+        co_id = session.get('admin_company_id')
+        if co_id:
+            return [to_dict(r) for r in query("""
+                SELECT id::text, name, description FROM roles
+                WHERE company_id = %s::uuid OR company_id IS NULL
+                ORDER BY name
+            """, (co_id,))]
+        return [to_dict(r) for r in query(
+            "SELECT id::text, name, description FROM roles WHERE company_id IS NULL ORDER BY name"
+        )]
+    co_id = session.get('company_id')
+    return [to_dict(r) for r in query("""
+        SELECT id::text, name, description FROM roles
+        WHERE (company_id = %s::uuid OR company_id IS NULL)
+          AND name != 'SYSTEM_ADMIN'
+        ORDER BY name
+    """, (co_id,))]
+
+
 @app.route('/admin')
 @require_roles(*_ADMIN_ROLES)
 def admin():
-    all_roles     = [to_dict(r) for r in query("SELECT id::text, name, description FROM roles ORDER BY name")]
-    is_tech_admin = 'SYSTEM_ADMIN' in session.get('roles', [])
-    companies     = []
+    all_roles        = _roles_for_context()
+    is_tech_admin    = 'SYSTEM_ADMIN' in session.get('roles', [])
+    is_portal_admin  = 'PORTAL_ADMIN' in session.get('roles', [])
+    companies        = []
     admin_company_id = ''
     if is_tech_admin:
         companies        = _companies_with_admins()
@@ -68,6 +137,7 @@ def admin():
     return render_template('admin/panel.html',
                            all_roles=all_roles,
                            is_tech_admin=is_tech_admin,
+                           is_portal_admin=is_portal_admin,
                            companies=companies,
                            companies_json=json.dumps(companies),
                            admin_company_id=admin_company_id)
@@ -169,11 +239,7 @@ def admin_register_user():
         user_id = user['id']
 
         for role_name in set(roles_list) | {'EMPLOYEE'}:
-            execute("""
-                INSERT INTO user_roles (user_id, role_id)
-                SELECT %s::uuid, id FROM roles WHERE name=%s
-                ON CONFLICT DO NOTHING
-            """, (user_id, role_name))
+            _assign_role(user_id, role_name, co_id)
 
         flash(f'Employee {first_name} {last_name} ({emp_num}) added successfully.', 'success')
         return redirect(url_for('admin'))
@@ -246,15 +312,9 @@ def api_update_roles():
             return jsonify({'error': 'User not in your company'}), 403
         # Portal Admin cannot grant SYSTEM_ADMIN or PORTAL_ADMIN to others
         new_roles = [r for r in new_roles if r not in ('SYSTEM_ADMIN', 'PORTAL_ADMIN')]
-    db = get_db()
-    with db.cursor() as cur:
-        cur.execute("DELETE FROM user_roles WHERE user_id = %s", (user_id,))
-        for rname in new_roles:
-            cur.execute("""
-                INSERT INTO user_roles (user_id, role_id)
-                SELECT %s, id FROM roles WHERE name = %s ON CONFLICT DO NOTHING
-            """, (user_id, rname))
-    db.commit()
+    execute("DELETE FROM user_roles WHERE user_id = %s::uuid", (user_id,))
+    for rname in new_roles:
+        _assign_role(user_id, rname, co_id)
     return jsonify({'ok': True})
 
 
@@ -344,21 +404,10 @@ def api_admin_update_feature_access():
 
 # ── Company-level role feature access (PORTAL_ADMIN) ─────────────────────────
 
-# Roles a PORTAL_ADMIN is allowed to manage (roles below them in the hierarchy)
-_PORTAL_MANAGEABLE_ROLES = [
-    'HR_ADMIN', 'DEPARTMENT_HEAD', 'LOCATION_HEAD',
-    'SOLID_LINE_MANAGER', 'DOTTED_LINE_MANAGER', 'HIRING_MANAGER', 'EMPLOYEE',
-]
-
-
 @app.route('/api/admin/company/role-feature-access')
 @require_roles('SYSTEM_ADMIN', 'PORTAL_ADMIN')
 def api_company_role_feature_access_get():
-    """Return per-company role×feature access matrix for the active company.
-
-    Returns for each feature: which roles have global access (SYSTEM_ADMIN ceiling)
-    and what the company override is (None = inherit global).
-    """
+    """Return per-company role×feature access matrix for the active company."""
     company_id = _company_scope()
     if not company_id:
         return jsonify({'error': 'No company selected'}), 400
@@ -366,18 +415,24 @@ def api_company_role_feature_access_get():
     features = [to_dict(r) for r in query(
         "SELECT id::text, code, label FROM portal_features ORDER BY sort_order"
     )]
-    # Global ceiling from SYSTEM_ADMIN
-    global_access = query("""
+    # All company roles (excludes SYSTEM_ADMIN; includes PORTAL_ADMIN global + company roles)
+    company_roles = [r['name'] for r in query("""
+        SELECT name FROM roles
+        WHERE (company_id = %s::uuid OR company_id IS NULL)
+          AND name != 'SYSTEM_ADMIN'
+        ORDER BY company_id NULLS FIRST, name
+    """, (company_id,))]
+
+    access_rows = query("""
         SELECT ro.name AS role_name, ro.id::text AS role_id,
-               pf.id::text AS feature_id,
-               rfa.can_read, rfa.can_write, rfa.can_delete
+               pf.id::text AS feature_id, rfa.can_read, rfa.can_write, rfa.can_delete
         FROM role_feature_access rfa
         JOIN roles ro ON ro.id = rfa.role_id
         JOIN portal_features pf ON pf.id = rfa.feature_id
-        WHERE ro.name = ANY(%s)
-    """, (_PORTAL_MANAGEABLE_ROLES,))
+        WHERE (ro.company_id = %s::uuid OR ro.company_id IS NULL)
+          AND ro.name != 'SYSTEM_ADMIN'
+    """, (company_id,))
 
-    # Company-level overrides
     overrides = query("""
         SELECT ro.name AS role_name, pf.id::text AS feature_id, crfa.is_enabled
         FROM company_role_feature_access crfa
@@ -387,25 +442,23 @@ def api_company_role_feature_access_get():
     """, (company_id,))
     override_map = {(r['role_name'], r['feature_id']): r['is_enabled'] for r in overrides}
 
-    # Build matrix: {feature_id: {role_name: {global_enabled, company_override}}}
     matrix = {}
-    for row in global_access:
-        fid = row['feature_id']
-        rname = row['role_name']
+    for row in access_rows:
+        fid, rname = row['feature_id'], row['role_name']
         if fid not in matrix:
             matrix[fid] = {}
         global_on = bool(row['can_read'])
-        company_override = override_map.get((rname, fid))
+        co_override = override_map.get((rname, fid))
         matrix[fid][rname] = {
             'global_enabled': global_on,
-            'company_override': company_override,   # None = inherit global
-            'effective': global_on if company_override is None else (global_on and company_override),
+            'company_override': co_override,
+            'effective': global_on if co_override is None else (global_on and co_override),
         }
 
     return jsonify({
         'company_id': company_id,
         'features': features,
-        'manageable_roles': _PORTAL_MANAGEABLE_ROLES,
+        'manageable_roles': company_roles,
         'matrix': matrix,
     })
 
@@ -429,11 +482,9 @@ def api_company_role_feature_access_set():
     if not feature_id or not role_name:
         return jsonify({'error': 'feature_id and role_name required'}), 400
 
-    # PORTAL_ADMIN can only manage roles below them
-    if 'PORTAL_ADMIN' in session.get('roles', []) and \
-            'SYSTEM_ADMIN' not in session.get('roles', []) and \
-            role_name not in _PORTAL_MANAGEABLE_ROLES:
-        return jsonify({'error': 'Cannot manage that role'}), 403
+    # PORTAL_ADMIN can manage any role in their company (not SYSTEM_ADMIN)
+    if role_name == 'SYSTEM_ADMIN':
+        return jsonify({'error': 'Cannot manage SYSTEM_ADMIN role'}), 403
 
     # Verify the role has global access first (can't grant beyond ceiling)
     global_row = query("""
@@ -466,6 +517,160 @@ def api_company_role_feature_access_set():
         """, (company_id, role_row['id'], feature_id, bool(is_enabled), session['user_id']))
 
     return jsonify({'ok': True})
+
+
+# ── Company Role CRUD (PORTAL_ADMIN manages their company's roles) ────────────
+
+@app.route('/api/admin/company/roles')
+@require_roles('SYSTEM_ADMIN', 'PORTAL_ADMIN')
+def api_company_roles_list():
+    company_id = _company_scope()
+    if not company_id:
+        return jsonify({'error': 'No company selected'}), 400
+    rows = query("""
+        SELECT r.id::text, r.name, r.description,
+               r.company_id IS NULL AS is_system,
+               COUNT(ur.user_id)::int AS user_count
+        FROM roles r
+        LEFT JOIN user_roles ur ON ur.role_id = r.id
+        WHERE (r.company_id = %s::uuid OR r.company_id IS NULL)
+          AND r.name != 'SYSTEM_ADMIN'
+        GROUP BY r.id, r.name, r.description, r.company_id
+        ORDER BY r.company_id NULLS FIRST, r.name
+    """, (company_id,))
+    features = [to_dict(f) for f in query(
+        "SELECT id::text, code, label FROM portal_features ORDER BY sort_order"
+    )]
+    access = query("""
+        SELECT rfa.role_id::text, pf.code, rfa.can_read, rfa.can_write, rfa.can_delete
+        FROM role_feature_access rfa
+        JOIN roles r ON r.id = rfa.role_id
+        JOIN portal_features pf ON pf.id = rfa.feature_id
+        WHERE (r.company_id = %s::uuid OR r.company_id IS NULL)
+    """, (company_id,))
+    perms = {}
+    for a in access:
+        perms.setdefault(a['role_id'], {})[a['code']] = {
+            'r': bool(a['can_read']), 'w': bool(a['can_write']), 'd': bool(a['can_delete'])
+        }
+    return jsonify({
+        'roles': [to_dict(r) for r in rows],
+        'features': features,
+        'perms': perms,
+        'company_id': company_id,
+    })
+
+
+@app.route('/api/admin/company/roles', methods=['POST'])
+@require_roles('SYSTEM_ADMIN', 'PORTAL_ADMIN')
+def api_company_roles_create():
+    company_id = _company_scope()
+    if not company_id:
+        return jsonify({'error': 'No company selected'}), 400
+    data = request.get_json() or {}
+    name = (data.get('name') or '').strip().upper().replace(' ', '_')
+    desc = (data.get('description') or '').strip() or None
+    if not name:
+        return jsonify({'error': 'name required'}), 400
+    if query("SELECT 1 FROM roles WHERE name=%s AND company_id=%s::uuid", (name, company_id), one=True):
+        return jsonify({'error': f'Role "{name}" already exists'}), 409
+    row = insert_returning(
+        "INSERT INTO roles (name, description, company_id) VALUES (%s,%s,%s::uuid) RETURNING id::text",
+        (name, desc, company_id))
+    return jsonify({'id': row['id'], 'name': name}), 201
+
+
+@app.route('/api/admin/company/roles/<role_id>', methods=['PUT'])
+@require_roles('SYSTEM_ADMIN', 'PORTAL_ADMIN')
+def api_company_roles_update(role_id):
+    company_id = _company_scope()
+    role = query("SELECT id, name, company_id FROM roles WHERE id=%s::uuid", (role_id,), one=True)
+    if not role or (role['company_id'] and str(role['company_id']) != company_id):
+        return jsonify({'error': 'Role not found'}), 404
+    if role['company_id'] is None:
+        return jsonify({'error': 'Cannot rename system roles'}), 403
+    data = request.get_json() or {}
+    name = (data.get('name') or '').strip().upper().replace(' ', '_')
+    desc = (data.get('description') or '').strip() or None
+    if not name:
+        return jsonify({'error': 'name required'}), 400
+    execute("UPDATE roles SET name=%s, description=%s WHERE id=%s::uuid", (name, desc, role_id))
+    return jsonify({'ok': True})
+
+
+@app.route('/api/admin/company/roles/<role_id>', methods=['DELETE'])
+@require_roles('SYSTEM_ADMIN', 'PORTAL_ADMIN')
+def api_company_roles_delete(role_id):
+    company_id = _company_scope()
+    role = query("SELECT id, name, company_id, (SELECT COUNT(*) FROM user_roles WHERE role_id=roles.id) AS cnt FROM roles WHERE id=%s::uuid", (role_id,), one=True)
+    if not role or (role['company_id'] and str(role['company_id']) != company_id):
+        return jsonify({'error': 'Role not found'}), 404
+    if role['company_id'] is None:
+        return jsonify({'error': 'Cannot delete system roles'}), 403
+    if role['cnt'] and int(role['cnt']) > 0:
+        return jsonify({'error': f'Cannot delete — {role["cnt"]} user(s) have this role'}), 409
+    execute("DELETE FROM roles WHERE id=%s::uuid", (role_id,))
+    return jsonify({'ok': True})
+
+
+@app.route('/api/admin/company/roles/<role_id>/permissions', methods=['POST'])
+@require_roles('SYSTEM_ADMIN', 'PORTAL_ADMIN')
+def api_company_role_set_permissions(role_id):
+    """Set all feature permissions for a company role at once."""
+    company_id = _company_scope()
+    role = query("SELECT id, company_id FROM roles WHERE id=%s::uuid", (role_id,), one=True)
+    if not role or (role['company_id'] and str(role['company_id']) != company_id):
+        return jsonify({'error': 'Role not found'}), 404
+    data = request.get_json() or {}
+    # data = {feature_id: {can_read, can_write, can_delete}, ...}
+    for feature_id, perms in data.items():
+        execute("""
+            INSERT INTO role_feature_access (role_id, feature_id, can_read, can_write, can_delete)
+            VALUES (%s::uuid, %s::uuid, %s, %s, %s)
+            ON CONFLICT (role_id, feature_id) DO UPDATE
+            SET can_read=EXCLUDED.can_read, can_write=EXCLUDED.can_write, can_delete=EXCLUDED.can_delete
+        """, (role_id, feature_id,
+              bool(perms.get('r', False)),
+              bool(perms.get('w', False)),
+              bool(perms.get('d', False))))
+    return jsonify({'ok': True})
+
+
+@app.route('/api/admin/company/seed-admin-user', methods=['POST'])
+@require_roles('SYSTEM_ADMIN')
+def api_seed_company_admin_user():
+    """SA creates the first Portal Admin user for a company."""
+    data       = request.get_json() or {}
+    company_id = data.get('company_id')
+    first_name = (data.get('first_name') or '').strip()
+    last_name  = (data.get('last_name') or '').strip()
+    email      = (data.get('email') or '').strip().lower()
+    emp_num    = (data.get('employee_number') or '').strip()
+
+    if not all([company_id, first_name, last_name, email, emp_num]):
+        return jsonify({'error': 'company_id, first_name, last_name, email, employee_number required'}), 400
+    if query("SELECT 1 FROM users WHERE LOWER(email)=%s", (email,), one=True):
+        return jsonify({'error': 'Email already registered'}), 409
+
+    emp = insert_returning("""
+        INSERT INTO employees (employee_number, first_name, last_name, email,
+                               employment_status, company_id)
+        VALUES (%s, %s, %s, %s, 'ACTIVE', %s::uuid) RETURNING id::text
+    """, (emp_num, first_name, last_name, email, company_id))
+
+    user = insert_returning("""
+        INSERT INTO users (employee_id, email, username, is_active)
+        VALUES (%s::uuid, %s, %s, TRUE) RETURNING id::text
+    """, (emp['id'], email, email.split('@')[0]))
+
+    # Assign PORTAL_ADMIN (global system role)
+    execute("""
+        INSERT INTO user_roles (user_id, role_id)
+        SELECT %s::uuid, id FROM roles WHERE name='PORTAL_ADMIN' AND company_id IS NULL
+        ON CONFLICT DO NOTHING
+    """, (user['id'],))
+
+    return jsonify({'ok': True, 'user_id': user['id'], 'employee_id': emp['id']})
 
 
 @app.route('/api/admin/org/business-units')
