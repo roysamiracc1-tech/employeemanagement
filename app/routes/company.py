@@ -4,6 +4,7 @@ from app import app
 from app.db import query, execute, insert_returning, to_dict
 from app.auth import login_required, require_roles
 from app.helpers import company_stats, save_logo
+from app.routes.admin import seed_company_roles, _assign_role
 
 
 @app.route('/company')
@@ -101,7 +102,45 @@ def admin_company_new():
               int(founded_year) if founded_year else None,
               description, logo_url, theme_color, header_html, footer_html))
 
-        flash(f'Company "{name}" registered. Go to Admin Panel → Company Roles to define roles for this company.', 'success')
+        # Auto-seed the Company Admin role for this company
+        company_admin_role_id = seed_company_roles(co['id'])
+
+        # Optionally create the first Company Admin user if SA filled in Step 5
+        admin_first  = request.form.get('admin_first_name', '').strip()
+        admin_last   = request.form.get('admin_last_name', '').strip()
+        admin_email  = request.form.get('admin_email', '').strip().lower()
+        admin_emp_no = request.form.get('admin_employee_number', '').strip()
+
+        if admin_first and admin_last and admin_email and admin_emp_no:
+            errors = []
+            if query("SELECT 1 FROM users WHERE LOWER(email)=%s", (admin_email,), one=True):
+                errors.append(f'Email {admin_email} is already registered.')
+            if query("SELECT 1 FROM employees WHERE employee_number=%s", (admin_emp_no,), one=True):
+                errors.append(f'Employee number {admin_emp_no} is already taken.')
+            if errors:
+                for e in errors:
+                    flash(e, 'error')
+            else:
+                emp = insert_returning("""
+                    INSERT INTO employees (employee_number, first_name, last_name, email,
+                                           employment_status, company_id)
+                    VALUES (%s,%s,%s,%s,'ACTIVE',%s::uuid) RETURNING id::text
+                """, (admin_emp_no, admin_first, admin_last, admin_email, co['id']))
+
+                user = insert_returning("""
+                    INSERT INTO users (employee_id, email, username, is_active)
+                    VALUES (%s::uuid,%s,%s,TRUE) RETURNING id::text
+                """, (emp['id'], admin_email, admin_email.split('@')[0]))
+
+                # Assign global PORTAL_ADMIN (so existing system checks work)
+                # + company-specific COMPANY_ADMIN (for role-based feature access)
+                _assign_role(user['id'], 'PORTAL_ADMIN', None)
+                _assign_role(user['id'], 'COMPANY_ADMIN', co['id'])
+
+                flash(f'Company "{name}" registered. Company Admin user created for {admin_first} {admin_last}.', 'success')
+                return redirect(url_for('admin_companies'))
+
+        flash(f'Company "{name}" registered with Company Admin role. Create the Company Admin user from Admin Panel → Company Roles.', 'success')
         return redirect(url_for('admin_companies'))
 
     return render_template('admin/company_form.html', co=None, action='new')

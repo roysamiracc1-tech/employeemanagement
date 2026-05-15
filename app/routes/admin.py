@@ -9,18 +9,6 @@ from app.helpers import next_employee_number, _EMP_SELECT
 
 _ADMIN_ROLES = ('SYSTEM_ADMIN', 'PORTAL_ADMIN')
 
-# Default roles seeded for every new company (excludes system roles)
-_DEFAULT_ROLE_SEEDS = [
-    ('HR_ADMIN',            'Full employee record access based on HR permissions'),
-    ('DEPARTMENT_HEAD',     'View all employees under their department/BU'),
-    ('LOCATION_HEAD',       'View all employees in their location'),
-    ('SOLID_LINE_MANAGER',  'View and manage solid-line direct reports'),
-    ('DOTTED_LINE_MANAGER', 'View dotted-line reports'),
-    ('HIRING_MANAGER',      'Search employees within assigned hiring scope'),
-    ('EMPLOYEE',            'View and manage own profile only'),
-]
-
-
 def _assign_role(user_id: str, role_name: str, company_id: str | None):
     """Insert a user_role row, preferring the company-specific role over the global one."""
     row = query("""
@@ -35,23 +23,28 @@ def _assign_role(user_id: str, role_name: str, company_id: str | None):
 
 
 def seed_company_roles(company_id: str):
-    """Create default roles for a newly registered company and seed their feature access."""
-    for name, desc in _DEFAULT_ROLE_SEEDS:
-        existing = query("SELECT id FROM roles WHERE name=%s AND company_id=%s::uuid",
-                         (name, company_id), one=True)
-        if existing:
-            continue
-        new_role = insert_returning(
-            "INSERT INTO roles (name, description, company_id) VALUES (%s,%s,%s::uuid) RETURNING id::text",
-            (name, desc, company_id))
-        # Copy feature access from global template role of the same name
-        execute("""
-            INSERT INTO role_feature_access (role_id, feature_id, can_read, can_write, can_delete)
-            SELECT %s::uuid, rfa.feature_id, rfa.can_read, rfa.can_write, rfa.can_delete
-            FROM role_feature_access rfa
-            JOIN roles gr ON gr.id = rfa.role_id AND gr.company_id IS NULL AND gr.name = %s
-            ON CONFLICT (role_id, feature_id) DO NOTHING
-        """, (new_role['id'], name))
+    """Seed ONE Company Admin role for a newly registered company.
+
+    The COMPANY_ADMIN role gets full R/W access to every portal feature.
+    Additional roles are defined by the company admin themselves.
+    """
+    existing = query("SELECT id FROM roles WHERE name='COMPANY_ADMIN' AND company_id=%s::uuid",
+                     (company_id,), one=True)
+    if existing:
+        return existing['id']
+
+    role = insert_returning(
+        "INSERT INTO roles (name, description, company_id) VALUES (%s,%s,%s::uuid) RETURNING id::text",
+        ('COMPANY_ADMIN', 'Company Administrator — full access to manage the company portal', company_id))
+
+    # Grant full R/W/D on all portal features
+    execute("""
+        INSERT INTO role_feature_access (role_id, feature_id, can_read, can_write, can_delete)
+        SELECT %s::uuid, id, TRUE, TRUE, TRUE FROM portal_features
+        ON CONFLICT (role_id, feature_id) DO NOTHING
+    """, (role['id'],))
+
+    return role['id']
 
 
 def _company_scope():

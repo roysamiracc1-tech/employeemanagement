@@ -1123,24 +1123,70 @@ class TestSessionAndCompanyIsolation:
                 assert result is None, \
                     "SYSTEM_ADMIN must get None from viewer_company_id (no boundary)."
 
-    def test_seed_company_roles_creates_all_default_roles(self, app):
+    def test_seed_company_roles_creates_only_company_admin_role(self, app):
         """
-        seed_company_roles must attempt to create all 7 default roles for a new
-        company. Missing a role would cause users of that company to not have
-        the role available for assignment.
+        seed_company_roles must create exactly ONE role: COMPANY_ADMIN.
+        It must NOT seed HR_ADMIN, EMPLOYEE, SOLID_LINE_MANAGER etc. — those
+        are defined by the company admin themselves. Seeding extra default roles
+        causes them to appear in Company Roles tab even though the company never
+        created them.
         """
-        from app.routes.admin import _DEFAULT_ROLE_SEEDS
-        expected_names = {name for name, _ in _DEFAULT_ROLE_SEEDS}
+        fake_company_id = '00000000-0000-0000-0000-000000000099'
+        inserted_names = []
 
-        assert 'HR_ADMIN' in expected_names
-        assert 'EMPLOYEE' in expected_names
-        assert 'SOLID_LINE_MANAGER' in expected_names
-        assert 'DEPARTMENT_HEAD' in expected_names
-        assert 'DOTTED_LINE_MANAGER' in expected_names
-        assert 'LOCATION_HEAD' in expected_names
-        assert 'HIRING_MANAGER' in expected_names
-        assert len(expected_names) == 7, \
-            f"Expected 7 default role seeds, found {len(expected_names)}."
+        def mock_query(sql, params=(), one=False):
+            if 'SELECT id FROM roles WHERE name=' in sql:
+                return None  # no existing role
+            return []
+
+        def mock_insert(sql, params):
+            inserted_names.append(params[0])  # first param is the role name
+            return {'id': 'fake-role-id'}
+
+        with app.app_context():
+            with patch('app.routes.admin.query', side_effect=mock_query), \
+                 patch('app.routes.admin.insert_returning', side_effect=mock_insert), \
+                 patch('app.routes.admin.execute'):
+                from app.routes.admin import seed_company_roles
+                seed_company_roles(fake_company_id)
+
+        assert inserted_names == ['COMPANY_ADMIN'], (
+            f"seed_company_roles must create only COMPANY_ADMIN, got: {inserted_names}"
+        )
+        assert 'HR_ADMIN' not in inserted_names
+        assert 'EMPLOYEE' not in inserted_names
+        assert 'SOLID_LINE_MANAGER' not in inserted_names
+
+    def test_company_creation_auto_seeds_company_admin_role(self, app):
+        """
+        When SA creates a new company via POST /admin/companies/new,
+        seed_company_roles must be called automatically — the COMPANY_ADMIN
+        role must exist before the SA ever visits the admin panel.
+        """
+        with app.test_client() as c:
+            with c.session_transaction() as s:
+                s['user_id']    = 'user-sa-001'
+                s['employee_id'] = 'emp-sa-001'
+                s['roles']      = ['SYSTEM_ADMIN']
+                s['company_id'] = None
+                s['user_name']  = 'SA'
+                s['branding']   = {}
+
+            seed_called_with = []
+
+            def mock_seed(company_id):
+                seed_called_with.append(company_id)
+                return 'fake-role-id'
+
+            with patch('app.routes.company.seed_company_roles', side_effect=mock_seed), \
+                 patch('app.routes.company.insert_returning', return_value={'id': 'co-new-001'}), \
+                 patch('app.routes.company.query', return_value=None), \
+                 patch('app.routes.company.save_logo', return_value=None):
+                r = c.post('/admin/companies/new', data={'name': 'Test Co', 'theme_color': '#2563eb'})
+
+        assert len(seed_called_with) == 1, \
+            "seed_company_roles must be called exactly once on company creation"
+        assert seed_called_with[0] == 'co-new-001'
 
     def test_assign_role_prefers_company_role_over_global(self, app):
         """
