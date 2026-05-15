@@ -540,6 +540,7 @@
 <script>
 const ALL_ROLES      = {{ all_roles | tojson }};
 const IS_TECH_ADMIN  = {{ is_tech_admin | tojson }};
+let   CURRENT_SA_COMPANY = {{ admin_company_id | tojson }};
 let allUsers = [], allEmps = [], currentUserId = null, currentUserRoles = [];
 let _curTab = 'users';
 
@@ -572,6 +573,7 @@ document.addEventListener('click', function(e) {
 
 // ── Company context switcher (Tech Admin only) ────────────────────────────
 async function switchCompanyCtx(companyId) {
+  CURRENT_SA_COMPANY = companyId || null;
   document.getElementById('admin-co-picker-menu').classList.remove('co-picker-menu--open');
   await fetch('/api/admin/switch-company', {
     method: 'POST', headers: {'Content-Type':'application/json'},
@@ -1406,7 +1408,11 @@ function closeSeedModal() {
 }
 
 async function saveSeedAdminUser() {
-  const company_id = typeof CURRENT_COMPANY_ID !== 'undefined' ? CURRENT_COMPANY_ID : null;
+  const company_id = CURRENT_SA_COMPANY;
+  if (!company_id) {
+    alert('No company selected. Please select a company from the picker first.');
+    return;
+  }
   const body = {
     company_id,
     first_name: document.getElementById('seed-first').value.trim(),
