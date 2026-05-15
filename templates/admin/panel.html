@@ -79,7 +79,7 @@
     <button class="admin-tab active" onclick="switchTab('users',this)">Users &amp; Roles</button>
     <button class="admin-tab" onclick="switchTab('employees',this)">Employees</button>
     <button class="admin-tab" onclick="switchTab('org',this)">Organisation</button>
-    {% if is_tech_admin %}
+    {% if is_tech_admin and not admin_company_id %}
     <button class="admin-tab" onclick="switchTab('roles',this)">
       <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="display:inline;margin-right:3px;vertical-align:-1px"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
       Roles &amp; Permissions
@@ -541,9 +541,11 @@
 const ALL_ROLES      = {{ all_roles | tojson }};
 const IS_TECH_ADMIN  = {{ is_tech_admin | tojson }};
 let allUsers = [], allEmps = [], currentUserId = null, currentUserRoles = [];
+let _curTab = 'users';
 
 // ── Tab switching ──────────────────────────────────────────────────────────
 function switchTab(name, btn) {
+  _curTab = name;
   document.querySelectorAll('.admin-tab').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.admin-panel').forEach(p => p.style.display = 'none');
   btn.classList.add('active');
@@ -607,6 +609,26 @@ async function switchCompanyCtx(companyId) {
   document.getElementById('loc-list').innerHTML = '<p style="padding:16px;color:#94a3b8;font-size:.85rem">Loading…</p>';
   document.getElementById('fu-list').innerHTML  = '<p style="padding:16px;color:#94a3b8;font-size:.85rem">Loading…</p>';
   loadOrg();
+  // Show/hide global-only tabs based on company context
+  const rolesPerm = document.querySelector('[onclick="switchTab(\'roles\',this)"]');
+  const settingsBtn = document.querySelector('[onclick="switchTab(\'settings\',this)"]');
+  if (rolesPerm)  rolesPerm.style.display  = companyId ? 'none' : '';
+  if (settingsBtn) settingsBtn.style.display = companyId ? 'none' : '';
+  if (companyId && _curTab === 'roles') switchTab('company-roles', document.querySelector('[onclick*="company-roles"]'));
+
+  // Reset company-specific tabs so they reload with the new company context
+  _crData = null;
+  _faData = null;
+  _faDirty = {};
+  const crLoading = document.getElementById('cr-loading');
+  const crBody    = document.getElementById('cr-body');
+  const faMatrix  = document.getElementById('fa-matrix-container');
+  if (crLoading) { crLoading.style.display = ''; crLoading.textContent = 'Loading roles…'; }
+  if (crBody)    crBody.style.display = 'none';
+  if (faMatrix)  faMatrix.innerHTML = '<p style="padding:24px;color:#94a3b8;font-size:.85rem">Loading feature access matrix…</p>';
+  // If these tabs are currently active, reload them immediately
+  if (_curTab === 'company-roles')  loadCompanyRoles();
+  if (_curTab === 'feature-access') loadFeatureAccessMatrix();
 }
 
 // ── Roles & Permissions matrix ────────────────────────────────────────────
@@ -1227,7 +1249,13 @@ async function loadCompanyRoles() {
   const body    = document.getElementById('cr-body');
   loading.style.display = ''; body.style.display = 'none';
   const res = await fetch('/api/admin/company/roles');
-  if (!res.ok) { loading.textContent = 'Failed to load roles.'; return; }
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    loading.innerHTML = err.error === 'No company selected'
+      ? '<span style="color:#94a3b8">Select a company from the picker above to manage its roles.</span>'
+      : `<span style="color:#ef4444">Failed to load roles: ${err.error || res.status}</span>`;
+    return;
+  }
   _crData = await res.json();
   renderCompanyRoles();
   loading.style.display = 'none'; body.style.display = '';
@@ -1237,36 +1265,40 @@ function renderCompanyRoles() {
   const { roles, features, perms } = _crData;
   const IS_SA = {{ is_tech_admin | tojson }};
 
-  let html = '<table class="perm-matrix" style="min-width:600px"><thead><tr>';
-  html += '<th class="pm-feature-col" style="text-align:left;padding:10px 16px">Role</th>';
-  html += '<th style="padding:10px 16px;font-size:.7rem;color:#64748b">Users</th>';
-  html += '<th style="padding:10px 16px;font-size:.7rem;color:#64748b">Type</th>';
-  html += '<th style="padding:10px 16px;font-size:.7rem;color:#64748b">Description</th>';
-  html += '<th style="padding:10px 16px;text-align:center;font-size:.7rem;color:#64748b">Actions</th>';
-  html += '</tr></thead><tbody>';
-
-  for (const r of roles) {
-    const badge = r.is_system
-      ? '<span style="background:#e0e7ff;color:#4338ca;font-size:.65rem;padding:1px 7px;border-radius:10px;font-weight:600">System</span>'
-      : '<span style="background:#dcfce7;color:#166534;font-size:.65rem;padding:1px 7px;border-radius:10px;font-weight:600">Custom</span>';
-    const actions = r.is_system ? '<span style="color:#cbd5e1;font-size:.75rem">locked</span>'
-      : `<button class="btn btn-ghost btn-sm" style="padding:3px 8px;font-size:.75rem" onclick="openRoleModal('${r.id}')">Edit</button>`;
-    html += `<tr>
-      <td style="padding:10px 16px;font-weight:600;font-size:.82rem">${escH(r.name.replace(/_/g,' '))}</td>
-      <td style="padding:10px 16px;font-size:.82rem;color:#64748b">${r.user_count}</td>
-      <td style="padding:10px 16px">${badge}</td>
-      <td style="padding:10px 16px;font-size:.78rem;color:#64748b">${escH(r.description || '—')}</td>
-      <td style="padding:10px 16px;text-align:center">${actions}</td>
-    </tr>`;
-  }
-  html += '</tbody></table>';
+  let html = '';
 
   if (IS_SA) {
-    html = `<div style="padding:12px 18px;background:#f0fdf4;border-bottom:1px solid #bbf7d0;font-size:.78rem;color:#166534;display:flex;align-items:center;gap:8px">
+    html += `<div style="padding:12px 18px;background:#f0fdf4;border-bottom:1px solid #bbf7d0;font-size:.78rem;color:#166534;display:flex;align-items:center;gap:8px">
       <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
-      <span>Super Admin view — you can manage any company's roles. To create the first Company Admin user for a company, use
+      <span>Super Admin view — managing roles for the selected company.
       <button class="btn btn-ghost btn-sm" style="padding:2px 8px;font-size:.75rem;margin-left:4px" onclick="openSeedModal()">+ Create Company Admin</button></span>
-    </div>` + html;
+    </div>`;
+  }
+
+  if (!roles.length) {
+    html += `<div style="padding:40px;text-align:center;color:#94a3b8">
+      <div style="font-size:2rem;margin-bottom:10px">👤</div>
+      <div style="font-weight:600;color:#64748b;margin-bottom:6px">No roles defined yet</div>
+      <div style="font-size:.82rem">Click <strong>New Role</strong> to create the first role for this company.</div>
+    </div>`;
+  } else {
+    html += '<table class="perm-matrix" style="min-width:500px"><thead><tr>';
+    html += '<th class="pm-feature-col" style="text-align:left;padding:10px 16px">Role Name</th>';
+    html += '<th style="padding:10px 16px;font-size:.7rem;color:#64748b">Users</th>';
+    html += '<th style="padding:10px 16px;font-size:.7rem;color:#64748b">Description</th>';
+    html += '<th style="padding:10px 16px;text-align:center;font-size:.7rem;color:#64748b">Actions</th>';
+    html += '</tr></thead><tbody>';
+    for (const r of roles) {
+      html += `<tr>
+        <td style="padding:10px 16px;font-weight:600;font-size:.82rem">${escH(r.name.replace(/_/g,' '))}</td>
+        <td style="padding:10px 16px;font-size:.82rem;color:#64748b">${r.user_count}</td>
+        <td style="padding:10px 16px;font-size:.78rem;color:#64748b">${escH(r.description || '—')}</td>
+        <td style="padding:10px 16px;text-align:center">
+          <button class="btn btn-ghost btn-sm" style="padding:3px 8px;font-size:.75rem" onclick="openRoleModal('${r.id}')">Edit</button>
+        </td>
+      </tr>`;
+    }
+    html += '</tbody></table>';
   }
 
   document.getElementById('cr-body').innerHTML = html;
@@ -1391,37 +1423,43 @@ async function saveSeedAdminUser() {
 }
 
 // ── Feature Access tab ───────────────────────────────────────────────────────
-let _faData     = null;   // loaded once
-let _faDirty    = {};     // key = "featureId|roleName" → {feature_id, role_name, is_enabled}
-const IS_PORTAL = {{ is_portal_admin | tojson }};
+let _faData  = null;
+let _faDirty = {};   // key = "featureId|roleName|action" → bool
 
 async function loadFeatureAccessMatrix() {
   const res = await fetch('/api/admin/company/role-feature-access');
   if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
     document.getElementById('fa-matrix-container').innerHTML =
-      '<p style="padding:24px;color:#ef4444">Failed to load feature access data.</p>';
+      err.error === 'No company selected'
+        ? '<p style="padding:24px;color:#94a3b8">Select a company to configure its feature access.</p>'
+        : `<p style="padding:24px;color:#ef4444">Failed to load: ${err.error || res.status}</p>`;
     return;
   }
-  _faData = await res.json();
+  _faData  = await res.json();
   _faDirty = {};
+  if (!_faData.roles || !_faData.roles.length) {
+    document.getElementById('fa-matrix-container').innerHTML =
+      '<div style="padding:40px;text-align:center;color:#94a3b8"><div style="font-size:2rem;margin-bottom:10px">🔒</div>' +
+      '<div style="font-weight:600;color:#64748b;margin-bottom:6px">No roles defined yet</div>' +
+      '<div style="font-size:.82rem">Create company roles first in the <strong>Company Roles</strong> tab, then configure their feature access here.</div></div>';
+    return;
+  }
   renderFeatureAccessMatrix();
 }
 
 function renderFeatureAccessMatrix() {
-  const { features, manageable_roles, matrix } = _faData;
-
-  const ROLE_COLORS = {
-    'HR_ADMIN':'#0891b2','DEPARTMENT_HEAD':'#7c3aed','LOCATION_HEAD':'#059669',
-    'SOLID_LINE_MANAGER':'#d97706','DOTTED_LINE_MANAGER':'#db2777',
-    'HIRING_MANAGER':'#6366f1','EMPLOYEE':'#64748b',
-  };
+  const { features, roles, matrix } = _faData;
+  const ACTIONS = [{k:'r',label:'R',full:'can_read'},{k:'w',label:'W',full:'can_write'},{k:'d',label:'D',full:'can_delete'}];
 
   let html = '<table class="perm-matrix"><thead><tr>';
   html += '<th class="pm-feature-col">Feature</th>';
-  for (const role of manageable_roles) {
-    const color = ROLE_COLORS[role] || '#64748b';
-    html += `<th class="pm-role-col" colspan="1" style="text-align:center;padding:8px 6px">
-      <div style="font-size:.65rem;font-weight:700;color:${color};white-space:nowrap">${role.replace(/_/g,' ')}</div>
+  for (const role of roles) {
+    html += `<th class="pm-role-col" colspan="3">
+      <div style="font-size:.68rem;font-weight:700;padding:3px 0">${role.name.replace(/_/g,' ')}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;text-align:center;font-size:.6rem;color:#94a3b8">
+        <span>R</span><span>W</span><span>D</span>
+      </div>
     </th>`;
   }
   html += '</tr></thead><tbody>';
@@ -1432,33 +1470,28 @@ function renderFeatureAccessMatrix() {
     html += `<tr><td class="pm-feature-label">
       <div style="font-size:.82rem;font-weight:600">${feat.label}</div>
     </td>`;
-    for (const role of manageable_roles) {
-      const cell = featMatrix[role];
-      if (!cell) {
-        // SYSTEM_ADMIN hasn't granted this role global access — locked off
-        html += `<td class="pm-cell" style="text-align:center">
-          <span title="Not enabled globally by Super Admin" style="color:#cbd5e1;font-size:.75rem">—</span>
-        </td>`;
-        continue;
-      }
-      const effective = cell.effective;
-      const isOverridden = cell.company_override !== null && cell.company_override !== undefined;
-      const key = `${fid}|${role}`;
-      const dirty = _faDirty[key];
-      const checked = dirty !== undefined ? dirty.is_enabled : effective;
-      const isDirtyNow = dirty !== undefined;
-
-      html += `<td class="pm-cell fa-cell${isDirtyNow ? ' pm-cb--dirty' : ''}" style="text-align:center"
-                  data-feature-id="${fid}" data-role="${role}">
-        <label style="display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer">
-          <input type="checkbox" class="fa-cb"
-            data-feature-id="${fid}" data-role="${role}"
-            data-feature-label="${feat.label}"
+    for (const role of roles) {
+      const cell = featMatrix[role.name];
+      for (const a of ACTIONS) {
+        if (!cell) {
+          // No access defined for this role×feature
+          html += `<td class="pm-cell" style="text-align:center">
+            <span style="color:#e2e8f0;font-size:.7rem">—</span></td>`;
+          continue;
+        }
+        const key = `${fid}|${role.name}|${a.k}`;
+        const origVal = cell[a.k];
+        const dirty   = _faDirty[key];
+        const checked = dirty !== undefined ? dirty : origVal;
+        const isDirty = dirty !== undefined && dirty !== origVal;
+        const isOverridden = cell.has_override;
+        html += `<td class="pm-cell${isDirty ? ' pm-cb--dirty' : ''}" style="text-align:center">
+          <input type="checkbox" class="fa-cb pm-cb"
+            data-fid="${fid}" data-role="${role.name}" data-action="${a.k}"
             ${checked ? 'checked' : ''}
             onchange="markFaDirty(this)">
-          ${isOverridden && !isDirtyNow ? `<span style="font-size:.55rem;color:#d97706" title="Overridden by company admin">custom</span>` : ''}
-        </label>
-      </td>`;
+        </td>`;
+      }
     }
     html += '</tr>';
   }
@@ -1468,21 +1501,18 @@ function renderFeatureAccessMatrix() {
 }
 
 function markFaDirty(cb) {
-  const fid  = cb.dataset.featureId;
-  const role = cb.dataset.role;
-  const key  = `${fid}|${role}`;
-  const cell = (_faData.matrix[fid] || {})[role] || {};
-  const orig = cell.effective;
+  const fid    = cb.dataset.fid;
+  const role   = cb.dataset.role;
+  const action = cb.dataset.action;
+  const key    = `${fid}|${role}|${action}`;
+  const orig   = ((_faData.matrix[fid] || {})[role] || {})[action] || false;
 
   if (cb.checked !== orig) {
-    _faDirty[key] = { feature_id: fid, role_name: role, is_enabled: cb.checked,
-                      feature_label: cb.dataset.featureLabel };
+    _faDirty[key] = cb.checked;
   } else {
     delete _faDirty[key];
   }
-
-  const td = cb.closest('td');
-  if (td) td.classList.toggle('pm-cb--dirty', key in _faDirty);
+  cb.closest('td').classList.toggle('pm-cb--dirty', key in _faDirty);
   _updateFaDirtyUI();
 }
 
@@ -1496,18 +1526,30 @@ function _updateFaDirtyUI() {
 }
 
 async function saveFeatureAccessChanges() {
-  const changes = Object.values(_faDirty);
-  if (!changes.length) return;
   const saveBtn = document.getElementById('fa-save-btn');
-  saveBtn.disabled = true;
-  saveBtn.textContent = 'Saving…';
+  saveBtn.disabled = true; saveBtn.textContent = 'Saving…';
+
+  // Group dirty cells by feature×role, then POST each group as one request
+  const grouped = {};
+  for (const [key, val] of Object.entries(_faDirty)) {
+    const [fid, role, action] = key.split('|');
+    const gkey = `${fid}|${role}`;
+    if (!grouped[gkey]) grouped[gkey] = { feature_id: fid, role_name: role, r: null, w: null, d: null };
+    grouped[gkey][action] = val;
+  }
+  // Fill nulls from current matrix state
+  for (const g of Object.values(grouped)) {
+    const cell = ((_faData.matrix[g.feature_id] || {})[g.role_name] || {});
+    if (g.r === null) g.r = cell.r || false;
+    if (g.w === null) g.w = cell.w || false;
+    if (g.d === null) g.d = cell.d || false;
+  }
 
   let ok = true;
-  for (const ch of changes) {
+  for (const g of Object.values(grouped)) {
     const res = await fetch('/api/admin/company/role-feature-access', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ feature_id: ch.feature_id, role_name: ch.role_name, is_enabled: ch.is_enabled }),
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ feature_id: g.feature_id, role_name: g.role_name, r: g.r, w: g.w, d: g.d }),
     });
     if (!res.ok) { ok = false; break; }
   }
@@ -1515,8 +1557,7 @@ async function saveFeatureAccessChanges() {
   if (ok) {
     await loadFeatureAccessMatrix();
   } else {
-    saveBtn.disabled = false;
-    saveBtn.textContent = 'Save Changes';
+    saveBtn.disabled = false; saveBtn.textContent = 'Save Changes';
     alert('Some changes failed to save. Please try again.');
   }
 }

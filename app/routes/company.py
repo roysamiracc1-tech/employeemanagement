@@ -4,7 +4,6 @@ from app import app
 from app.db import query, execute, insert_returning, to_dict
 from app.auth import login_required, require_roles
 from app.helpers import company_stats, save_logo
-from app.routes.admin import seed_company_roles
 
 
 @app.route('/company')
@@ -102,9 +101,7 @@ def admin_company_new():
               int(founded_year) if founded_year else None,
               description, logo_url, theme_color, header_html, footer_html))
 
-        seed_company_roles(co['id'])
-
-        flash(f'Company "{name}" registered. Default roles seeded — create a Company Admin user next.', 'success')
+        flash(f'Company "{name}" registered. Go to Admin Panel → Company Roles to define roles for this company.', 'success')
         return redirect(url_for('admin_companies'))
 
     return render_template('admin/company_form.html', co=None, action='new')

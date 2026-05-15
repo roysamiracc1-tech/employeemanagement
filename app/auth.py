@@ -57,13 +57,13 @@ def _load_feature_access():
             rows = query("""
                 SELECT pf.code,
                        bool_or(
-                           rfa.can_read  AND COALESCE(crfa.is_enabled, TRUE)
+                           rfa.can_read   AND COALESCE(crfa.can_read,   rfa.can_read)
                        ) AS r,
                        bool_or(
-                           rfa.can_write AND COALESCE(crfa.is_enabled, TRUE)
+                           rfa.can_write  AND COALESCE(crfa.can_write,  rfa.can_write)
                        ) AS w,
                        bool_or(
-                           rfa.can_delete AND COALESCE(crfa.is_enabled, TRUE)
+                           rfa.can_delete AND COALESCE(crfa.can_delete, rfa.can_delete)
                        ) AS d
                 FROM role_feature_access rfa
                 JOIN roles ro ON ro.id = rfa.role_id

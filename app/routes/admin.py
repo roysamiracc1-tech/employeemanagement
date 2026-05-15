@@ -370,10 +370,21 @@ def api_admin_switch_company():
 @app.route('/api/admin/roles/features')
 @require_roles('SYSTEM_ADMIN')
 def api_admin_roles_features():
-    roles    = [to_dict(r) for r in query("SELECT id::text, name, description FROM roles ORDER BY name")]
-    features = [to_dict(r) for r in query("SELECT id::text, code, label, description FROM portal_features ORDER BY sort_order")]
-    access   = query("SELECT role_id::text, feature_id::text, can_read, can_write, can_delete FROM role_feature_access")
-    matrix   = {}
+    # Global template roles only (company_id IS NULL) — these are the system-wide defaults.
+    # Company-specific roles are managed via the Company Roles tab.
+    roles    = [to_dict(r) for r in query(
+        "SELECT id::text, name, description FROM roles WHERE company_id IS NULL ORDER BY name"
+    )]
+    features = [to_dict(r) for r in query(
+        "SELECT id::text, code, label, description FROM portal_features ORDER BY sort_order"
+    )]
+    role_ids = [r['id'] for r in roles]
+    access   = query(
+        "SELECT role_id::text, feature_id::text, can_read, can_write, can_delete "
+        "FROM role_feature_access WHERE role_id = ANY(%s::uuid[])",
+        (role_ids,)
+    )
+    matrix = {}
     for a in access:
         rid, fid = a['role_id'], a['feature_id']
         if rid not in matrix:
@@ -407,7 +418,7 @@ def api_admin_update_feature_access():
 @app.route('/api/admin/company/role-feature-access')
 @require_roles('SYSTEM_ADMIN', 'PORTAL_ADMIN')
 def api_company_role_feature_access_get():
-    """Return per-company role×feature access matrix for the active company."""
+    """Return per-company role×feature R/W/D matrix."""
     company_id = _company_scope()
     if not company_id:
         return jsonify({'error': 'No company selected'}), 400
@@ -415,50 +426,57 @@ def api_company_role_feature_access_get():
     features = [to_dict(r) for r in query(
         "SELECT id::text, code, label FROM portal_features ORDER BY sort_order"
     )]
-    # All company roles (excludes SYSTEM_ADMIN; includes PORTAL_ADMIN global + company roles)
-    company_roles = [r['name'] for r in query("""
-        SELECT name FROM roles
-        WHERE (company_id = %s::uuid OR company_id IS NULL)
-          AND name != 'SYSTEM_ADMIN'
-        ORDER BY company_id NULLS FIRST, name
+    # Only company-created custom roles — no global/system roles
+    roles = [to_dict(r) for r in query("""
+        SELECT id::text, name FROM roles
+        WHERE company_id = %s::uuid
+        ORDER BY name
     """, (company_id,))]
 
-    access_rows = query("""
-        SELECT ro.name AS role_name, ro.id::text AS role_id,
-               pf.id::text AS feature_id, rfa.can_read, rfa.can_write, rfa.can_delete
+    if not roles:
+        return jsonify({'company_id': company_id, 'features': features, 'roles': [], 'matrix': {}})
+
+    # Default R/W/D per company role×feature
+    global_rows = query("""
+        SELECT ro.name AS role_name, pf.id::text AS feature_id,
+               rfa.can_read, rfa.can_write, rfa.can_delete
         FROM role_feature_access rfa
         JOIN roles ro ON ro.id = rfa.role_id
         JOIN portal_features pf ON pf.id = rfa.feature_id
-        WHERE (ro.company_id = %s::uuid OR ro.company_id IS NULL)
-          AND ro.name != 'SYSTEM_ADMIN'
+        WHERE ro.company_id = %s::uuid
     """, (company_id,))
 
-    overrides = query("""
-        SELECT ro.name AS role_name, pf.id::text AS feature_id, crfa.is_enabled
+    # Company-level R/W/D overrides
+    override_rows = query("""
+        SELECT ro.name AS role_name, pf.id::text AS feature_id,
+               crfa.can_read, crfa.can_write, crfa.can_delete
         FROM company_role_feature_access crfa
         JOIN roles ro ON ro.id = crfa.role_id
         JOIN portal_features pf ON pf.id = crfa.feature_id
         WHERE crfa.company_id = %s::uuid
     """, (company_id,))
-    override_map = {(r['role_name'], r['feature_id']): r['is_enabled'] for r in overrides}
 
+    global_map   = {(r['role_name'], r['feature_id']): r for r in global_rows}
+    override_map = {(r['role_name'], r['feature_id']): r for r in override_rows}
+
+    # Build matrix: {feature_id: {role_name: {r, w, d, override_r, override_w, override_d}}}
     matrix = {}
-    for row in access_rows:
-        fid, rname = row['feature_id'], row['role_name']
+    for (rname, fid), g in global_map.items():
         if fid not in matrix:
             matrix[fid] = {}
-        global_on = bool(row['can_read'])
-        co_override = override_map.get((rname, fid))
+        ov = override_map.get((rname, fid))
         matrix[fid][rname] = {
-            'global_enabled': global_on,
-            'company_override': co_override,
-            'effective': global_on if co_override is None else (global_on and co_override),
+            'global_r': bool(g['can_read']),   'global_w': bool(g['can_write']),   'global_d': bool(g['can_delete']),
+            'has_override': ov is not None,
+            'r': bool(ov['can_read'])   if ov else bool(g['can_read']),
+            'w': bool(ov['can_write'])  if ov else bool(g['can_write']),
+            'd': bool(ov['can_delete']) if ov else bool(g['can_delete']),
         }
 
     return jsonify({
         'company_id': company_id,
         'features': features,
-        'manageable_roles': company_roles,
+        'roles': roles,
         'matrix': matrix,
     })
 
@@ -466,10 +484,7 @@ def api_company_role_feature_access_get():
 @app.route('/api/admin/company/role-feature-access', methods=['POST'])
 @require_roles('SYSTEM_ADMIN', 'PORTAL_ADMIN')
 def api_company_role_feature_access_set():
-    """Set or clear a company-level override for a role×feature.
-
-    Body: {feature_id, role_name, is_enabled}  (is_enabled=null clears override)
-    """
+    """Set R/W/D override for a role×feature in this company. Omit can_read/write/delete to clear override."""
     company_id = _company_scope()
     if not company_id:
         return jsonify({'error': 'No company selected'}), 400
@@ -477,44 +492,38 @@ def api_company_role_feature_access_set():
     data       = request.get_json() or {}
     feature_id = data.get('feature_id')
     role_name  = data.get('role_name')
-    is_enabled = data.get('is_enabled')   # True / False / None
 
     if not feature_id or not role_name:
         return jsonify({'error': 'feature_id and role_name required'}), 400
-
-    # PORTAL_ADMIN can manage any role in their company (not SYSTEM_ADMIN)
     if role_name == 'SYSTEM_ADMIN':
         return jsonify({'error': 'Cannot manage SYSTEM_ADMIN role'}), 403
 
-    # Verify the role has global access first (can't grant beyond ceiling)
-    global_row = query("""
-        SELECT rfa.can_read FROM role_feature_access rfa
-        JOIN roles ro ON ro.id = rfa.role_id
-        WHERE ro.name = %s AND rfa.feature_id = %s::uuid
-    """, (role_name, feature_id), one=True)
-    if not global_row or not global_row['can_read']:
-        return jsonify({'error': 'Role does not have global access to this feature'}), 403
-
-    role_row = query("SELECT id::text FROM roles WHERE name = %s", (role_name,), one=True)
+    role_row = query("""
+        SELECT id::text FROM roles
+        WHERE name = %s AND (company_id = %s::uuid OR company_id IS NULL)
+        ORDER BY company_id NULLS LAST LIMIT 1
+    """, (role_name, company_id), one=True)
     if not role_row:
         return jsonify({'error': 'Role not found'}), 400
 
-    if is_enabled is None:
-        # Clear override → inherit global
+    # None means clear override (revert to global default)
+    if data.get('clear'):
         execute("""
             DELETE FROM company_role_feature_access
-            WHERE company_id = %s::uuid AND role_id = %s::uuid AND feature_id = %s::uuid
+            WHERE company_id=%s::uuid AND role_id=%s::uuid AND feature_id=%s::uuid
         """, (company_id, role_row['id'], feature_id))
     else:
+        can_read   = bool(data.get('r', False))
+        can_write  = bool(data.get('w', False))
+        can_delete = bool(data.get('d', False))
         execute("""
             INSERT INTO company_role_feature_access
-                (company_id, role_id, feature_id, is_enabled, updated_by, updated_at)
-            VALUES (%s::uuid, %s::uuid, %s::uuid, %s, %s::uuid, NOW())
+                (company_id, role_id, feature_id, can_read, can_write, can_delete, updated_by, updated_at)
+            VALUES (%s::uuid, %s::uuid, %s::uuid, %s, %s, %s, %s::uuid, NOW())
             ON CONFLICT (company_id, role_id, feature_id) DO UPDATE
-            SET is_enabled  = EXCLUDED.is_enabled,
-                updated_by  = EXCLUDED.updated_by,
-                updated_at  = NOW()
-        """, (company_id, role_row['id'], feature_id, bool(is_enabled), session['user_id']))
+            SET can_read=EXCLUDED.can_read, can_write=EXCLUDED.can_write,
+                can_delete=EXCLUDED.can_delete, updated_by=EXCLUDED.updated_by, updated_at=NOW()
+        """, (company_id, role_row['id'], feature_id, can_read, can_write, can_delete, session['user_id']))
 
     return jsonify({'ok': True})
 
@@ -527,16 +536,15 @@ def api_company_roles_list():
     company_id = _company_scope()
     if not company_id:
         return jsonify({'error': 'No company selected'}), 400
+    # Only show custom roles created by the company — NOT global system roles (PORTAL_ADMIN etc.)
     rows = query("""
         SELECT r.id::text, r.name, r.description,
-               r.company_id IS NULL AS is_system,
                COUNT(ur.user_id)::int AS user_count
         FROM roles r
         LEFT JOIN user_roles ur ON ur.role_id = r.id
-        WHERE (r.company_id = %s::uuid OR r.company_id IS NULL)
-          AND r.name != 'SYSTEM_ADMIN'
-        GROUP BY r.id, r.name, r.description, r.company_id
-        ORDER BY r.company_id NULLS FIRST, r.name
+        WHERE r.company_id = %s::uuid
+        GROUP BY r.id, r.name, r.description
+        ORDER BY r.name
     """, (company_id,))
     features = [to_dict(f) for f in query(
         "SELECT id::text, code, label FROM portal_features ORDER BY sort_order"
@@ -546,7 +554,7 @@ def api_company_roles_list():
         FROM role_feature_access rfa
         JOIN roles r ON r.id = rfa.role_id
         JOIN portal_features pf ON pf.id = rfa.feature_id
-        WHERE (r.company_id = %s::uuid OR r.company_id IS NULL)
+        WHERE r.company_id = %s::uuid
     """, (company_id,))
     perms = {}
     for a in access:
