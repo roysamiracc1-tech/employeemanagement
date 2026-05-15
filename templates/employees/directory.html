@@ -6,6 +6,24 @@
 <div class="page" style="padding-bottom:20px">
   <div id="page-top"></div>
 
+  {% if is_sa and not active_company_id %}
+  <!-- SA with no company selected — prompt to pick one -->
+  <div style="text-align:center;padding:60px 20px;background:#fff;border:1.5px solid #e2e8f0;border-radius:12px;margin-bottom:20px">
+    <div style="font-size:2.5rem;margin-bottom:12px">🏢</div>
+    <div style="font-weight:700;font-size:1.1rem;color:#0f172a;margin-bottom:8px">Select a Company</div>
+    <div style="color:#64748b;font-size:.875rem;margin-bottom:20px">Choose a company from the picker in the Admin Panel to view its employee directory.</div>
+    <div style="display:flex;justify-content:center;flex-wrap:wrap;gap:10px">
+      {% for c in companies %}
+      <a href="/admin" onclick="event.preventDefault();history.pushState({},'','/directory');window.location.href='/admin'"
+         style="padding:8px 18px;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:8px;font-size:.82rem;font-weight:600;color:#0f172a;text-decoration:none;cursor:pointer">
+        {{ c.name }}
+      </a>
+      {% endfor %}
+    </div>
+    <div style="font-size:.75rem;color:#94a3b8;margin-top:14px">Use the company switcher (top of Admin Panel sidebar) to select a company, then return here.</div>
+  </div>
+  {% else %}
+
   <div class="table-card">
 
     <!-- TOP pagination -->
@@ -100,6 +118,8 @@
     <span class="status-dot loading" id="status-dot"></span>
     <span id="status-text">Loading…</span>
   </div>
+
+  {% endif %}{# end else: SA with company selected OR non-SA #}
 </div>
 
 <!-- Floating scroll buttons -->
@@ -115,6 +135,7 @@
 
 {% block scripts %}
 <script>
+const ACTIVE_COMPANY_ID = {{ active_company_id | tojson }};
 const AVATAR_COLORS = ['#3b82f6','#8b5cf6','#ec4899','#f59e0b','#10b981','#06b6d4','#ef4444','#6366f1'];
 const MGMT_ROLES   = ['SYSTEM_ADMIN','HR_ADMIN','DEPARTMENT_HEAD','LOCATION_HEAD',
                       'HIRING_MANAGER','SOLID_LINE_MANAGER','DOTTED_LINE_MANAGER'];
@@ -292,7 +313,10 @@ function onRowsChange(e){
 
 async function loadEmployees(){
   try{
-    const res=await fetch('/api/employees');
+    const url = ACTIVE_COMPANY_ID
+      ? `/api/employees?company_id=${encodeURIComponent(ACTIVE_COMPANY_ID)}`
+      : '/api/employees';
+    const res=await fetch(url);
     if(!res.ok) throw new Error(`HTTP ${res.status}`);
     all=await res.json();
 

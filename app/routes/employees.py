@@ -4,6 +4,7 @@ from app import app
 from app.db import query, execute, insert_returning, to_dict
 from app.auth import login_required, require_roles
 from app.helpers import fetch_employees, direct_report_ids, is_direct_report
+from app.services.company_scope import current_company_id
 
 
 # ── Pages ─────────────────────────────────────────────────────────────────────
@@ -11,10 +12,33 @@ from app.helpers import fetch_employees, direct_report_ids, is_direct_report
 @app.route('/directory')
 @require_roles('SYSTEM_ADMIN', 'HR_ADMIN', 'DEPARTMENT_HEAD', 'LOCATION_HEAD', 'HIRING_MANAGER')
 def directory():
-    departments = [to_dict(r) for r in query("SELECT id::text, name, code FROM business_units ORDER BY name")]
-    locations   = [to_dict(r) for r in query("SELECT id::text, name, office_code FROM locations ORDER BY name")]
+    co_id = current_company_id()
+    is_sa = 'SYSTEM_ADMIN' in session.get('roles', [])
+
+    if co_id:
+        co_filter    = "WHERE company_id = %s::uuid"
+        co_params    = (co_id,)
+    else:
+        co_filter    = ""
+        co_params    = ()
+
+    departments = [to_dict(r) for r in query(
+        f"SELECT id::text, name, code FROM business_units {co_filter} ORDER BY name", co_params)]
+    locations   = [to_dict(r) for r in query(
+        f"SELECT id::text, name, office_code FROM locations {co_filter} ORDER BY name", co_params)]
+
+    # For SA with no company selected, show a prompt in the template
+    companies = []
+    if is_sa and not co_id:
+        companies = [to_dict(r) for r in query(
+            "SELECT id::text, name FROM companies WHERE is_active ORDER BY name")]
+
     return render_template('employees/directory.html',
-                           departments=departments, locations=locations)
+                           departments=departments,
+                           locations=locations,
+                           active_company_id=co_id or '',
+                           companies=companies,
+                           is_sa=is_sa)
 
 
 @app.route('/my-team')
@@ -74,8 +98,13 @@ def profile(emp_id=None):
 @login_required
 def api_employees():
     roles = session.get('roles', [])
+    co_id = current_company_id()
+
     if any(r in roles for r in ['SYSTEM_ADMIN', 'HR_ADMIN', 'DEPARTMENT_HEAD', 'LOCATION_HEAD', 'HIRING_MANAGER']):
-        data = fetch_employees()
+        # SA: honour ?company_id query param (from JS); fall back to session context
+        if 'SYSTEM_ADMIN' in roles:
+            co_id = request.args.get('company_id') or co_id
+        data = fetch_employees(company_id=co_id)
     elif any(r in roles for r in ['SOLID_LINE_MANAGER', 'DOTTED_LINE_MANAGER']):
         ids  = direct_report_ids(session['employee_id'])
         data = fetch_employees(emp_ids=ids)

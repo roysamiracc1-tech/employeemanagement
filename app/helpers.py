@@ -123,15 +123,18 @@ _EMP_SELECT = """
 """
 
 
-def fetch_employees(emp_ids=None):
-    if emp_ids is None:
-        sql  = _EMP_SELECT + " WHERE e.employment_status='ACTIVE' ORDER BY e.first_name, e.last_name"
-        rows = query(sql)
-    else:
+def fetch_employees(emp_ids=None, company_id=None):
+    if emp_ids is not None:
         if not emp_ids:
             return []
         sql  = _EMP_SELECT + " WHERE e.id = ANY(%s::uuid[]) AND e.employment_status='ACTIVE' ORDER BY e.first_name, e.last_name"
         rows = query(sql, (list(emp_ids),))
+    elif company_id:
+        sql  = _EMP_SELECT + " WHERE e.company_id = %s::uuid AND e.employment_status='ACTIVE' ORDER BY e.first_name, e.last_name"
+        rows = query(sql, (company_id,))
+    else:
+        sql  = _EMP_SELECT + " WHERE e.employment_status='ACTIVE' ORDER BY e.first_name, e.last_name"
+        rows = query(sql)
     return [to_dict(r) for r in rows]
 
 
