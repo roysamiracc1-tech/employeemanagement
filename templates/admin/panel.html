@@ -310,7 +310,7 @@
           </button>
         </div>
       </div>
-      <div style="padding:0;overflow-x:auto" id="role-matrix-container">
+      <div style="padding:0" id="role-matrix-container">
         <p style="padding:24px;color:#94a3b8;font-size:.85rem">Loading permissions matrix…</p>
       </div>
     </div>
@@ -453,7 +453,7 @@
           </button>
         </div>
       </div>
-      <div style="padding:0;overflow-x:auto" id="fa-matrix-container">
+      <div style="padding:0" id="fa-matrix-container">
         <p style="padding:24px;color:#94a3b8;font-size:.85rem">Loading feature access matrix…</p>
       </div>
     </div>
@@ -647,9 +647,10 @@ async function loadRoleMatrix() {
   renderRoleMatrix();
 }
 
+let _rmSelectedRole = null;
+
 function renderRoleMatrix() {
   const { roles, features, matrix } = _rolesData;
-  const ACTIONS = [{k:'r', label:'R', full:'can_read'}, {k:'w', label:'W', full:'can_write'}, {k:'d', label:'D', full:'can_delete'}];
 
   // Snapshot original state
   for (const r of roles) {
@@ -664,51 +665,94 @@ function renderRoleMatrix() {
     }
   }
 
-  let html = '<table class="perm-matrix"><thead><tr>';
-  html += '<th class="pm-feature-col">Feature</th>';
-  for (const r of roles) {
-    const isSys = r.name === 'SYSTEM_ADMIN';
-    html += `<th class="pm-role-col" colspan="3" style="${isSys ? 'background:#7c3aed08' : ''}">
-      <div style="font-size:.68rem;font-weight:700;padding:3px 0;color:${isSys ? '#7c3aed' : 'inherit'}">${r.name.replace(/_/g,' ')}</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;text-align:center;font-size:.6rem;color:#94a3b8">
-        <span>R</span><span>W</span><span>D</span>
-      </div>
-    </th>`;
+  if (!_rmSelectedRole || !roles.find(r => r.id === _rmSelectedRole)) {
+    _rmSelectedRole = roles[0]?.id || null;
   }
-  html += '</tr></thead><tbody>';
 
-  for (const f of features) {
-    html += `<tr><td class="pm-feature-label">
-      <div style="font-size:.82rem;font-weight:600">${f.label}</div>
-      <div style="font-size:.67rem;color:#94a3b8;margin-top:2px">${f.description || ''}</div>
-    </td>`;
-    for (const r of roles) {
-      const isSys = r.name === 'SYSTEM_ADMIN';
-      const acc   = (matrix[r.id] || {})[f.id] || {r:false, w:false, d:false};
-      for (const a of ACTIONS) {
-        const checked = isSys || acc[a.k];
-        html += `<td class="pm-cell" style="${isSys ? 'background:#7c3aed04' : ''}">
-          <input type="checkbox" class="pm-cb"
-            data-role="${r.id}" data-feature="${f.id}" data-action="${a.full}"
-            data-role-name="${r.name}" data-feature-label="${f.label}"
-            ${checked ? 'checked' : ''} ${isSys ? 'disabled title="Tech Admin always has full access"' : ''}
-            onchange="markPermDirty(this)">
-        </td>`;
-      }
-    }
-    html += '</tr>';
+  // Role pill selector
+  let pills = '<div style="padding:16px 20px 0;border-bottom:1px solid #e2e8f0">';
+  pills += '<div style="font-size:.72rem;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">Select Role</div>';
+  pills += '<div style="display:flex;flex-wrap:wrap;gap:6px;padding-bottom:16px">';
+  for (const r of roles) {
+    const isSys    = r.name === 'SYSTEM_ADMIN';
+    const isActive = r.id === _rmSelectedRole;
+    const color    = isSys ? '#7c3aed' : '#0f172a';
+    const bg       = isActive ? (isSys ? '#7c3aed' : '#0f172a') : (isSys ? '#f3f0ff' : '#f1f5f9');
+    const fg       = isActive ? '#fff' : color;
+    pills += `<button onclick="selectRmRole('${r.id}')" style="
+      padding:5px 12px;border-radius:20px;border:1.5px solid ${isSys ? '#7c3aed' : '#e2e8f0'};
+      font-size:.75rem;font-weight:600;cursor:pointer;background:${bg};color:${fg};
+      transition:all .15s" id="rm-pill-${r.id}">
+      ${r.name.replace(/_/g,' ')}
+    </button>`;
   }
-  html += '</tbody></table>';
-  document.getElementById('role-matrix-container').innerHTML = html;
+  pills += '</div></div>';
+
+  // Feature table for selected role
+  const role    = roles.find(r => r.id === _rmSelectedRole);
+  const isSys   = role?.name === 'SYSTEM_ADMIN';
+  const roleAcc = matrix[_rmSelectedRole] || {};
+
+  let table = `<div style="padding:16px 20px">
+    <div style="font-size:.78rem;color:#64748b;margin-bottom:14px">
+      Configuring: <strong>${role ? role.name.replace(/_/g,' ') : ''}</strong>
+      ${isSys ? '<span style="margin-left:6px;font-size:.7rem;background:#f3f0ff;color:#7c3aed;padding:2px 8px;border-radius:10px;font-weight:600">Always full access — cannot be changed</span>' : ''}
+    </div>
+    <table style="width:100%;border-collapse:collapse">
+      <thead>
+        <tr style="background:#f8fafc;border-bottom:2px solid #e2e8f0">
+          <th style="padding:10px 16px;text-align:left;font-size:.72rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.04em">Feature</th>
+          <th style="padding:10px 16px;text-align:center;width:100px;font-size:.72rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.04em">Read</th>
+          <th style="padding:10px 16px;text-align:center;width:100px;font-size:.72rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.04em">Write</th>
+          <th style="padding:10px 16px;text-align:center;width:100px;font-size:.72rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.04em">Delete</th>
+        </tr>
+      </thead>
+      <tbody>`;
+
+  const ACTIONS = [{k:'r', full:'can_read'}, {k:'w', full:'can_write'}, {k:'d', full:'can_delete'}];
+  for (const f of features) {
+    const acc = roleAcc[f.id] || {r:false, w:false, d:false};
+    table += `<tr style="border-bottom:1px solid #f1f5f9">
+      <td style="padding:12px 16px">
+        <div style="font-size:.85rem;font-weight:600;color:#0f172a">${f.label}</div>
+        ${f.description ? `<div style="font-size:.7rem;color:#94a3b8;margin-top:2px">${f.description}</div>` : ''}
+      </td>`;
+    for (const a of ACTIONS) {
+      const checked = isSys || acc[a.k];
+      const orig    = (_origPerms[_rmSelectedRole]?.[f.id] || {})[a.full] ?? false;
+      const curKey  = `${_rmSelectedRole}|${f.id}`;
+      const isDirty = _dirtyPerms[curKey] &&
+                      (_dirtyPerms[curKey][a.full] !== orig);
+      table += `<td style="padding:12px 16px;text-align:center">
+        <input type="checkbox" class="pm-cb${isDirty ? ' pm-cb--dirty' : ''}"
+          data-role="${_rmSelectedRole}" data-feature="${f.id}" data-action="${a.full}"
+          data-role-name="${role?.name}" data-feature-label="${f.label}"
+          ${checked ? 'checked' : ''} ${isSys ? 'disabled title="Tech Admin always has full access"' : ''}
+          onchange="markPermDirty(this)"
+          style="width:16px;height:16px;cursor:${isSys ? 'not-allowed' : 'pointer'}">
+      </td>`;
+    }
+    table += '</tr>';
+  }
+  table += '</tbody></table></div>';
+
+  document.getElementById('role-matrix-container').innerHTML = pills + table;
   _updateDirtyUI();
+}
+
+function selectRmRole(roleId) {
+  _rmSelectedRole = roleId;
+  renderRoleMatrix();
 }
 
 function markPermDirty(cb) {
   const roleId    = cb.dataset.role;
   const featureId = cb.dataset.feature;
+  const roleName  = cb.dataset.roleName || roleId;
+  const featLabel = cb.dataset.featureLabel || featureId;
   const key       = roleId + '|' + featureId;
 
-  // Collect current state for this role×feature
+  // Collect current state for all three checkboxes (all visible on page)
   const cbs  = document.querySelectorAll(`.pm-cb[data-role="${roleId}"][data-feature="${featureId}"]`);
   const cur  = {can_read:false, can_write:false, can_delete:false};
   cbs.forEach(c => { cur[c.dataset.action] = c.checked; });
@@ -719,10 +763,9 @@ function markPermDirty(cb) {
                   cur.can_write !== orig.can_write ||
                   cur.can_delete !== orig.can_delete;
 
-  if (isDirty) _dirtyPerms[key] = {roleId, featureId, ...cur};
+  if (isDirty) _dirtyPerms[key] = {roleId, featureId, roleName, featureLabel: featLabel, ...cur};
   else         delete _dirtyPerms[key];
 
-  // Highlight all three cells for this role×feature
   cbs.forEach(c => {
     c.classList.toggle('pm-cb--dirty', isDirty);
   });
@@ -753,10 +796,8 @@ function openPermConfirmModal() {
   }
 
   tbody.innerHTML = rows.map(d => {
-    // Look up names from DOM
-    const cb = document.querySelector(`.pm-cb[data-role="${d.roleId}"][data-feature="${d.featureId}"]`);
-    const roleName    = cb ? cb.dataset.roleName.replace(/_/g,' ')    : d.roleId;
-    const featureLabel= cb ? cb.dataset.featureLabel : d.featureId;
+    const roleName    = (d.roleName || d.roleId).replace(/_/g,' ');
+    const featureLabel= d.featureLabel || d.featureId;
     const orig = (_origPerms[d.roleId]||{})[d.featureId] || {can_read:false,can_write:false,can_delete:false};
     return `<tr style="border-bottom:1px solid #f1f5f9">
       <td style="padding:9px 16px;font-size:.8rem;font-weight:600">${featureLabel}</td>
@@ -1454,56 +1495,106 @@ async function loadFeatureAccessMatrix() {
   renderFeatureAccessMatrix();
 }
 
+let _faSelectedRole = null;
+
 function renderFeatureAccessMatrix() {
-  const { features, roles, matrix } = _faData;
-  const ACTIONS = [{k:'r',label:'R',full:'can_read'},{k:'w',label:'W',full:'can_write'},{k:'d',label:'D',full:'can_delete'}];
+  const { features, roles, matrix, global_ceiling } = _faData;
 
-  let html = '<table class="perm-matrix"><thead><tr>';
-  html += '<th class="pm-feature-col">Feature</th>';
+  if (!_faSelectedRole || !roles.find(r => r.name === _faSelectedRole)) {
+    _faSelectedRole = roles[0]?.name || null;
+  }
+
+  // Role pill selector
+  let pills = '<div style="padding:16px 20px 0;border-bottom:1px solid #e2e8f0">';
+  pills += '<div style="font-size:.72rem;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">Select Role</div>';
+  pills += '<div style="display:flex;flex-wrap:wrap;gap:6px;padding-bottom:16px">';
   for (const role of roles) {
-    html += `<th class="pm-role-col" colspan="3">
-      <div style="font-size:.68rem;font-weight:700;padding:3px 0">${role.name.replace(/_/g,' ')}</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;text-align:center;font-size:.6rem;color:#94a3b8">
-        <span>R</span><span>W</span><span>D</span>
-      </div>
-    </th>`;
+    const isActive = role.name === _faSelectedRole;
+    const bg = isActive ? '#0f172a' : '#f1f5f9';
+    const fg = isActive ? '#fff' : '#0f172a';
+    pills += `<button onclick="selectFaRole('${role.name}')" style="
+      padding:5px 12px;border-radius:20px;border:1.5px solid #e2e8f0;
+      font-size:.75rem;font-weight:600;cursor:pointer;background:${bg};color:${fg};
+      transition:all .15s" id="fa-pill-${role.name.replace(/[^a-zA-Z0-9]/g,'-')}">
+      ${role.name.replace(/_/g,' ')}
+    </button>`;
   }
-  html += '</tr></thead><tbody>';
+  pills += '</div></div>';
 
+  // Feature table for selected role
+  const roleData = roles.find(r => r.name === _faSelectedRole);
+
+  let table = `<div style="padding:16px 20px">
+    <div style="font-size:.78rem;color:#64748b;margin-bottom:6px">
+      Configuring: <strong>${_faSelectedRole ? _faSelectedRole.replace(/_/g,' ') : ''}</strong>
+    </div>
+    <div style="font-size:.72rem;color:#94a3b8;margin-bottom:14px">
+      Checkboxes show this company's access.
+      ${IS_TECH_ADMIN
+        ? 'As Super Admin you are setting the global ceiling — these values apply to all companies unless overridden.'
+        : 'Grey locked cells show the Super Admin ceiling — you cannot grant access beyond what Super Admin has set.'}
+    </div>
+    <table style="width:100%;border-collapse:collapse">
+      <thead>
+        <tr style="background:#f8fafc;border-bottom:2px solid #e2e8f0">
+          <th style="padding:10px 16px;text-align:left;font-size:.72rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.04em">Feature</th>
+          <th style="padding:10px 16px;text-align:center;width:110px;font-size:.72rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.04em">Read</th>
+          <th style="padding:10px 16px;text-align:center;width:110px;font-size:.72rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.04em">Write</th>
+          <th style="padding:10px 16px;text-align:center;width:110px;font-size:.72rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.04em">Delete</th>
+        </tr>
+      </thead>
+      <tbody>`;
+
+  const ACTIONS = [{k:'r'}, {k:'w'}, {k:'d'}];
   for (const feat of features) {
-    const fid = feat.id;
-    const featMatrix = matrix[fid] || {};
-    html += `<tr><td class="pm-feature-label">
-      <div style="font-size:.82rem;font-weight:600">${feat.label}</div>
-    </td>`;
-    for (const role of roles) {
-      const cell = featMatrix[role.name];
-      for (const a of ACTIONS) {
-        if (!cell) {
-          // No access defined for this role×feature
-          html += `<td class="pm-cell" style="text-align:center">
-            <span style="color:#e2e8f0;font-size:.7rem">—</span></td>`;
-          continue;
-        }
-        const key = `${fid}|${role.name}|${a.k}`;
-        const origVal = cell[a.k];
-        const dirty   = _faDirty[key];
-        const checked = dirty !== undefined ? dirty : origVal;
-        const isDirty = dirty !== undefined && dirty !== origVal;
-        const isOverridden = cell.has_override;
-        html += `<td class="pm-cell${isDirty ? ' pm-cb--dirty' : ''}" style="text-align:center">
-          <input type="checkbox" class="fa-cb pm-cb"
-            data-fid="${fid}" data-role="${role.name}" data-action="${a.k}"
-            ${checked ? 'checked' : ''}
-            onchange="markFaDirty(this)">
-        </td>`;
+    const fid      = feat.id;
+    const cell     = (matrix[fid] || {})[_faSelectedRole];
+    // ceiling = what SA allows globally for this role×feature
+    const ceiling  = (global_ceiling && global_ceiling[fid] && global_ceiling[fid][_faSelectedRole]) || null;
+
+    table += `<tr style="border-bottom:1px solid #f1f5f9">
+      <td style="padding:12px 16px">
+        <div style="font-size:.85rem;font-weight:600;color:#0f172a">${feat.label}</div>
+        ${feat.description ? `<div style="font-size:.7rem;color:#94a3b8;margin-top:2px">${feat.description}</div>` : ''}
+      </td>`;
+
+    for (const a of ACTIONS) {
+      const origVal = cell ? !!cell[a.k] : false;
+      const keyStr  = `${fid}|${_faSelectedRole}|${a.k}`;
+      const dirty   = _faDirty[keyStr];
+      const checked = dirty !== undefined ? dirty : origVal;
+      const isDirty = dirty !== undefined && dirty !== origVal;
+      // ceiling for this action — if SA hasn't granted it, lock it off
+      const ceilVal = ceiling ? !!ceiling[a.k] : false;
+      const isLocked = !IS_TECH_ADMIN && !ceilVal;
+
+      table += `<td style="padding:12px 16px;text-align:center;${isDirty ? 'background:#fffbeb' : ''}">`;
+      if (!cell && !IS_TECH_ADMIN && !ceilVal) {
+        // SA never granted this feature to this role — show dash
+        table += `<span title="Not available — Super Admin has not granted this feature to this role" style="color:#d1d5db;font-size:1rem">—</span>`;
+      } else if (isLocked) {
+        table += `<input type="checkbox" disabled title="Locked — Super Admin ceiling is OFF for this permission"
+          style="width:16px;height:16px;opacity:.35;cursor:not-allowed">`;
+      } else {
+        table += `<input type="checkbox" class="fa-cb pm-cb${isDirty ? ' pm-cb--dirty' : ''}"
+          data-fid="${fid}" data-role="${_faSelectedRole}" data-action="${a.k}"
+          ${checked ? 'checked' : ''}
+          onchange="markFaDirty(this)"
+          style="width:16px;height:16px;cursor:pointer">`;
       }
+      table += '</td>';
     }
-    html += '</tr>';
+    table += '</tr>';
   }
-  html += '</tbody></table>';
-  document.getElementById('fa-matrix-container').innerHTML = html;
+  table += '</tbody></table></div>';
+
+  document.getElementById('fa-matrix-container').innerHTML = pills + table;
   _updateFaDirtyUI();
+}
+
+function selectFaRole(roleName) {
+  _faSelectedRole = roleName;
+  renderFeatureAccessMatrix();
 }
 
 function markFaDirty(cb) {

@@ -472,11 +472,23 @@ def api_company_role_feature_access_get():
             'd': bool(ov['can_delete']) if ov else bool(g['can_delete']),
         }
 
+    # Build global ceiling: {feature_id: {role_name: {r, w, d}}} — SA's granted maximum
+    global_ceiling = {}
+    for (rname, fid), g in global_map.items():
+        if fid not in global_ceiling:
+            global_ceiling[fid] = {}
+        global_ceiling[fid][rname] = {
+            'r': bool(g['can_read']),
+            'w': bool(g['can_write']),
+            'd': bool(g['can_delete']),
+        }
+
     return jsonify({
         'company_id': company_id,
         'features': features,
         'roles': roles,
         'matrix': matrix,
+        'global_ceiling': global_ceiling,
     })
 
 
