@@ -4,10 +4,53 @@
 
 {% block content %}
 <div class="page">
+
+  {% if is_sa %}
+  <!-- SA company context bar — same design as Dashboard / Admin Panel / Employee Directory -->
+  <div class="ctx-bar" style="align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:16px">
+    <div style="display:flex;align-items:center;gap:6px;padding-top:4px">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      <strong>Company:</strong>
+    </div>
+    <div class="co-picker" id="vt-co-picker">
+      <button type="button" class="co-picker-btn" id="vt-co-picker-btn" onclick="toggleVtCoPicker()">
+        <span id="vt-co-picker-selected">
+          {% if active_company_id %}
+            {% for c in companies %}{% if c.id == active_company_id %}
+              {% if c.logo_url %}<img src="{{ c.logo_url }}" alt="" class="co-picker-logo">{% endif %}
+              <span>{{ c.name }}</span>
+            {% endif %}{% endfor %}
+          {% else %}
+            <span style="opacity:.6">All Companies</span>
+          {% endif %}
+        </span>
+        <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="co-picker-menu" id="vt-co-picker-menu">
+        <div class="co-picker-opt" onclick="switchVtCompany('')">
+          <span style="opacity:.6;font-style:italic">All Companies</span>
+        </div>
+        {% for c in companies %}
+        <div class="co-picker-opt {% if c.id == active_company_id %}co-picker-opt--active{% endif %}"
+             onclick="switchVtCompany('{{ c.id }}')">
+          {% if c.logo_url %}<img src="{{ c.logo_url }}" alt="" class="co-picker-logo">{% endif %}
+          <div style="font-weight:600;font-size:.88rem">{{ c.name }}</div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% if active_company_id %}
+    <span class="ctx-badge-scoped">Scoped</span>
+    {% else %}
+    <span class="ctx-badge-all">All Companies</span>
+    {% endif %}
+  </div>
+  {% endif %}
+
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px">
     <div>
       <h1 style="font-size:1.25rem;font-weight:700;margin-bottom:2px">Vacation Types</h1>
-      <p style="font-size:.8rem;color:#64748b">{{ types|length }} type{{ 's' if types|length != 1 }} configured</p>
+      <p style="font-size:.8rem;color:#64748b">{{ types|length }} type{{ 's' if types|length != 1 }} configured{% if active_company_id %} for selected company{% endif %}</p>
     </div>
     <a href="{{ url_for('admin_vacation_type_new') }}" class="btn btn-primary">
       <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -82,6 +125,23 @@
 {% endblock %}
 
 {% block scripts %}
+<script>
+function toggleVtCoPicker() {
+  document.getElementById('vt-co-picker-menu').classList.toggle('co-picker-menu--open');
+}
+document.addEventListener('click', function(e) {
+  const picker = document.getElementById('vt-co-picker');
+  if (picker && !picker.contains(e.target))
+    document.getElementById('vt-co-picker-menu').classList.remove('co-picker-menu--open');
+});
+function switchVtCompany(companyId) {
+  fetch('/api/admin/switch-company', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({company_id: companyId || null})
+  }).then(() => location.reload());
+}
+</script>
 <script>
 const RULE_LABELS = {
   'GENDER_EQ':         v => `Gender: ${v.charAt(0)+v.slice(1).toLowerCase()}`,

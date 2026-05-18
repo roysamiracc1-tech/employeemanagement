@@ -19,13 +19,14 @@ _ADMIN_ROLES = ('SYSTEM_ADMIN', 'PORTAL_ADMIN')
 
 def _vac_company_scope():
     if 'SYSTEM_ADMIN' in session.get('roles', []):
-        return None
+        return session.get('admin_company_id') or None
     return session.get('company_id') or None
 
 
 @app.route('/admin/vacation-types')
 @require_roles(*_ADMIN_ROLES)
 def admin_vacation_types():
+    is_sa = 'SYSTEM_ADMIN' in session.get('roles', [])
     co_id = _vac_company_scope()
     co_filter = "WHERE vt.company_id = %s::uuid" if co_id else ""
     rows = query(f"""
@@ -41,8 +42,17 @@ def admin_vacation_types():
         GROUP BY vt.id, c.name
         ORDER BY c.name, vt.name
     """, (co_id,) if co_id else ())
+
+    companies = []
+    if is_sa:
+        companies = [to_dict(r) for r in query(
+            "SELECT id::text, name, logo_url FROM companies WHERE is_active ORDER BY name")]
+
     return render_template('admin/vacation_types.html',
-                           types=[to_dict(r) for r in rows])
+                           types=[to_dict(r) for r in rows],
+                           companies=companies,
+                           active_company_id=co_id or '',
+                           is_sa=is_sa)
 
 
 @app.route('/admin/vacation-types/new', methods=['GET', 'POST'])
@@ -50,7 +60,11 @@ def admin_vacation_types():
 def admin_vacation_type_new():
     co_id     = _vac_company_scope()
     companies = [] if co_id else [to_dict(r) for r in query("SELECT id::text, name FROM companies WHERE is_active ORDER BY name")]
-    locations = [to_dict(r) for r in query("SELECT id::text, name FROM locations ORDER BY name")]
+    if co_id:
+        locations = [to_dict(r) for r in query(
+            "SELECT id::text, name FROM locations WHERE company_id = %s::uuid ORDER BY name", (co_id,))]
+    else:
+        locations = [to_dict(r) for r in query("SELECT id::text, name FROM locations ORDER BY name")]
 
     if request.method == 'POST':
         company_id = co_id or request.form.get('company_id')
