@@ -287,10 +287,16 @@ def api_admin_users():
 @require_roles(*_ADMIN_ROLES)
 def api_update_roles():
     data      = request.get_json()
+    if not isinstance(data, dict):
+        data = {}
     user_id   = data.get('user_id')
-    new_roles = data.get('roles', [])
+    new_roles = data.get('roles') or []
     if not user_id:
         return jsonify({'error': 'user_id required'}), 400
+    if not isinstance(user_id, str):
+        return jsonify({'error': 'user_id must be a string'}), 400
+    if not isinstance(new_roles, list):
+        return jsonify({'error': 'roles must be a list'}), 400
     co_id = _company_scope()
     if co_id:
         owner = query("SELECT 1 FROM users u JOIN employees e ON e.id=u.employee_id WHERE u.id=%s AND e.company_id=%s::uuid", (user_id, co_id), one=True)
@@ -307,7 +313,12 @@ def api_update_roles():
 @app.route('/api/admin/toggle-user', methods=['POST'])
 @require_roles(*_ADMIN_ROLES)
 def api_toggle_user():
-    user_id = request.get_json().get('user_id')
+    _data = request.get_json()
+    user_id = (_data if isinstance(_data, dict) else {}).get('user_id')
+    if not user_id:
+        return jsonify({'error': 'user_id required'}), 400
+    if not isinstance(user_id, str):
+        return jsonify({'error': 'user_id must be a string'}), 400
     co_id = _company_scope()
     if co_id:
         owner = query("SELECT 1 FROM users u JOIN employees e ON e.id=u.employee_id WHERE u.id=%s AND e.company_id=%s::uuid", (user_id, co_id), one=True)
@@ -315,6 +326,8 @@ def api_toggle_user():
             return jsonify({'error': 'User not in your company'}), 403
     execute("UPDATE users SET is_active = NOT is_active WHERE id=%s", (user_id,))
     row = query("SELECT is_active FROM users WHERE id=%s", (user_id,), one=True)
+    if not row:
+        return jsonify({'error': 'User not found'}), 404
     return jsonify({'is_active': row['is_active']})
 
 
@@ -562,8 +575,12 @@ def api_company_roles_create():
     if not company_id:
         return jsonify({'error': 'No company selected'}), 400
     data = request.get_json() or {}
-    name = (data.get('name') or '').strip().upper().replace(' ', '_')
-    desc = (data.get('description') or '').strip() or None
+    raw_name = data.get('name')
+    if not isinstance(raw_name, str):
+        return jsonify({'error': 'name must be a string'}), 400
+    name = raw_name.strip().upper().replace(' ', '_')
+    raw_desc = data.get('description')
+    desc = (str(raw_desc).strip() if isinstance(raw_desc, str) else None) or None
     if not name:
         return jsonify({'error': 'name required'}), 400
     if query("SELECT 1 FROM roles WHERE name=%s AND company_id=%s::uuid", (name, company_id), one=True):
@@ -584,8 +601,12 @@ def api_company_roles_update(role_id):
     if role['company_id'] is None:
         return jsonify({'error': 'Cannot rename system roles'}), 403
     data = request.get_json() or {}
-    name = (data.get('name') or '').strip().upper().replace(' ', '_')
-    desc = (data.get('description') or '').strip() or None
+    raw_name = data.get('name')
+    if raw_name is not None and not isinstance(raw_name, str):
+        return jsonify({'error': 'name must be a string'}), 400
+    name = (raw_name or '').strip().upper().replace(' ', '_')
+    raw_desc = data.get('description')
+    desc = (str(raw_desc).strip() if isinstance(raw_desc, str) else None) or None
     if not name:
         return jsonify({'error': 'name required'}), 400
     execute("UPDATE roles SET name=%s, description=%s WHERE id=%s::uuid", (name, desc, role_id))
@@ -737,10 +758,13 @@ def _assert_org_ownership(table, id_col, record_id):
 @app.route('/api/admin/org/business-units', methods=['POST'])
 @require_roles(*_ADMIN_ROLES)
 def api_org_bu_create():
-    data  = request.get_json()
-    name  = (data.get('name') or '').strip()
-    code  = (data.get('code') or '').strip() or None
-    desc  = (data.get('description') or '').strip() or None
+    data  = request.get_json() or {}
+    raw_name = data.get('name')
+    if raw_name is not None and not isinstance(raw_name, str):
+        return jsonify({'error': 'name must be a string'}), 400
+    name  = (raw_name or '').strip()
+    code  = str(data.get('code') or '').strip() or None if isinstance(data.get('code'), str) else None
+    desc  = str(data.get('description') or '').strip() or None if isinstance(data.get('description'), str) else None
     co_id = _company_scope()
     if not name:
         return jsonify({'error': 'Name is required'}), 400
@@ -759,10 +783,15 @@ def api_org_bu_update(bu_id):
     err = _assert_org_ownership('business_units', 'id', bu_id)
     if err:
         return err
-    data = request.get_json()
-    name = (data.get('name') or '').strip()
-    code = (data.get('code') or '').strip() or None
-    desc = (data.get('description') or '').strip() or None
+    data = request.get_json() or {}
+    raw_name = data.get('name')
+    if raw_name is not None and not isinstance(raw_name, str):
+        return jsonify({'error': 'name must be a string'}), 400
+    name = (raw_name or '').strip()
+    raw_code = data.get('code')
+    code = (str(raw_code).strip() or None) if isinstance(raw_code, str) else None
+    raw_desc = data.get('description')
+    desc = (str(raw_desc).strip() or None) if isinstance(raw_desc, str) else None
     if not name:
         return jsonify({'error': 'Name is required'}), 400
     if code:
@@ -780,10 +809,11 @@ def api_org_bu_delete(bu_id):
     err = _assert_org_ownership('business_units', 'id', bu_id)
     if err:
         return err
-    count = query(
+    row = query(
         "SELECT COUNT(*) AS c FROM employee_org_assignments WHERE business_unit_id=%s::uuid AND is_current",
         (bu_id,), one=True,
-    )['c']
+    )
+    count = row['c'] if row else 0
     if count:
         return jsonify({'error': f'Cannot delete — {count} employee(s) currently assigned to this BU'}), 409
     execute("DELETE FROM business_units WHERE id=%s::uuid", (bu_id,))
@@ -795,11 +825,14 @@ def api_org_bu_delete(bu_id):
 @app.route('/api/admin/org/locations', methods=['POST'])
 @require_roles(*_ADMIN_ROLES)
 def api_org_loc_create():
-    data        = request.get_json()
-    name        = (data.get('name') or '').strip()
-    office_code = (data.get('office_code') or '').strip() or None
-    country     = (data.get('country') or '').strip() or None
-    city        = (data.get('city') or '').strip() or None
+    data        = request.get_json() or {}
+    raw_name    = data.get('name')
+    if raw_name is not None and not isinstance(raw_name, str):
+        return jsonify({'error': 'name must be a string'}), 400
+    name        = (raw_name or '').strip()
+    office_code = (data.get('office_code') or '').strip() or None if isinstance(data.get('office_code', ''), str) else None
+    country     = (data.get('country') or '').strip() or None if isinstance(data.get('country', ''), str) else None
+    city        = (data.get('city') or '').strip() or None if isinstance(data.get('city', ''), str) else None
     co_id       = _company_scope()
     if not name:
         return jsonify({'error': 'Name is required'}), 400
@@ -818,11 +851,17 @@ def api_org_loc_update(loc_id):
     err = _assert_org_ownership('locations', 'id', loc_id)
     if err:
         return err
-    data        = request.get_json()
-    name        = (data.get('name') or '').strip()
-    office_code = (data.get('office_code') or '').strip() or None
-    country     = (data.get('country') or '').strip() or None
-    city        = (data.get('city') or '').strip() or None
+    data        = request.get_json() or {}
+    raw_name    = data.get('name')
+    if raw_name is not None and not isinstance(raw_name, str):
+        return jsonify({'error': 'name must be a string'}), 400
+    name        = (raw_name or '').strip()
+    raw_oc      = data.get('office_code')
+    office_code = (str(raw_oc).strip() or None) if isinstance(raw_oc, str) else None
+    raw_country = data.get('country')
+    country     = (str(raw_country).strip() or None) if isinstance(raw_country, str) else None
+    raw_city    = data.get('city')
+    city        = (str(raw_city).strip() or None) if isinstance(raw_city, str) else None
     if not name:
         return jsonify({'error': 'Name is required'}), 400
     if office_code:
@@ -840,10 +879,11 @@ def api_org_loc_delete(loc_id):
     err = _assert_org_ownership('locations', 'id', loc_id)
     if err:
         return err
-    count = query(
+    row = query(
         "SELECT COUNT(*) AS c FROM employee_org_assignments WHERE location_id=%s::uuid AND is_current",
         (loc_id,), one=True,
-    )['c']
+    )
+    count = row['c'] if row else 0
     if count:
         return jsonify({'error': f'Cannot delete — {count} employee(s) currently assigned to this location'}), 409
     execute("DELETE FROM locations WHERE id=%s::uuid", (loc_id,))

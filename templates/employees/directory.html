@@ -6,21 +6,53 @@
 <div class="page" style="padding-bottom:20px">
   <div id="page-top"></div>
 
+  {% if is_sa %}
+  <!-- SA company context bar — matches Dashboard / Admin Panel design -->
+  <div class="ctx-bar" style="align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:16px">
+    <div style="display:flex;align-items:center;gap:6px;padding-top:4px">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      <strong>Company:</strong>
+    </div>
+
+    <div class="co-picker" id="dir-co-picker">
+      <button type="button" class="co-picker-btn" id="dir-co-picker-btn" onclick="toggleDirCoPicker()">
+        <span id="dir-co-picker-selected">
+          {% if active_company_id %}
+            {% for c in companies %}{% if c.id == active_company_id %}
+              {% if c.logo_url %}<img src="{{ c.logo_url }}" alt="" class="co-picker-logo">{% endif %}
+              <span>{{ c.name }}</span>
+            {% endif %}{% endfor %}
+          {% else %}
+            <span style="opacity:.6">Select a company</span>
+          {% endif %}
+        </span>
+        <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="co-picker-menu" id="dir-co-picker-menu">
+        {% for c in companies %}
+        <div class="co-picker-opt {% if c.id == active_company_id %}co-picker-opt--active{% endif %}"
+             onclick="switchDirectoryCompany('{{ c.id }}')">
+          {% if c.logo_url %}<img src="{{ c.logo_url }}" alt="" class="co-picker-logo">{% endif %}
+          <div style="font-weight:600;font-size:.88rem">{{ c.name }}</div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    {% if active_company_id %}
+    <span class="ctx-badge-scoped">Scoped</span>
+    {% else %}
+    <span class="ctx-badge-all">Select a company</span>
+    {% endif %}
+  </div>
+  {% endif %}
+
   {% if is_sa and not active_company_id %}
-  <!-- SA with no company selected — prompt to pick one -->
+  <!-- SA with no company selected — prompt -->
   <div style="text-align:center;padding:60px 20px;background:#fff;border:1.5px solid #e2e8f0;border-radius:12px;margin-bottom:20px">
     <div style="font-size:2.5rem;margin-bottom:12px">🏢</div>
-    <div style="font-weight:700;font-size:1.1rem;color:#0f172a;margin-bottom:8px">Select a Company</div>
-    <div style="color:#64748b;font-size:.875rem;margin-bottom:20px">Choose a company from the picker in the Admin Panel to view its employee directory.</div>
-    <div style="display:flex;justify-content:center;flex-wrap:wrap;gap:10px">
-      {% for c in companies %}
-      <a href="/admin" onclick="event.preventDefault();history.pushState({},'','/directory');window.location.href='/admin'"
-         style="padding:8px 18px;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:8px;font-size:.82rem;font-weight:600;color:#0f172a;text-decoration:none;cursor:pointer">
-        {{ c.name }}
-      </a>
-      {% endfor %}
-    </div>
-    <div style="font-size:.75rem;color:#94a3b8;margin-top:14px">Use the company switcher (top of Admin Panel sidebar) to select a company, then return here.</div>
+    <div style="font-weight:700;font-size:1.1rem;color:#0f172a;margin-bottom:8px">Select a Company Above</div>
+    <div style="color:#64748b;font-size:.875rem">Use the company selector at the top of this page to view a company's employee directory.</div>
   </div>
   {% else %}
 
@@ -136,6 +168,23 @@
 {% block scripts %}
 <script>
 const ACTIVE_COMPANY_ID = {{ active_company_id | tojson }};
+
+function toggleDirCoPicker() {
+  document.getElementById('dir-co-picker-menu').classList.toggle('co-picker-menu--open');
+}
+document.addEventListener('click', function(e) {
+  const picker = document.getElementById('dir-co-picker');
+  if (picker && !picker.contains(e.target))
+    document.getElementById('dir-co-picker-menu').classList.remove('co-picker-menu--open');
+});
+
+function switchDirectoryCompany(companyId) {
+  fetch('/api/admin/switch-company', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({company_id: companyId})
+  }).then(() => location.reload());
+}
 const AVATAR_COLORS = ['#3b82f6','#8b5cf6','#ec4899','#f59e0b','#10b981','#06b6d4','#ef4444','#6366f1'];
 const MGMT_ROLES   = ['SYSTEM_ADMIN','HR_ADMIN','DEPARTMENT_HEAD','LOCATION_HEAD',
                       'HIRING_MANAGER','SOLID_LINE_MANAGER','DOTTED_LINE_MANAGER'];

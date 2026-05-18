@@ -27,11 +27,10 @@ def directory():
     locations   = [to_dict(r) for r in query(
         f"SELECT id::text, name, office_code FROM locations {co_filter} ORDER BY name", co_params)]
 
-    # For SA with no company selected, show a prompt in the template
     companies = []
-    if is_sa and not co_id:
+    if is_sa:
         companies = [to_dict(r) for r in query(
-            "SELECT id::text, name FROM companies WHERE is_active ORDER BY name")]
+            "SELECT id::text, name, logo_url FROM companies WHERE is_active ORDER BY name")]
 
     return render_template('employees/directory.html',
                            departments=departments,
@@ -136,7 +135,10 @@ def api_user_theme():
 @app.route('/api/profile/gender', methods=['POST'])
 @login_required
 def api_profile_gender():
-    gender = (request.get_json().get('gender') or '').strip().upper() or None
+    raw = (request.get_json() or {}).get('gender')
+    if raw is not None and not isinstance(raw, str):
+        return jsonify({'error': 'Invalid gender value'}), 400
+    gender = (raw or '').strip().upper() or None
     if gender and gender not in ('MALE', 'FEMALE', 'OTHER'):
         return jsonify({'error': 'Invalid gender value'}), 400
     execute("UPDATE employees SET gender=%s WHERE id=%s::uuid",
