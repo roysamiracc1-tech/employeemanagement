@@ -113,6 +113,31 @@ def require_feature_access(feature_code, action='r'):
     return decorator
 
 
+def _company_has_vacation_types():
+    """Return True if the user's company has at least one active vacation type.
+    SYSTEM_ADMIN always returns True (they manage types for all companies).
+    Result cached in g for the duration of the request."""
+    if hasattr(g, '_has_vac_types'):
+        return g._has_vac_types
+    if 'user_id' not in session:
+        g._has_vac_types = False
+        return False
+    if 'SYSTEM_ADMIN' in session.get('roles', []):
+        g._has_vac_types = True
+        return True
+    co_id = session.get('company_id')
+    if not _is_valid_uuid(co_id):
+        g._has_vac_types = False
+        return False
+    from app.db import query as _query
+    row = _query(
+        "SELECT 1 FROM vacation_types WHERE company_id = %s::uuid AND is_active LIMIT 1",
+        (co_id,), one=True,
+    )
+    g._has_vac_types = row is not None
+    return g._has_vac_types
+
+
 def register_context_processor(app):
     @app.context_processor
     def inject_ctx():
@@ -136,4 +161,5 @@ def register_context_processor(app):
             theme_pref=theme_pref,
             is_tech_admin=is_tech_admin,
             is_portal_admin=is_portal_admin,
+            company_has_vacation_types=_company_has_vacation_types,
         )

@@ -211,10 +211,11 @@ class TestVacationCalendar:
         assert r.status_code == 200
 
     def test_calendar_nav_link_in_base(self, auth_client):
-        """Leave Calendar link must appear in the sidebar for all users."""
+        """Leave Calendar link appears when company has vacation types configured."""
         with patch('app.routes.dashboard.compute_dashboard_stats', return_value={'own': {}}), \
              patch('app.routes.dashboard.get_refresh_interval', return_value=30000), \
-             patch('app.routes.dashboard.query', return_value=[]):
+             patch('app.routes.dashboard.query', return_value=[]), \
+             patch('app.auth._company_has_vacation_types', return_value=True):
             r = auth_client.get('/dashboard')
         assert r.status_code == 200
         assert b'Leave Calendar' in r.data or b'vacation_calendar' in r.data
