@@ -28,6 +28,26 @@ under **Needs measurement** and should be confirmed before scheduling.
 
 ---
 
+## Progress (updated)
+
+Delivered on branch `chore/arch-review-and-hardening` (PR #2), each verified + test-gated:
+
+| Finding | Story | Status |
+|---------|-------|--------|
+| F3 (partial) | KAN-150 | 🟡 Output escaping via global `escH()` on directory, org-tree, team-vacation, my-team; remaining screens → KAN-173 |
+| F5 | KAN-152 | ✅ Secure runtime defaults — `SECRET_KEY` prod fail-fast, `SESSION_COOKIE_*`, env-driven debug, `MAX_CONTENT_LENGTH` |
+| F6 | KAN-154 | ✅ `employees(company_id, employment_status)` index (migration 07) |
+| F23 | KAN-157 | ✅ `(company_id)` indexes on BU/loc/FU + `vacation_requests(vacation_type_id)` |
+| F9 | KAN-165 | ✅ Authoritative `database/schema.sql` baseline + `seed_rbac.sql`; README bootstrap updated |
+| F11 | KAN-169 | ✅ GitHub Actions CI — test job (schema+seed) + fresh-DB schema/boot drift check |
+
+**Also surfaced by CI:** a chunk of the "unit" suite is really integration tests needing a live DB, and
+`setup_db.py` can't bootstrap the canonical `schema.sql` (rolls back on `ON CONFLICT`) — captured as
+**KAN-167** (single seeding owner) and **KAN-168** (real-DB integration tier). Remaining high-value items:
+**KAN-148** (auth), **KAN-149** (CSRF), **KAN-151** (HTML/upload sanitisation), **KAN-159** (connection pool).
+
+---
+
 ## Consolidated findings (deduplicated, ranked)
 
 Severity: **P0** = correctness/security/scaling risk that will bite in production · **P1** = clear

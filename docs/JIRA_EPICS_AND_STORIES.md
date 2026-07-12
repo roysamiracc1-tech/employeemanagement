@@ -431,6 +431,11 @@
 > Proposed epics from the `architect-reviewer` agent's audit. Source: `docs/ARCHITECTURE_REVIEW.md`.
 > Priorities are framed for a **demo/local** app today: security items are **Must Have (pre-prod)** —
 > required before any real deployment, not live incidents. Each story cites its review finding (`Fn`).
+>
+> **Delivered so far** (branch `chore/arch-review-and-hardening`, PR #2): **KAN-152** secure runtime
+> defaults · **KAN-154 / KAN-157** missing indexes (migration 07) · **KAN-150** output escaping (4 of the
+> highest-traffic screens; remainder → KAN-173) · **KAN-165** authoritative `schema.sql` baseline ·
+> **KAN-169** GitHub Actions CI. Status shown in the Priority column below (✅ Done · 🟡 Partial).
 
 ## EP28 — Security Hardening
 **Jira:** KAN-148 · **Label:** `security` `hardening` `pre-prod`
@@ -441,9 +446,9 @@ upload handling before the portal is exposed beyond local/demo use. Sourced from
 |----------|-----------|---------------------|----------|
 | KAN-148 | As the **product owner**, I want real authentication (password hash / SSO-OIDC / signed magic-link) so a session cannot be minted from an email address alone. (F1) | Login requires a verified factor; no session issued on email-only match; the login page no longer renders real user emails to anonymous visitors; existing tests updated. | Must Have (pre-prod) |
 | KAN-149 | As the **system**, I want CSRF protection on every state-changing endpoint so cross-site requests cannot act as a logged-in user. (F2) | Flask-WTF `CSRFProtect` (or a double-submit token for JSON) added as a real dependency; token required on all POST/PUT/DELETE (~44 routes); `api.js` sends the token; tests cover accept/reject. | Must Have (pre-prod) |
-| KAN-150 | As the **system**, I want all dynamic values escaped before insertion into the DOM so stored data cannot execute as script. (F3) | Every `innerHTML` build routes through a shared `escapeHtml`/safe-`html\`\`` helper (or `textContent`); directory, org-tree, team, my-team, admin panels covered; regression test with a `<img onerror>` name renders inert. | Must Have (pre-prod) |
+| KAN-150 | As the **system**, I want all dynamic values escaped before insertion into the DOM so stored data cannot execute as script. (F3) | Every `innerHTML` build routes through a shared `escapeHtml`/safe-`html\`\`` helper (or `textContent`); directory, org-tree, team, my-team, admin panels covered; regression test with a `<img onerror>` name renders inert. | 🟡 Partial (directory, org-tree, team, my-team done via global `escH()`; admin/profile/search/register → KAN-173) |
 | KAN-151 | As the **system**, I want company HTML and logo uploads sanitized so a portal admin cannot inject active content to all employees. (F4) | `header_html`/`footer_html` sanitized on write (allowlist) or rendered as text (drop `| safe`); `svg` removed from allowed uploads (or rasterized); uploads served with `Content-Disposition: attachment`; content-type/magic-byte check added. | Must Have (pre-prod) |
-| KAN-152 | As the **operator**, I want secure runtime defaults so a misconfigured deploy fails safe. (F5) | App raises if `SECRET_KEY` unset outside dev; `SESSION_COOKIE_SECURE/SAMESITE/HTTPONLY` set; `debug` driven by env (default off); `MAX_CONTENT_LENGTH` caps request/upload size. | Must Have (pre-prod) |
+| KAN-152 | As the **operator**, I want secure runtime defaults so a misconfigured deploy fails safe. (F5) | App raises if `SECRET_KEY` unset outside dev; `SESSION_COOKIE_SECURE/SAMESITE/HTTPONLY` set; `debug` driven by env (default off); `MAX_CONTENT_LENGTH` caps request/upload size. | ✅ Done (`app/config.py`, `run.py`) |
 | KAN-153 | As the **operator**, I want required DB configuration with no personal defaults so missing config is caught, not masked. (F31) | `app/config.py` requires `PGUSER`/`PGDATABASE` (no `'samirroy'` default); missing values raise a clear error at startup. | Should Have |
 
 ---
@@ -455,10 +460,10 @@ over-fetching the directory. Sourced from F6, F8, F22, F23, F24.
 
 | Story ID | User Story | Acceptance Criteria | Priority |
 |----------|-----------|---------------------|----------|
-| KAN-154 | As a **user**, I want dashboard/directory/analytics queries to use an index on `employees.company_id` so they don't seq-scan the whole table. (F6) | Composite `(company_id, employment_status)` index added (supersedes low-value `idx_employees_status`); `EXPLAIN ANALYZE` shows index usage on the directory + dashboard queries. | Must Have |
+| KAN-154 | As a **user**, I want dashboard/directory/analytics queries to use an index on `employees.company_id` so they don't seq-scan the whole table. (F6) | Composite `(company_id, employment_status)` index added (supersedes low-value `idx_employees_status`); `EXPLAIN ANALYZE` shows index usage on the directory + dashboard queries. | ✅ Done (`database/migrations/07_perf_indexes.sql`) |
 | KAN-155 | As the **system**, I want composite writes to be atomic so a mid-loop failure cannot leave partial data. (F8) | A `transaction()` context manager (single commit/rollback) is added and used by vacation-type create/edit and org-change apply; per-row-loop commits removed; failure rolls back the whole unit; read paths no longer sit idle-in-transaction. | Must Have |
 | KAN-156 | As a **user**, I want list/analytics pages to avoid N+1 queries so they stay fast as data grows. (F22) | Analytics overview replaces the per-feature COUNT loop with one `GROUP BY route`; vacation page computes used-days for all types in one `GROUP BY`; team-pending replaces the per-row correlated subselect with a single windowed/join query. | Should Have |
-| KAN-157 | As the **system**, I want indexes on the org/vacation foreign keys that are filtered/joined so those scans use an index. (F23) | `(company_id)` indexes on `business_units`/`locations`/`functional_units`; `idx` on `vacation_requests(vacation_type_id)`; confirmed via `EXPLAIN`. | Should Have |
+| KAN-157 | As the **system**, I want indexes on the org/vacation foreign keys that are filtered/joined so those scans use an index. (F23) | `(company_id)` indexes on `business_units`/`locations`/`functional_units`; `idx` on `vacation_requests(vacation_type_id)`; confirmed via `EXPLAIN`. | ✅ Done (migration 07) |
 | KAN-158 | As a **user**, I want the employee directory paginated with a light list projection so a large company doesn't load everyone (with full skills/certs) at once. (F24) | Directory API paginates; a lightweight list query is separated from the detail query; skills/cert `JSON_AGG` only run for the detail view; serialization moved toward psycopg2 type adapters. | Should Have |
 
 ---
@@ -486,7 +491,7 @@ can't happen silently (the `org_change` tables currently exist only in migration
 
 | Story ID | User Story | Acceptance Criteria | Priority |
 |----------|-----------|---------------------|----------|
-| KAN-165 | As a **developer**, I want one authoritative schema so a fresh database matches production, including all currently-missing tables. (F9) | A single canonical schema (e.g. `pg_dump --schema-only` baseline or complete numbered migrations) recreates every live table — `companies`, `employees.company_id`, `vacation_*`, `page_views`, `user_notifications`, `org_change_*`, etc.; README bootstrap updated to use it. | Must Have |
+| KAN-165 | As a **developer**, I want one authoritative schema so a fresh database matches production, including all currently-missing tables. (F9) | A single canonical schema (e.g. `pg_dump --schema-only` baseline or complete numbered migrations) recreates every live table — `companies`, `employees.company_id`, `vacation_*`, `page_views`, `user_notifications`, `org_change_*`, etc.; README bootstrap updated to use it. | ✅ Done (`database/schema.sql` + `seed_rbac.sql`; README updated) |
 | KAN-166 | As a **developer**, I want a migration tool with version tracking so applied migrations are recorded and ordered. (F9) | Alembic (or Flyway) adopted; existing migrations 02–06 folded into the tool; `alembic upgrade head` on a fresh DB yields the full schema. | Should Have |
 | KAN-167 | As a **developer**, I want a single owner for feature/role seeding so `setup_db.py` and `alter_table.sql` can't diverge. (F9) | `portal_features`/`role_feature_access` DDL+seed defined once; the other path references it; onboarding a company is unambiguous. | Should Have |
 
@@ -500,7 +505,7 @@ pipeline — so SQL and schema are verified, not just string-matched. Sourced fr
 | Story ID | User Story | Acceptance Criteria | Priority |
 |----------|-----------|---------------------|----------|
 | KAN-168 | As a **developer**, I want a real-DB integration test tier so SQL is executed against the actual schema. (F10) | Pytest tier spins up disposable Postgres (testcontainers or CI service container), applies schema+migrations, and exercises real routes/services; covers the org_change decide→apply flow asserting row state. | Must Have |
-| KAN-169 | As a **team**, I want CI on every PR so a broken build/migration/test can't reach `main`. (F11) | GitHub Actions runs lint + full pytest + "build fresh DB from migrations then boot the app" smoke test; required status check; not bypassable like the local hook. | Must Have |
+| KAN-169 | As a **team**, I want CI on every PR so a broken build/migration/test can't reach `main`. (F11) | GitHub Actions runs lint + full pytest + "build fresh DB from migrations then boot the app" smoke test; required status check; not bypassable like the local hook. | ✅ Done (`.github/workflows/ci.yml` — test + fresh-DB boot jobs) |
 | KAN-170 | As a **developer**, I want coverage measured with a floor so thin/untested modules are visible. (F12) | `pytest-cov` added; `--cov=app --cov-report=term-missing`; CI fails under an agreed floor; `email_service`/`page_tracker`/`skills_intelligence_service` gaps surfaced. | Should Have |
 | KAN-171 | As a **developer**, I want the mocked engine tests backed by behavior tests so they assert outcomes, not internal call order. (F10, testing #4) | The org_change (and vacation) approval flows have integration tests asserting final DB state; brittle SQL-substring/`side_effect`-ordering assertions supplemented rather than relied upon. | Should Have |
 

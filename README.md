@@ -110,7 +110,8 @@ python scripts/setup_db.py                             # seed roles, portal feat
 ### 4. Configure environment
 
 ```bash
-export SECRET_KEY=your-secret-key
+export APP_ENV=development          # 'production' enables secure cookies + requires SECRET_KEY, forces debug off
+export SECRET_KEY=your-secret-key   # REQUIRED when APP_ENV=production (app fails fast if unset)
 export PGHOST=localhost
 export PGPORT=5432
 export PGDATABASE=employee
@@ -129,8 +130,25 @@ Open **http://localhost:8000**
 ### Production
 
 ```bash
+export APP_ENV=production
+export SECRET_KEY=<random-256-bit-string>
 gunicorn -w 4 -b 0.0.0.0:8000 "app:app"
 ```
+
+---
+
+## Testing & CI
+
+```bash
+python -m pytest -q                        # ~4,500 tests (needs the seeded dev DB running)
+python tests/ui/test_browser.py            # browser regression suite (live server on :8000)
+python tests/ui/test_vacation_workflow.py  # vacation-workflow regression
+```
+
+**GitHub Actions** (`.github/workflows/ci.yml`) runs on every push/PR: a **test job** (builds Postgres from
+`database/schema.sql` + `database/seed_rbac.sql`, runs pytest) and a **fresh-DB schema + app-boot job** that
+catches schema drift. See `docs/TECHNICAL_DOCUMENTATION.md` §11 and the improvement backlog in
+`docs/ARCHITECTURE_REVIEW.md`.
 
 ---
 

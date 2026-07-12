@@ -475,14 +475,17 @@ Toggle calls `POST /api/user/theme` → updates `users.theme_preference` → upd
 
 | Area | Implementation |
 |------|---------------|
-| **Route protection** | `@login_required` + `@require_roles(*roles)` decorators on every non-public route and API |
-| **Session integrity** | Flask server-side session; `SECRET_KEY` from env var |
-| **XSS** | Jinja2 auto-escapes all template variables; `| safe` used only for admin-controlled `header_html` / `footer_html` |
-| **SQL injection** | All DB calls use parameterised queries via psycopg2; no string formatting in SQL |
-| **File uploads** | Extension allowlist; UUID filename (no user-controlled path); size validated client-side |
-| **IDOR prevention** | Profile self-edit APIs check `session['employee_id']`; vacation cancel checks `employee_id` ownership; skill validation requires admin role |
-| **CSRF** | Not yet implemented — forms rely on session cookies; recommended addition for production |
-| **Passwords** | Not implemented in dev; production should add bcrypt hashing and password field |
+| **Route protection** | `@login_required` + `@require_roles(*roles)` / `@require_feature_access(...)` decorators on every non-public route and API |
+| **Runtime defaults** | `APP_ENV=production` **fails fast** if `SECRET_KEY` is unset; `SESSION_COOKIE_HTTPONLY` + `SAMESITE=Lax` always, `SECURE` in production; `debug` driven by env (off in prod); `MAX_CONTENT_LENGTH` caps upload/body size (`app/config.py`, KAN-152) |
+| **Session integrity** | Flask signed-cookie session; `SECRET_KEY` from env var (see above) |
+| **XSS** | Jinja2 auto-escapes template variables; JS builders route dynamic values through the global `escH()` helper on the directory, org-tree, team-vacation and my-team screens (KAN-150; remaining screens tracked under KAN-173). `| safe` still used for admin-controlled `header_html` / `footer_html` — sanitisation tracked under KAN-151 |
+| **SQL injection** | All DB calls use parameterised queries via psycopg2; audited clean — dynamic `WHERE` fragments interpolate only fixed internal strings, never user input |
+| **File uploads** | Extension allowlist; UUID filename (no user-controlled path); size validated client-side + `MAX_CONTENT_LENGTH` server-side. SVG hardening tracked under KAN-151 |
+| **IDOR prevention** | Profile self-edit APIs check `session['employee_id']`; vacation cancel checks `employee_id` ownership; org-change requires the initiator to manage the subject or be HR/Portal admin |
+| **CSRF** | Not yet implemented — tracked under **KAN-149** (EP28) |
+| **Authentication** | Email-only login (demo). Real auth factor tracked under **KAN-148** (EP28) before any production use |
+
+> Full audit and remaining hardening backlog: `docs/ARCHITECTURE_REVIEW.md` (EP28).
 
 ---
 
@@ -490,7 +493,10 @@ Toggle calls `POST /api/user/theme` → updates `users.theme_preference` → upd
 
 ### Environment Variables
 ```bash
-SECRET_KEY=<random-256-bit-string>
+APP_ENV=production            # 'development' (default) | 'production'
+SECRET_KEY=<random-256-bit-string>   # REQUIRED when APP_ENV=production (app fails fast if unset)
+FLASK_DEBUG=0                 # optional override; defaults on in dev, off in production
+MAX_CONTENT_LENGTH=8388608    # optional; default 8 MB request/upload cap
 PGHOST=localhost
 PGPORT=5432
 PGDATABASE=employee
@@ -498,10 +504,26 @@ PGUSER=<db-user>
 PGPASSWORD=<db-password>
 ```
 
+In production, `APP_ENV=production` also turns on `SESSION_COOKIE_SECURE` and forces `debug=False`
+(`app/config.py`). Serve strictly over HTTPS behind a proxy so the Secure cookie is honoured.
+
+### Building the database
+`database/schema.sql` is the **authoritative** schema (a `pg_dump --schema-only` baseline of all 46
+tables/indexes/functions/triggers). Build a fresh DB from it, then seed:
+```bash
+psql -d employee -f database/schema.sql        # full structure (canonical)
+psql -d employee -f database/seed_rbac.sql      # companies + roles + portal_features + role_feature_access
+python scripts/setup_db.py                       # demo data (Telia seed) — see caveat below
+```
+> `database/schema_v2.sql` and `database/migrations/*.sql` are **historical** — a fresh DB uses
+> `schema.sql`, not migration replay. Add new schema changes as a numbered migration **and** regenerate
+> `schema.sql`. Note: `setup_db.py` currently targets the old schema and is not idempotent against
+> `schema.sql` (tracked under KAN-167); `seed_rbac.sql` provides the RBAC seed CI and tests rely on.
+
 ### Running the Server
 ```bash
-python run.py                               # dev mode, port 8000
-gunicorn -w 4 -b 0.0.0.0:8000 "app:app"   # production
+python run.py                               # dev mode, port 8000, debug from env
+APP_ENV=production SECRET_KEY=… gunicorn -w 4 -b 0.0.0.0:8000 "app:app"   # production
 ```
 
 ### Required PostgreSQL Extensions
@@ -517,14 +539,35 @@ The `static/uploads/logos/` directory must be writable by the application proces
 ## 11. Testing
 
 ### Overview
-The test suite uses **pytest** and **pytest-flask**. All DB calls are mocked with `unittest.mock` — no live PostgreSQL connection is required to run tests.
+The test suite uses **pytest** and **pytest-flask** (~4,500 tests). Most tests mock the DB with
+`unittest.mock`, but ~800 render full pages that fire incidental unmocked queries (feature-access, nav)
+and therefore need a **live schema + RBAC seed** — locally satisfied by the running dev DB.
 
 ```bash
-pip install pytest pytest-flask
-python -m pytest           # run all tests
-python -m pytest -v        # verbose output
-python -m pytest tests/test_helpers.py   # single file
+python -m pytest -q                    # run all tests (needs the seeded dev DB up)
+python -m pytest tests/test_helpers.py # single file
 ```
+
+### Continuous Integration — `.github/workflows/ci.yml`
+Runs on every push to `main` and every PR (KAN-169):
+- **Test suite** — spins up Postgres, builds from `database/schema.sql` + `database/seed_rbac.sql`, runs
+  `pytest --ignore=tests/ui`.
+- **Fresh-DB schema + app boot** — builds from `schema.sql` alone (no seed), asserts core + `org_change`
+  tables exist, and boots the app (`GET /login` runs real queries). This catches schema drift the mocked
+  suite cannot — e.g. a feature enabled in nav whose backing tables are missing from `schema.sql`.
+
+### Browser regression suites (`tests/ui/`) — standalone, NOT part of pytest/CI
+Headless Playwright scripts run directly against a live server on `http://localhost:8000`:
+```bash
+python tests/ui/test_browser.py            # 77 checks: login, admin, org tree, search, vacation, directory,
+                                           #  Portal-Admin scoping, restricted access, mobile, redirects
+python tests/ui/test_vacation_workflow.py  # 39 checks: full submit → approve → reject → history workflow
+```
+Per `CLAUDE.md`, run these before confirming any substantial change. (A **"flow test"** the user asks for
+is a separate, VISIBLE Chrome + audio session — see the FLOW TESTS rule in `CLAUDE.md`.)
+
+### Local pre-commit gate
+`.git/hooks/pre-commit` runs the full `pytest` suite and aborts the commit on failure (requires the dev DB up).
 
 ### Test Structure
 

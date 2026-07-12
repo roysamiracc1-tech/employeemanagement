@@ -2,7 +2,15 @@
 
 ## FLOW TESTS — How to run any "flow test" the user asks for
 
-Whenever the user asks for a **flow test** (of any feature, role, or scenario), it MUST be run as a live, watchable, narrated browser session — never as a silent curl/API check. Follow this exactly:
+**⚠️ NON-NEGOTIABLE. This applies the moment the user's request contains the words "flow test" in
+ANY form** — "flow test", "regression flow test", "do a flow test", "test the flow", "run the flow",
+"show me the flow". It does NOT matter if the word "regression" or a feature name is attached. A flow
+test is ALWAYS a **visible Chrome/Chromium window + spoken audio narration**, driven live in front of
+the user. It is **NEVER** a headless run, NEVER a silent `pytest`/curl/API check, and NEVER just the
+`tests/ui/*` headless suites. If you are about to run something headless in response to a "flow test"
+request, STOP — you are making the exact mistake this rule exists to prevent.
+
+Follow this exactly:
 
 1. **Make sure the app is running** on `http://localhost:8000` (`python run.py`).
 2. **Drive a VISIBLE Chrome/Chromium window** with Playwright (`headless=False`, a moderate `slow_mo` so it's watchable). Bring the window to the foreground (`page.bring_to_front()` + `osascript -e 'tell application "Chromium" to activate'`) so the user can actually see it. Note: Playwright launches the light-blue **Chromium** app, not the user's normal Google Chrome.
@@ -10,6 +18,11 @@ Whenever the user asks for a **flow test** (of any feature, role, or scenario), 
 4. **Actually perform the real steps** in the UI — click the real buttons, fill the real forms, log in/out as the real users involved. Take a screenshot at each step for the record.
 5. **When finished, say aloud "The flow test is complete"** (and print it), then **STOP and wait for the user to approve.** Do NOT declare the flow test successful on your own.
 6. **The flow test counts as SUCCESSFUL only after the user explicitly approves** ("the flow is correct" / "approved"). Until then it is pending, no matter how clean the run looked.
+
+**"Regression flow test" specifically** = the visible + audio browser walkthrough above, covering the
+regression-critical flows (login, dashboard, directory, org tree, vacation request round-trip,
+position-change approval, key admin pages). The headless `tests/ui/*` suites are a SEPARATE internal
+check you may ALSO run — but they never substitute for the visible + audio session the user asked for.
 
 Reusable drivers live under the session scratchpad (e.g. `roundtrip.py`, `flow.py`) — model new flow tests on them.
 
