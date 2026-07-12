@@ -14,9 +14,29 @@ Whenever the user asks for a **flow test** (of any feature, role, or scenario), 
 Reusable drivers live under the session scratchpad (e.g. `roundtrip.py`, `flow.py`) — model new flow tests on them.
 
 
+## REGRESSION FLOW TEST — run before confirming any substantial change
+
+For any non-trivial change (feature, route, template, DB, or refactor), run the **regression flow test**
+before confirming, so nothing silently breaks. This is in addition to `pytest`. Steps:
+
+1. Ensure the app is running on `http://localhost:8000` (`python run.py`) against the seeded dev DB.
+2. Run both headless browser regression suites and confirm **0 failures**:
+   - `python tests/ui/test_browser.py` — 77 checks across login, admin, org tree, search, vacation
+     calendar, bell, dark mode, directory, Portal-Admin scoping, restricted access, mobile, redirects.
+   - `python tests/ui/test_vacation_workflow.py` — 39 checks: the full submit → approve → reject →
+     history → dashboard vacation workflow.
+3. Report the pass counts (e.g. "browser 77/77, vacation 39/39") alongside the `pytest` result.
+4. If a regression suite fails, **investigate whether it's a real regression or a stale assertion** —
+   drive the specific flow in a browser and check console/page errors before deciding. Fix real
+   regressions; correct genuinely stale assertions (and say which). Never delete a check to go green.
+
+These suites are standalone Playwright scripts (headless), NOT part of the `pytest`/CI run — run them
+directly. Keep them current: when a change alters a flow they cover, update the corresponding checks.
+
+
 ## BEFORE CONFIRMING ANY CHANGE TO THE USER
 
-**Run `python -m pytest -q` and verify 0 failures. Then manually check these 5 things:**
+**Run `python -m pytest -q` and verify 0 failures, run the REGRESSION FLOW TEST above (0 failures), then manually check these 5 things:**
 
 1. Does the UI show data ONLY scoped to the correct company / role? (No global template roles bleeding in.)
 2. Does a company with NO custom roles show an empty state — not global roles like EMPLOYEE, DEPARTMENT_HEAD?
@@ -24,7 +44,7 @@ Reusable drivers live under the session scratchpad (e.g. `roundtrip.py`, `flow.p
 4. Does every feature route use `@require_feature_access(...)` — never a hardcoded `@require_roles(...)` list?
 5. Does SYSTEM_ADMIN bypass all feature checks automatically?
 
-**Only confirm to the user AFTER all 5 pass. No exceptions.**
+**Only confirm to the user AFTER pytest, the regression flow test, and all 5 checks pass. No exceptions.**
 
 
 

@@ -424,12 +424,14 @@ def run_all(playwright):
         fail("Employee directory page loads", str(e))
 
     try:
-        page.wait_for_function(
-            "document.querySelectorAll('.emp-card, .directory-row, tr').length > 2",
-            timeout=6000)
-        ok("Directory shows employee rows/cards")
+        # Tech Admin has no company selected, so under the two-tier scoping model
+        # the directory shows a "Select a Company" prompt rather than rows. Actual
+        # row rendering is verified under a company-scoped user (Portal Admin) in
+        # section 12.
+        assert "Select a Company" in page.content()
+        ok("Directory prompts Tech Admin to select a company (scoping)")
     except Exception as e:
-        fail("Directory shows employee rows/cards", str(e))
+        fail("Directory prompts Tech Admin to select a company (scoping)", str(e))
 
     # ══════════════════════════════════════════════════════════
     section("12 · Portal Admin login + scoping")
@@ -466,6 +468,17 @@ def run_all(playwright):
         ok("Portal Admin can access vacation calendar")
     except Exception as e:
         fail("Portal Admin can access vacation calendar", str(e))
+
+    try:
+        # Directory row rendering (company-scoped): a Portal Admin sees their
+        # company's employees. Verifies buildRow() renders rows without error.
+        page.goto(BASE + "/directory")
+        page.wait_for_load_state("networkidle")
+        page.wait_for_function(
+            "document.querySelectorAll('tbody tr').length > 2", timeout=6000)
+        ok("Directory shows employee rows (Portal Admin, company-scoped)")
+    except Exception as e:
+        fail("Directory shows employee rows (Portal Admin, company-scoped)", str(e))
 
     # ══════════════════════════════════════════════════════════
     section("13 · My Company page (Portal Admin)")
