@@ -21,7 +21,10 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
       - name: Run pytest
-        run: python -m pytest -q
+        # tests/ui/* are standalone Playwright E2E scripts that require a live
+        # server + browser (and contribute no collectable pytest items); they are
+        # not part of the mocked-DB suite, so exclude them from this fast job.
+        run: python -m pytest -q --ignore=tests/ui
 
   # ── Schema reproducibility + app-boot smoke test against a real Postgres ──────
   # Builds a fresh DB from database/schema.sql (the authoritative baseline) and
