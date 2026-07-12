@@ -128,18 +128,18 @@ function renderNav(focus, ancestors) {
 
   // Breadcrumb
   const bcParts = ancestors.map(a =>
-    `<button class="org-bc-item" onclick="focusTree('${a.id}')" title="${a.job_title||''}">${a.first_name} ${a.last_name}</button><span class="org-bc-sep">›</span>`
-  ).join('') + `<span class="org-bc-current">${fullName}</span>`;
+    `<button class="org-bc-item" onclick="focusTree('${escH(a.id)}')" title="${escH(a.job_title||'')}">${escH(a.first_name)} ${escH(a.last_name)}</button><span class="org-bc-sep">›</span>`
+  ).join('') + `<span class="org-bc-current">${escH(fullName)}</span>`;
 
   const backBtn = (focusId !== OWN_ID)
     ? `<button class="org-back-btn" onclick="focusTree('${OWN_ID}')">← My view</button>`
     : '';
 
   const upHtml = directMgr
-    ? `<button class="org-up-btn" onclick="focusTree('${directMgr.id}')">
+    ? `<button class="org-up-btn" onclick="focusTree('${escH(directMgr.id)}')">
         <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M18 15l-6-6-6 6"/></svg>
-        <span>${directMgr.first_name} ${directMgr.last_name}</span>
-        <span class="org-up-role">${directMgr.job_title||''}</span>
+        <span>${escH(directMgr.first_name)} ${escH(directMgr.last_name)}</span>
+        <span class="org-up-role">${escH(directMgr.job_title||'')}</span>
        </button>`
     : `<span class="org-up-top">&#8679; Top of organisation</span>`;
 
@@ -184,7 +184,7 @@ function buildNode(data) {
 
   const nameEl = document.createElement('div');
   nameEl.className = 'ft-name';
-  nameEl.innerHTML  = `${fullName}${isSelf ? ' <span class="org-self-tag">you</span>' : ''}`;
+  nameEl.innerHTML  = `${escH(fullName)}${isSelf ? ' <span class="org-self-tag">you</span>' : ''}`;
   card.appendChild(nameEl);
 
   const titleEl = document.createElement('div');
@@ -429,7 +429,7 @@ async function loadPendingCounts() {
 let mvSubjectId = null, mvFUAll = [];
 
 function opt(value, label, selected) {
-  return `<option value="${value}"${selected ? ' selected' : ''}>${label}</option>`;
+  return `<option value="${escH(value)}"${selected ? ' selected' : ''}>${escH(label)}</option>`;
 }
 
 async function openMoveModal(subjectId, subjectName, targetId, targetName) {
