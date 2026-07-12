@@ -77,6 +77,16 @@
       <span class="nav-label">Org Tree</span>
     </a>
 
+    {% if has_feature_access('org_change') %}
+    <a href="{{ url_for('org_change_inbox') }}"
+       class="nav-link {% if request.endpoint == 'org_change_inbox' %}active{% endif %}">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path d="M16 3h5v5"/><path d="M21 3l-7 7"/><path d="M8 21H3v-5"/><path d="M3 21l7-7"/>
+      </svg>
+      <span class="nav-label">Position Changes</span>
+    </a>
+    {% endif %}
+
     {% if company_has_vacation_types() %}
     <a href="{{ url_for('vacation_page') }}"
        class="nav-link {% if request.endpoint in ('vacation_page',) %}active{% endif %}">
@@ -176,6 +186,15 @@
         <path d="M12 12v4m-2-2h4"/>
       </svg>
       <span class="nav-label">Company Settings</span>
+    </a>
+    {% endif %}
+    {% if has_feature_access('org_structure', 'w') %}
+    <a href="{{ url_for('admin_org_change_workflow') }}"
+       class="nav-link {% if request.endpoint == 'admin_org_change_workflow' %}active{% endif %}">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path d="M4 6h16M4 12h10M4 18h6"/><circle cx="18" cy="15" r="3"/>
+      </svg>
+      <span class="nav-label">Change Workflow</span>
     </a>
     {% endif %}
     {% endif %}

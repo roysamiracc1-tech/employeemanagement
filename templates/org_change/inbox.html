@@ -1,0 +1,188 @@
+{% extends 'base.html' %}
+{% block title %}Position Changes — HR Portal{% endblock %}
+{% block page_title %}Position Changes{% endblock %}
+
+{% block content %}
+<div class="page">
+
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px">
+    <div>
+      <h1 style="font-size:1.25rem;font-weight:700;margin-bottom:2px">Position Changes</h1>
+      <p id="oc-subtitle" style="font-size:.8rem;color:#64748b">Loading…</p>
+    </div>
+  </div>
+
+  <div class="admin-tabs">
+    <button class="admin-tab active" onclick="switchTab('pending',this)">
+      Pending My Approval <span id="pending-badge" style="display:none;margin-left:5px;background:#ef4444;color:#fff;border-radius:999px;padding:1px 6px;font-size:.65rem"></span>
+    </button>
+    <button class="admin-tab" onclick="switchTab('mine',this)">My Requests</button>
+  </div>
+
+  <!-- Pending tab -->
+  <div class="admin-panel" id="tab-pending">
+    <div class="table-card" style="margin:0">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Employee</th><th>Proposed change</th><th>Level</th><th>Requested by</th><th>Reason</th><th style="min-width:160px">Actions</th></tr>
+          </thead>
+          <tbody id="pending-tbody"><tr class="empty-row"><td colspan="6">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- My requests tab -->
+  <div class="admin-panel" id="tab-mine" style="display:none">
+    <div class="table-card" style="margin:0">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Employee</th><th>Proposed change</th><th>Status</th><th>Progress</th><th>Reason</th><th></th></tr>
+          </thead>
+          <tbody id="mine-tbody"><tr class="empty-row"><td colspan="6">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Review modal -->
+  <div id="review-modal" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.45);align-items:center;justify-content:center" onclick="if(event.target===this)closeReview()">
+    <div class="modal-box" style="width:440px" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <div class="modal-title" id="rv-title">Review Position Change</div>
+          <div class="modal-sub" id="rv-sub"></div>
+        </div>
+        <button class="modal-close" onclick="closeReview()">×</button>
+      </div>
+      <div class="modal-body">
+        <div id="rv-diff" style="font-size:.8rem;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;margin-bottom:14px"></div>
+        <div class="form-group" style="margin:0">
+          <label>Note (optional)</label>
+          <textarea id="rv-note" class="form-control" rows="2" placeholder="Reason for decision…" style="resize:vertical"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost btn-sm" onclick="closeReview()">Cancel</button>
+        <button class="btn btn-danger btn-sm" onclick="submitReview('reject')">Reject</button>
+        <button class="btn btn-primary btn-sm" onclick="submitReview('approve')">Approve</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let pendingData = [], mineData = [], currentReviewId = null;
+
+function switchTab(name, btn) {
+  document.querySelectorAll('.admin-tab').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.admin-panel').forEach(p => p.style.display = 'none');
+  btn.classList.add('active');
+  document.getElementById('tab-' + name).style.display = '';
+}
+
+function esc(s) { return (s == null ? '' : String(s)).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+// Build a "from → to" diff for the changed dimensions only
+function diffHtml(r) {
+  const rows = [];
+  const add = (label, from, to) => { if (to && to !== from) rows.push(`<div><strong>${label}:</strong> ${esc(from) || '—'} → <strong>${esc(to)}</strong></div>`); };
+  add('Manager',        r.from_manager, r.to_manager);
+  add('Business unit',  r.from_bu,      r.to_bu);
+  add('Functional unit',r.from_fu,      r.to_fu);
+  add('Location',       r.from_loc,     r.to_loc);
+  return rows.length ? rows.join('') : '<span style="color:#94a3b8">No change</span>';
+}
+function diffInline(r) {
+  const parts = [];
+  if (r.to_manager && r.to_manager !== r.from_manager) parts.push('mgr → ' + esc(r.to_manager));
+  if (r.to_bu && r.to_bu !== r.from_bu)               parts.push('BU → ' + esc(r.to_bu));
+  if (r.to_fu && r.to_fu !== r.from_fu)               parts.push('unit → ' + esc(r.to_fu));
+  if (r.to_loc && r.to_loc !== r.from_loc)            parts.push('loc → ' + esc(r.to_loc));
+  return parts.join(' · ') || '—';
+}
+
+// ── Pending ──────────────────────────────────────────────────────────────────
+async function loadPending() {
+  const res = await fetch('/api/org-change/pending');
+  pendingData = res.ok ? await res.json() : [];
+  const tb = document.getElementById('pending-tbody');
+  tb.innerHTML = pendingData.length ? pendingData.map(r => `
+    <tr id="ocp-${r.id}">
+      <td><a href="/profile/${r.employee_id}" style="font-weight:600;color:#0f172a;text-decoration:none">${esc(r.employee_name)}</a>
+          <div style="font-size:.68rem;color:#64748b">${esc(r.job_title || '')}</div></td>
+      <td style="font-size:.78rem">${diffInline(r)}</td>
+      <td style="font-size:.75rem;white-space:nowrap">Level ${r.current_step} / ${r.total_steps}</td>
+      <td style="font-size:.78rem">${esc(r.requested_by_name)}</td>
+      <td style="font-size:.75rem;color:#64748b;max-width:160px">${esc(r.reason || '—')}</td>
+      <td><div style="display:flex;gap:5px">
+        <button class="btn btn-sm btn-success" onclick="openReview('${r.id}')">✓ Approve</button>
+        <button class="btn btn-sm btn-danger"  onclick="openReview('${r.id}','reject')">✕ Reject</button>
+      </div></td>
+    </tr>`).join('') : '<tr class="empty-row"><td colspan="6">No requests awaiting your approval.</td></tr>';
+  const badge = document.getElementById('pending-badge');
+  if (pendingData.length) { badge.textContent = pendingData.length; badge.style.display = ''; }
+  else badge.style.display = 'none';
+}
+
+// ── My requests ──────────────────────────────────────────────────────────────
+const STATUS_COLORS = {PENDING:'#f59e0b', APPROVED:'#16a34a', REJECTED:'#dc2626', CANCELLED:'#64748b'};
+async function loadMine() {
+  const res = await fetch('/api/org-change/my-requests');
+  mineData = res.ok ? await res.json() : [];
+  const tb = document.getElementById('mine-tbody');
+  tb.innerHTML = mineData.length ? mineData.map(r => `
+    <tr>
+      <td><a href="/profile/${r.employee_id}" style="font-weight:600;color:#0f172a;text-decoration:none">${esc(r.employee_name)}</a></td>
+      <td style="font-size:.78rem">${diffInline(r)}</td>
+      <td><span style="font-size:.72rem;font-weight:700;color:${STATUS_COLORS[r.status]||'#64748b'}">${r.status}</span></td>
+      <td style="font-size:.75rem">${r.status === 'PENDING' ? 'Level ' + r.current_step + ' / ' + r.total_steps : '—'}</td>
+      <td style="font-size:.75rem;color:#64748b;max-width:160px">${esc(r.reason || '—')}</td>
+      <td>${r.status === 'PENDING' ? `<button class="btn btn-ghost btn-sm" style="color:#dc2626;border-color:#fca5a5" onclick="cancelReq('${r.id}')">Cancel</button>` : ''}</td>
+    </tr>`).join('') : '<tr class="empty-row"><td colspan="6">You have not raised any position changes.</td></tr>';
+}
+
+async function cancelReq(id) {
+  if (!confirm('Cancel this pending request?')) return;
+  const res = await fetch('/api/org-change/' + id + '/cancel', { method: 'POST' });
+  if (res.ok) init(); else { const d = await res.json(); alert(d.error || 'Failed'); }
+}
+
+// ── Review modal ─────────────────────────────────────────────────────────────
+function openReview(id, action) {
+  const r = pendingData.find(x => x.id === id);
+  if (!r) return;
+  currentReviewId = id;
+  document.getElementById('rv-title').textContent = 'Review: ' + r.employee_name;
+  document.getElementById('rv-sub').textContent   = `Level ${r.current_step} of ${r.total_steps} · raised by ${r.requested_by_name}`;
+  document.getElementById('rv-diff').innerHTML     = diffHtml(r);
+  document.getElementById('rv-note').value = '';
+  document.getElementById('review-modal').style.display = 'flex';
+}
+function closeReview() { document.getElementById('review-modal').style.display = 'none'; }
+
+async function submitReview(action) {
+  const note = document.getElementById('rv-note').value.trim();
+  const res  = await fetch('/api/org-change/' + currentReviewId + '/decide', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, note: note || null })
+  });
+  if (!res.ok) { const d = await res.json(); alert(d.error || 'Failed'); return; }
+  closeReview();
+  init();
+}
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+async function init() {
+  await Promise.all([loadPending(), loadMine()]);
+  document.getElementById('oc-subtitle').textContent =
+    `${pendingData.length} awaiting your approval · ${mineData.length} raised by you`;
+}
+init();
+</script>
+{% endblock %}

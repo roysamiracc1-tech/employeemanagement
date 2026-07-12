@@ -38,7 +38,10 @@
       </div>
       {% endif %}
       {% if t.max_days_per_year %}
-      <div style="font-size:.72rem;color:#64748b;margin-bottom:6px">{{ t.used_days }} / {{ t.max_days_per_year }} days used</div>
+      <div style="font-size:.72rem;margin-bottom:6px">
+        <span style="font-weight:700;color:{{ t.color }}">{{ t.remaining }} day{{ 's' if t.remaining != 1 else '' }} left</span>
+        <span style="color:#94a3b8"> · {{ t.used_days }}/{{ t.max_days_per_year }} used</span>
+      </div>
       <div style="background:#f1f5f9;border-radius:999px;height:5px;overflow:hidden">
         <div style="height:100%;border-radius:999px;background:{{ t.color }};width:{{ [[(t.used_days / t.max_days_per_year * 100)|int, 0]|max, 100]|min }}%"></div>
       </div>
@@ -114,26 +117,29 @@
     <div class="modal-body" style="display:flex;flex-direction:column;gap:14px">
       <div class="form-group" style="margin:0">
         <label>Type *</label>
-        <select id="rm-type" class="form-control" onchange="updateDayPreview()">
+        <select id="rm-type" class="form-control" onchange="refreshPreview()">
           <option value="">— Select type —</option>
           {% for t in vacation_types %}
           <option value="{{ t.id }}"
                   data-max="{{ t.max_days_per_year or '' }}"
                   data-remaining="{{ t.remaining if t.remaining is not none else '' }}"
+                  data-name="{{ t.name }}"
                   data-color="{{ t.color }}">
             {{ t.name }}{% if t.remaining is not none %} ({{ t.remaining }} days left){% endif %}
           </option>
           {% endfor %}
         </select>
       </div>
+      <!-- Live balance for the selected vacation type -->
+      <div id="rm-balance" style="display:none;padding:10px 14px;border-radius:8px;font-size:.82rem;border:1px solid transparent"></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
         <div class="form-group" style="margin:0">
           <label>Start Date *</label>
-          <input type="date" id="rm-start" class="form-control" onchange="updateDayPreview()">
+          <input type="date" id="rm-start" class="form-control" onchange="refreshPreview()">
         </div>
         <div class="form-group" style="margin:0">
           <label>End Date *</label>
-          <input type="date" id="rm-end" class="form-control" onchange="updateDayPreview()">
+          <input type="date" id="rm-end" class="form-control" onchange="refreshPreview()">
         </div>
       </div>
       <div id="day-preview" style="display:none;padding:10px 14px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;font-size:.83rem;color:#166534"></div>
@@ -164,8 +170,9 @@ function openReqModal() {
   const today = new Date().toISOString().split('T')[0];
   document.getElementById('rm-start').value = today;
   document.getElementById('rm-end').value   = today;
+  document.getElementById('rm-balance').style.display = 'none';
   document.getElementById('req-modal').style.display = 'flex';
-  updateDayPreview();
+  refreshPreview();
 }
 function closeReqModal() { document.getElementById('req-modal').style.display = 'none'; }
 
@@ -176,12 +183,48 @@ function countWeekdays(start, end) {
   return Math.max(count, 1);
 }
 
-function updateDayPreview() {
-  const s = document.getElementById('rm-start').value;
-  const e = document.getElementById('rm-end').value;
+function refreshPreview() {
+  const sel     = document.getElementById('rm-type');
+  const opt     = sel.options[sel.selectedIndex];
+  const s       = document.getElementById('rm-start').value;
+  const e       = document.getElementById('rm-end').value;
   const preview = document.getElementById('day-preview');
-  if (!s || !e || e < s) { preview.style.display='none'; return; }
-  const days = countWeekdays(s, e);
+  const bal     = document.getElementById('rm-balance');
+  const haveDates = s && e && e >= s;
+  const days = haveDates ? countWeekdays(s, e) : 0;
+
+  // ── Balance panel for the selected type ──
+  if (!sel.value) {
+    bal.style.display = 'none';
+  } else {
+    const name   = opt.getAttribute('data-name') || 'This type';
+    const maxRaw = opt.getAttribute('data-max');
+    const remRaw = opt.getAttribute('data-remaining');
+    let bg='#eff6ff', bd='#bfdbfe', fg='#1e40af', html;
+    if (!maxRaw) {
+      bg='#f8fafc'; bd='#e2e8f0'; fg='#475569';
+      html = `<strong>${name}</strong> · No annual limit`;
+    } else {
+      const max = parseInt(maxRaw, 10);
+      const remaining = remRaw !== '' ? parseInt(remRaw, 10) : max;
+      html = `<strong>${name}</strong> · <strong>${remaining}</strong> of ${max} day${max!==1?'s':''} remaining this year`;
+      if (haveDates) {
+        const after = remaining - days;
+        if (days > remaining) {
+          bg='#fef2f2'; bd='#fecaca'; fg='#b91c1c';
+          html += `<br>⚠ This request needs ${days} day${days!==1?'s':''}, but only ${remaining} remain.`;
+        } else {
+          bg='#f0fdf4'; bd='#bbf7d0'; fg='#166534';
+          html += `<br>This request uses ${days} day${days!==1?'s':''} → <strong>${after}</strong> will remain after approval.`;
+        }
+      }
+    }
+    bal.style.background = bg; bal.style.borderColor = bd; bal.style.color = fg;
+    bal.innerHTML = html; bal.style.display = '';
+  }
+
+  // ── Working-day preview ──
+  if (!haveDates) { preview.style.display = 'none'; return; }
   preview.style.display = '';
   preview.textContent   = `${days} working day${days!==1?'s':''} (weekends excluded)`;
 }

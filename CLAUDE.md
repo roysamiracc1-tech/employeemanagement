@@ -1,5 +1,19 @@
 # CLAUDE.md — Project Rules
 
+## FLOW TESTS — How to run any "flow test" the user asks for
+
+Whenever the user asks for a **flow test** (of any feature, role, or scenario), it MUST be run as a live, watchable, narrated browser session — never as a silent curl/API check. Follow this exactly:
+
+1. **Make sure the app is running** on `http://localhost:8000` (`python run.py`).
+2. **Drive a VISIBLE Chrome/Chromium window** with Playwright (`headless=False`, a moderate `slow_mo` so it's watchable). Bring the window to the foreground (`page.bring_to_front()` + `osascript -e 'tell application "Chromium" to activate'`) so the user can actually see it. Note: Playwright launches the light-blue **Chromium** app, not the user's normal Google Chrome.
+3. **Speak every step aloud** using the macOS `say` command as it happens, so the user hears what is being done and why (login, each page, each action, the outcome).
+4. **Actually perform the real steps** in the UI — click the real buttons, fill the real forms, log in/out as the real users involved. Take a screenshot at each step for the record.
+5. **When finished, say aloud "The flow test is complete"** (and print it), then **STOP and wait for the user to approve.** Do NOT declare the flow test successful on your own.
+6. **The flow test counts as SUCCESSFUL only after the user explicitly approves** ("the flow is correct" / "approved"). Until then it is pending, no matter how clean the run looked.
+
+Reusable drivers live under the session scratchpad (e.g. `roundtrip.py`, `flow.py`) — model new flow tests on them.
+
+
 ## BEFORE CONFIRMING ANY CHANGE TO THE USER
 
 **Run `python -m pytest -q` and verify 0 failures. Then manually check these 5 things:**
@@ -36,6 +50,16 @@
 - Use `{% if has_feature_access('your_feature_code') %}` in nav
 
 **Company roles are ONLY roles with `company_id = that company's UUID`.** Never query `OR company_id IS NULL` when showing a company's roles — that pulls in global template roles (EMPLOYEE, DEPARTMENT_HEAD, etc.) which the company has NOT created. Every query that lists or shows roles for a specific company must filter `WHERE company_id = %s::uuid` only.
+
+## Position Change Workflow (org_change feature)
+
+Drag-and-drop employee moves (BU / functional unit / location / manager) go through a company-configurable, **sequential** multi-level approval chain before anything is applied. Key invariants — do not weaken:
+
+1. Pages/APIs are gated by `@require_feature_access('org_change', ...)`; the admin config page by `@require_feature_access('org_structure','w')`. Never hardcode role lists on these routes.
+2. **An individual employee can NEVER initiate their own move.** On top of the feature gate, `create_request` requires the initiator to be the subject's current `SOLID_LINE` manager **or** hold `HR_ADMIN`/`PORTAL_ADMIN`/`SYSTEM_ADMIN`. Keep this business-rule check (`_can_initiate_for`) — the feature flag alone is not sufficient.
+3. Approvals are **sequential**: level N+1 is only reached after level N approves; any single rejection sets `status=REJECTED` and applies **no** change. Nothing is applied until the final level approves.
+4. All org-change queries are **company-scoped** (`company_id = %s::uuid`) — same rule as everything else. Approver resolution matches role by **name** within the company (roles are per-company).
+5. The engine lives in `app/services/org_change_service.py`; reuse it — do not re-implement approval logic inline in routes.
 
 **Past mistakes to never repeat:**
 - Skills Intelligence had a legacy `enabled_for_hr` flag that blocked HR_ADMIN even after they were granted access via `role_feature_access`. This was removed. Never add sub-flags like this again.

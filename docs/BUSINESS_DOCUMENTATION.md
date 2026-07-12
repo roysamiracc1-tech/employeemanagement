@@ -447,3 +447,56 @@ Answers: *What are employees looking for? What can they not find?*
 
 **Export:** Each tab has a "↓ CSV" download button. The "⎙ Print" button opens the browser print dialog, which can save any view as a PDF — suitable for board presentations.
 
+---
+
+### 3.19 Vacation Balance Visibility
+
+To help employees and managers make informed leave decisions, the remaining balance for each vacation type is now surfaced everywhere a decision is made:
+
+- **Vacation type cards** (`/vacation`) lead with **"X days left"** in the type's colour, alongside "used / annual limit".
+- **Request modal** — when an employee picks a type, a live balance panel shows *"Annual Leave · 20 of 25 days remaining this year"*. Once dates are chosen it adds *"This request uses 5 days → 15 will remain after approval"*, and turns **red with a warning** if the request would exceed the remaining balance.
+- **Manager review** — the Team Vacation pending list shows each requester's remaining balance under the type, and the approve/reject modal spells out *"Liisa has 20 of 25 Annual Leave days left. Approving this 5-day request leaves 15 days."*
+
+**Business value:** managers can see at approval time whether granting leave breaches an employee's entitlement, and employees never over-request. Types with no annual cap display *"No annual limit"*.
+
+---
+
+### 3.20 Position Change Requests (Drag-and-Drop Org Moves)
+
+Moving an employee to a different **business unit**, **functional unit (department)**, **location**, or **reporting manager** is a controlled, auditable request that must pass a company-defined chain of approvals before it takes effect.
+
+**Who can raise a request:** Solid-line managers (for their own reports only), HR Admins, and Portal Admins. **An individual employee can never initiate their own move.**
+
+**How it is raised:** On the **Organisation Tree**, an authorised user **drags an employee card onto another person's card**. A "Request Position Change" modal opens, pre-filled from the drop target (new manager and their unit/location), with every field editable and a mandatory reason. Submitting creates a request — **nothing changes until it is fully approved.**
+
+**Approval workflow (`PENDING → APPROVED | REJECTED | CANCELLED`):**
+
+```
+Manager / HR drags employee → fills modal → submits
+        │
+        ▼
+  Status: PENDING (Level 1 of N)
+  Requester notified "submitted (N-level approval)"
+        │
+        ├─ Level-1 approver Approves ─► advances to Level 2, requester notified
+        │        │
+        │        └─ … each level in turn …
+        │              │
+        │              └─ Final level Approves ─► change APPLIED, requester + employee notified
+        │
+        └─ Any approver Rejects ─► Status REJECTED, chain stops, requester + employee notified
+                                    (no change is applied)
+```
+
+**Configurable workflow (Portal Admin → Change Workflow):** Each company defines **how many approval levels** a move must pass and **who approves each level**. Every level's approver is either **a role** (e.g. HR Admin — anyone with that role in the company can approve) **or a specific named person**. Approvals are **sequential**: level 1 must approve before level 2 is asked, and any single rejection stops the whole chain.
+
+**Business Rules:**
+- The individual employee being moved cannot raise the request; only their manager, HR, or a Portal Admin can.
+- A solid-line manager may only move **their own** direct reports; HR/Portal Admins may move anyone in the company.
+- The proposed change is a **snapshot** — the request records both the old and new placement for audit.
+- Nothing is applied until the **final** level approves; a rejection at any level applies **no** change.
+- If a company has not configured a workflow, a single **HR Admin** approval is required by default.
+- On final approval, the employee's org assignment (BU / department / location) and solid-line reporting manager are updated; the previous assignment is retained (marked non-current) for history.
+
+**Where users track requests:** the **Position Changes** page has two tabs — *Pending My Approval* (approve/reject with a note) and *My Requests* (status + which level it is on). All parties receive in-app bell notifications at each transition.
+

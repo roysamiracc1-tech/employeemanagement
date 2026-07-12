@@ -1,0 +1,102 @@
+{% extends 'base.html' %}
+{% block title %}Position Change Workflow — HR Portal{% endblock %}
+{% block page_title %}Position Change Workflow{% endblock %}
+
+{% block content %}
+<div class="page" style="max-width:760px">
+
+  <div style="margin-bottom:18px">
+    <h1 style="font-size:1.25rem;font-weight:700;margin-bottom:2px">Position Change Approval Workflow</h1>
+    <p style="font-size:.8rem;color:#64748b">
+      Define how many approval levels a position-change request must pass, and who approves each level.
+      Approvals happen in order — level 1, then level 2, and so on.
+    </p>
+  </div>
+
+  <div id="unconfigured-note" style="display:none;font-size:.78rem;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px 12px;margin-bottom:14px">
+    No workflow configured yet — requests currently need a single <strong>HR Admin</strong> approval by default.
+  </div>
+
+  <div class="card">
+    <div class="card-body" style="display:flex;flex-direction:column;gap:12px">
+      <div id="steps-list" style="display:flex;flex-direction:column;gap:10px"></div>
+      <div>
+        <button class="btn btn-ghost btn-sm" onclick="addStep()">+ Add approval level</button>
+      </div>
+      <div id="save-error" style="display:none;color:#dc2626;font-size:.78rem;background:#fef2f2;padding:8px 12px;border-radius:6px"></div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn btn-primary btn-sm" id="save-btn" onclick="saveWorkflow()">Save Workflow</button>
+        <span id="save-ok" style="display:none;color:#16a34a;font-size:.8rem">✓ Saved</span>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let ROLES = [], EMPLOYEES = [], steps = [];
+
+function esc(s){return (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+
+function render() {
+  const box = document.getElementById('steps-list');
+  if (!steps.length) { box.innerHTML = '<p style="color:#94a3b8;font-size:.85rem">No levels yet. Add one below.</p>'; return; }
+  box.innerHTML = steps.map((s, i) => `
+    <div style="display:flex;gap:8px;align-items:center;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px">
+      <div style="font-weight:700;color:#8b5cf6;min-width:58px">Level ${i + 1}</div>
+      <select class="form-control" style="max-width:130px" onchange="setType(${i}, this.value)">
+        <option value="ROLE"${s.approver_type==='ROLE'?' selected':''}>Role</option>
+        <option value="EMPLOYEE"${s.approver_type==='EMPLOYEE'?' selected':''}>Person</option>
+      </select>
+      ${s.approver_type === 'EMPLOYEE'
+        ? `<select class="form-control" onchange="setVal(${i},'approver_employee_id',this.value)">
+             <option value="">— Select person —</option>
+             ${EMPLOYEES.map(e => `<option value="${e.id}"${e.id===s.approver_employee_id?' selected':''}>${esc(e.name)}${e.job_title?' · '+esc(e.job_title):''}</option>`).join('')}
+           </select>`
+        : `<select class="form-control" onchange="setVal(${i},'approver_role',this.value)">
+             <option value="">— Select role —</option>
+             ${ROLES.map(r => `<option value="${r}"${r===s.approver_role?' selected':''}>${esc(r)}</option>`).join('')}
+           </select>`}
+      <input class="form-control" style="max-width:160px" placeholder="Label (optional)" value="${esc(s.label||'')}" oninput="setVal(${i},'label',this.value)">
+      <button class="btn btn-ghost btn-sm" style="color:#dc2626;margin-left:auto" onclick="removeStep(${i})" title="Remove">✕</button>
+    </div>`).join('');
+}
+
+function setType(i, v) { steps[i].approver_type = v; steps[i].approver_role = null; steps[i].approver_employee_id = null; render(); }
+function setVal(i, k, v) { steps[i][k] = v || null; }
+function addStep() { steps.push({ approver_type: 'ROLE', approver_role: 'HR_ADMIN', approver_employee_id: null, label: '' }); render(); }
+function removeStep(i) { steps.splice(i, 1); render(); }
+
+async function saveWorkflow() {
+  const err = document.getElementById('save-error'); err.style.display = 'none';
+  document.getElementById('save-ok').style.display = 'none';
+  for (const [i, s] of steps.entries()) {
+    if (s.approver_type === 'ROLE' && !s.approver_role) { err.textContent = `Level ${i+1}: pick a role.`; err.style.display=''; return; }
+    if (s.approver_type === 'EMPLOYEE' && !s.approver_employee_id) { err.textContent = `Level ${i+1}: pick a person.`; err.style.display=''; return; }
+  }
+  const btn = document.getElementById('save-btn'); btn.disabled = true; btn.textContent = 'Saving…';
+  const res = await fetch('/api/admin/org-change-workflow', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: 'Position Change Approval', steps })
+  });
+  btn.disabled = false; btn.textContent = 'Save Workflow';
+  if (!res.ok) { const d = await res.json(); err.textContent = d.error || 'Failed.'; err.style.display=''; return; }
+  document.getElementById('save-ok').style.display = '';
+  document.getElementById('unconfigured-note').style.display = 'none';
+}
+
+async function load() {
+  const res = await fetch('/api/admin/org-change-workflow');
+  const data = await res.json();
+  ROLES = data.roles || []; EMPLOYEES = data.employees || [];
+  steps = (data.steps || []).map(s => ({
+    approver_type: s.approver_type, approver_role: s.approver_role || null,
+    approver_employee_id: s.approver_employee_id || null, label: s.label || ''
+  }));
+  if (!data.configured) document.getElementById('unconfigured-note').style.display = '';
+  if (!steps.length) addStep(); else render();
+}
+load();
+</script>
+{% endblock %}

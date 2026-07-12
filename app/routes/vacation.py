@@ -375,6 +375,14 @@ def api_vacation_team_pending():
         SELECT vr.id::text, vr.start_date, vr.end_date, vr.working_days,
                vr.notes, vr.status, vr.created_at,
                vt.name AS type_name, vt.color,
+               vt.max_days_per_year AS max_days,
+               COALESCE((
+                   SELECT SUM(vr2.working_days) FROM vacation_requests vr2
+                   WHERE vr2.employee_id = vr.employee_id
+                     AND vr2.vacation_type_id = vr.vacation_type_id
+                     AND vr2.status IN ('PENDING','APPROVED')
+                     AND EXTRACT(YEAR FROM vr2.start_date) = EXTRACT(YEAR FROM vr.start_date)
+               ), 0)::int AS used_days,
                (e.first_name||' '||e.last_name) AS employee_name,
                e.id::text AS employee_id, e.job_title,
                COALESCE(l.name,'') AS location
