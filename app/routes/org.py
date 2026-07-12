@@ -2,7 +2,7 @@ from flask import session, request, render_template, jsonify
 
 from app import app
 from app.db import query, to_dict
-from app.auth import login_required
+from app.auth import login_required, can_access_feature
 from app.helpers import TREE_CTE, build_nested
 
 
@@ -16,7 +16,9 @@ def _viewer_company():
 @app.route('/org-tree')
 @login_required
 def org_tree():
-    return render_template('org/tree.html', own_emp_id=session['employee_id'])
+    return render_template('org/tree.html',
+                           own_emp_id=session['employee_id'],
+                           can_move=can_access_feature('org_change', 'w'))
 
 
 @app.route('/api/org-tree')

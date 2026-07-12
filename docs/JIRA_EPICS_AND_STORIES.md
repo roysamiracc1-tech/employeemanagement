@@ -35,6 +35,8 @@
 | EP23 | In-App Notification System | KAN-107 · KAN-108 · KAN-109 · KAN-110 · KAN-111 · KAN-112 · KAN-113 |
 | EP24 | Vacation Cancellation & Withdrawal UI | KAN-114 · KAN-115 · KAN-116 · KAN-117 · KAN-118 |
 | EP25 | Analytics & Reporting Dashboard | KAN-119 · KAN-120 · KAN-121 · KAN-122 · KAN-123 · KAN-124 · KAN-125 · KAN-126 · KAN-127 · KAN-128 · KAN-129 · KAN-130 · KAN-131 · KAN-132 |
+| EP26 | Vacation Balance Visibility | KAN-133 · KAN-134 · KAN-135 · KAN-136 |
+| EP27 | Employee Position Change Workflow | KAN-137 · KAN-138 · KAN-139 · KAN-140 · KAN-141 · KAN-142 · KAN-143 · KAN-144 · KAN-145 · KAN-146 · KAN-147 |
 
 ---
 
@@ -378,3 +380,36 @@
 | KAN-130 | As an **admin**, I want filter state to be reflected in the URL so I can share a specific view with a colleague. | All filter params (`tab`, `range`, `start`, `end`, `company_id`, `group_by`) in query string via `history.replaceState`; page restores state on load. | Should Have |
 | KAN-131 | As an **HR Admin**, I want read-only access to my company's analytics so I can track leave and skills without needing Company Admin rights. | `HR_ADMIN` added to `_ROLES` tuple in analytics route; sidebar "Analytics" link visible for HR_ADMIN; company always scoped to session. | Must Have |
 | KAN-132 | As a **developer**, I want 24 unit tests covering all analytics endpoints so access control, data shape, CSV export, and date parsing are verified. | `TestAnalyticsPageAccess` (5), `TestAnalyticsOverview` (5), `TestAnalyticsVacation` (3), `TestAnalyticsSkills` (2), `TestAnalyticsOrg` (2), `TestAnalyticsSearch` (2), `TestAnalyticsExport` (3), `TestAnalyticsDateParsing` (2) — all passing. | Must Have |
+
+---
+
+## EP26 — Vacation Balance Visibility
+**Jira:** KAN-133 · **Label:** `vacation` `ux` `balance`
+**Description:** Surface the remaining balance for each vacation type wherever a leave decision is made — the type cards, the employee's request modal (live, as dates change), the manager's pending list, and the manager's review modal — so employees never over-request and managers can see entitlement impact before approving.
+
+| Story ID | User Story | Acceptance Criteria | Priority |
+|----------|-----------|---------------------|----------|
+| KAN-133 | As an **employee**, I want each vacation type card to show how many days I have left so I can plan at a glance. | `/vacation` cards render **"X days left"** (in the type colour) next to "used / annual limit"; types with no cap show "No annual limit". | Must Have |
+| KAN-134 | As an **employee**, I want the request modal to show my remaining balance for the selected type, updating as I pick dates, so I know the impact before submitting. | Selecting a type shows *"N of MAX days remaining this year"*; after dates it adds *"this request uses D days → R will remain"*; panel turns **red with a warning** when D > remaining. | Must Have |
+| KAN-135 | As a **manager**, I want each pending request to show the employee's remaining balance for that type so I can spot over-allocation in the list. | `/api/vacation/team-pending` returns `max_days` + `used_days`; pending row shows *"used/limit left"* and flags **"⚠ over limit"** in red when exceeded. | Must Have |
+| KAN-136 | As a **manager**, I want the approve/reject modal to state the balance and post-approval remainder so my decision is informed. | Review modal shows *"<name> has N of MAX <type> days left. Approving this D-day request leaves R days."*; red warning when it would exceed the limit. | Must Have |
+
+---
+
+## EP27 — Employee Position Change Workflow
+**Jira:** KAN-137 · **Label:** `org` `workflow` `approval` `drag-drop`
+**Description:** Managers, HR, and Portal Admins move an employee to a new business unit, functional unit (department), location, and/or reporting manager by **dragging a card in the Organisation Tree**. The move is a request that flows through a **company-configurable, multi-level, sequential approval chain** (each level a role or a named person) and is only applied after the final approval. Individual employees can never initiate their own move. Backed by four tables (`org_change_workflows`, `org_change_workflow_steps`, `org_change_requests`, `org_change_approvals`) and a new `org_change` portal feature.
+
+| Story ID | User Story | Acceptance Criteria | Priority |
+|----------|-----------|---------------------|----------|
+| KAN-137 | As a **manager**, I want to drag an employee onto another person in the Org Tree to propose a move so the change starts where I already work. | `.ft-card` is `draggable` only when `has_feature_access('org_change','w')`; dropping S on T opens a "Request Position Change" modal pre-filled from T (new manager + unit/location). | Must Have |
+| KAN-138 | As a **requester**, I want to adjust the proposed business unit, department, location, and manager and give a reason before submitting so the request is accurate. | Modal selects populated from `/api/org-change/prefill` (company-scoped); reason is mandatory; submit `POST /api/org-change/request`; banner states nothing changes until approved. | Must Have |
+| KAN-139 | As the **system**, I want to prevent an individual employee from initiating their own move so moves are always manager-driven. | `POST /api/org-change/request` gated by `org_change` (write); requester must manage the subject (solid-line) **or** be HR/Portal/System admin, else `403`; plain `EMPLOYEE` blocked. | Must Have |
+| KAN-140 | As a **Portal Admin**, I want to configure how many approval levels a move needs and who approves each so the workflow matches our governance. | `/admin/org-change-workflow` editor adds/removes ordered levels; each level is **Role** (company role) or **Person** (employee); replace-all save via `POST /api/admin/org-change-workflow`. | Must Have |
+| KAN-141 | As an **approver**, I want to see only the requests waiting at a step I can decide so my queue is relevant. | `/api/org-change/pending` returns requests where the **current** step matches the caller's role or employee id; shown in "Pending My Approval" with the from→to diff and "Level X / N". | Must Have |
+| KAN-142 | As an **approver**, I want to approve or reject with a note so the next level or the requester understands the decision. | `POST /api/org-change/<id>/decide` records the step decision; approve with more levels advances `current_step`; final approve applies the change; reject stops the chain. | Must Have |
+| KAN-143 | As the **system**, I want approvals to be strictly sequential and any rejection to stop the chain so partial moves never occur. | Level N+1 is only notified after level N approves; a single reject sets `status=REJECTED` and applies **no** change; verified in tests and end-to-end. | Must Have |
+| KAN-144 | As the **system**, I want the final approval to actually move the employee so the org data reflects the decision. | `apply_change` sets old `employee_org_assignments.is_current=FALSE`, inserts a new current row (BU/FU/location, cost centre carried), and re-points the `SOLID_LINE` manager when changed. | Must Have |
+| KAN-145 | As a **requester and employee**, I want to be notified at every step so I know the status. | In-app notifications on submit, each level pass, final approve, and reject (`ORG_CHANGE_*` events, link `/org-change`) to requester; subject notified on final approve and reject. | Must Have |
+| KAN-146 | As a **requester**, I want to see my requests and cancel a pending one so I stay in control. | "My Requests" tab shows status + current level; `POST /api/org-change/<id>/cancel` allowed for the requester or an admin on `PENDING` only. | Should Have |
+| KAN-147 | As a **developer**, I want unit tests covering permissions and the sequential engine so regressions are caught pre-commit. | `tests/test_org_change.py` (17): initiator matrix, `decide` advance/reject/final, approver eligibility, `apply_change` SQL, `create_request` notifications, workflow save; full suite **4,511 passing**. | Must Have |

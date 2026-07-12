@@ -156,6 +156,34 @@ vacation_requests
 
 ---
 
+### 3.5 Position Change (Org-Change) Tables
+
+Migration: `database/migrations/06_org_change_workflow.sql`. Powers the drag-and-drop position-change feature (see §19).
+
+```
+org_change_workflows          ← one active chain per company (company_id UNIQUE)
+  └── org_change_workflow_steps  ← ordered approval levels
+        step_order INT
+        approver_type: ROLE | EMPLOYEE
+        approver_role  (role NAME — roles are per-company) | approver_employee_id
+        CHECK: exactly one of role / employee set per type
+
+org_change_requests             ← a proposed move
+  company_id, employee_id (subject), requested_by_user_id, reason
+  from_business_unit_id / from_functional_unit_id / from_location_id / from_manager_id   (audit snapshot)
+  proposed_business_unit_id / proposed_functional_unit_id / proposed_location_id / proposed_manager_id
+  workflow_id, current_step INT,
+  status: PENDING | APPROVED | REJECTED | CANCELLED
+
+org_change_approvals            ← one row per step (audit trail)
+  request_id, step_order, approver_type, approver_role, approver_employee_id,
+  decided_by_user_id, decision: APPROVED | REJECTED, note, decided_at
+```
+
+Feature gate: a new `org_change` row in `portal_features`, with default `role_feature_access` (read+write) for `SOLID_LINE_MANAGER`, `HR_ADMIN`, `PORTAL_ADMIN` (also seeded in `scripts/setup_db.py`).
+
+---
+
 ## 4. Application Architecture
 
 ### 4.1 Request Lifecycle
@@ -260,6 +288,21 @@ Browser → Flask Route
 | GET | `/api/vacation/team-upcoming` | manager+ | Upcoming approved/pending leave |
 | GET | `/api/vacation/team-pending-counts` | manager+ | Per-employee pending counts |
 | POST | `/api/vacation/review/<id>` | manager+ | Approve or reject a request |
+
+Vacation submit/review responses and the manager pending list (`team-pending`) now include per-type balance fields (`max_days`, `used_days`) so the UI can render remaining balance in the request modal, type cards, pending list, and review modal.
+
+### Position Change (Org-Change) APIs
+| Method | Path | Access | Description |
+|--------|------|--------|-------------|
+| GET | `/org-change` | `org_change` (r) | Position Changes inbox page (Pending My Approval + My Requests) |
+| POST | `/api/org-change/request` | `org_change` (w) + must manage subject, or be HR/Portal | Create a request (validates initiator; `EMPLOYEE` cannot self-initiate) |
+| GET | `/api/org-change/pending` | `org_change` (r) | Requests whose **current** step this user may decide |
+| GET | `/api/org-change/my-requests` | login | Requests the caller raised (status + level) |
+| GET | `/api/org-change/pending-count` | login | Count for the bell/badge |
+| POST | `/api/org-change/<id>/decide` | `org_change` (w) | Approve/reject the current step (advances or stops the chain) |
+| POST | `/api/org-change/<id>/cancel` | login (requester or admin) | Cancel a PENDING request |
+| GET | `/api/org-change/prefill?target=&subject=` | `org_change` (w) | Drop-target placement + company BU/FU/location/manager option lists for the modal |
+| GET/POST | `/admin/org-change-workflow`, `/api/admin/org-change-workflow` | `org_structure` (w) | Config page + load / replace-all workflow steps |
 
 ---
 
@@ -512,7 +555,8 @@ tests/
 | `test_routes_auth_login.py` | 21 | POST login sets session keys, company_id stored, Tech Admin gets null company, branding loaded, protected-route redirects |
 | `test_routes_org.py` | 31 | BU/loc/FU list with company filter, create (conflict, missing name), update (403 cross-company), delete (409 with employees), company context switch, role-feature permission matrix CRUD |
 | `test_ui_ux.py` | 48 | Login page 200/CSS path/split-panel structure/demo chips/no-old-classes, base.html CSS path, sidebar nav gating, admin panel tab visibility, CSS file integrity (all classes defined), template asset consistency (no bare `style.css`) |
-| **Total** | **238** | |
+| `test_org_change.py` | 17 | Position-change initiator permissions (employee blocked, manager own-reports-only, HR/Portal open), sequential `decide` (advance / reject-stops / final-applies), approver eligibility, `apply_change` SQL, `create_request` notifications, workflow-config save |
+| **Total (representative core files)** | **255** | Full repository suite: **4,511 passing** |
 
 ### Pre-Commit Test Gate
 
@@ -890,3 +934,60 @@ Company scoping: PORTAL_ADMIN and HR_ADMIN always use `session['company_id']`; S
 - **CSV**: `GET /api/analytics/export/csv?section=<tab>&range=<range>` — Python `csv.DictWriter` → `text/csv` response with `Content-Disposition: attachment`
 - **PDF**: Browser `window.print()` with `@media print` CSS
 
+
+---
+
+## 22. Position Change Workflow (Org-Change Engine)
+
+Drag-and-drop, multi-level, sequential approval for moving an employee's business unit,
+functional unit, location and reporting manager. Generalises the single-level vacation
+approval into a configurable N-step chain.
+
+### 22.1 Components
+
+| Layer | File | Role |
+|-------|------|------|
+| Schema | `database/migrations/06_org_change_workflow.sql` | 4 tables + `org_change` feature (§3.5) |
+| Engine | `app/services/org_change_service.py` | create / decide / apply / notify + config |
+| Routes | `app/routes/org_change.py` | request lifecycle, inbox, prefill, admin config |
+| Drag-drop | `templates/org/tree.html` | draggable cards + move modal (gated by `can_move`) |
+| Inbox | `templates/org_change/inbox.html` | Pending My Approval + My Requests tabs |
+| Config | `templates/admin/org_change_workflow.html` | ordered step editor (role or person) |
+| Nav | `templates/base.html` | "Position Changes" + "Change Workflow" links |
+
+### 22.2 Engine logic (`org_change_service.py`)
+
+- `workflow_steps(company_id)` — ordered steps; **falls back to a single `HR_ADMIN` step** when a company has no configured chain.
+- `create_request(...)` — snapshots the subject's current placement (BU/FU/location/manager), inserts the request + one `org_change_approvals` row per step, sets `current_step=1`, notifies step-1 approvers and the requester.
+- `decide(request_id, user, decision, note)` — verifies the caller is eligible for the **current** step (`_user_matches_step`: role held, or employee id equals the named approver), records the decision, then:
+  - **reject** → `status=REJECTED`, chain stops, notify requester + subject;
+  - **approve, more steps** → `current_step += 1`, notify next approvers + requester;
+  - **approve, last step** → `apply_change()`, `status=APPROVED`, notify requester + subject.
+- `apply_change(request)` — sets the old `employee_org_assignments.is_current=FALSE` (`effective_to=today`), inserts a new current row (carrying cost centre), and re-points the `SOLID_LINE` `manager_relationships` row if the manager changed. Mirrors the registration logic in `admin.py`.
+- Approver resolution: `_step_approver_user_ids` returns all active company users holding the step's role, or the single user behind the named employee.
+
+### 22.3 Authorisation
+
+- Pages/APIs gated by `@require_feature_access('org_change', ...)`; config gated by `@require_feature_access('org_structure','w')` — no hardcoded role lists (per `CLAUDE.md`).
+- **Initiator business rule** (on top of the feature gate): the requester must be the subject's current solid-line manager **or** hold `HR_ADMIN` / `PORTAL_ADMIN` / `SYSTEM_ADMIN`. Plain `EMPLOYEE` can never self-initiate.
+
+### 22.4 Notifications
+
+In-app bell notifications via `notification_service.create_user_notification` (link `/org-change`).
+Event types: `ORG_CHANGE_REQUESTED`, `ORG_CHANGE_STEP_APPROVED`, `ORG_CHANGE_APPROVED`,
+`ORG_CHANGE_REJECTED`, `ORG_CHANGE_CANCELLED`. (Email dispatch is out of scope for v1 — no
+per-company `notification_settings`/template rows are seeded for these events yet.)
+
+### 22.5 Drag-and-drop (frontend)
+
+`org_tree()` passes `can_move = can_access_feature('org_change','w')`. When true, each `.ft-card`
+becomes `draggable`; dropping card **S** onto card **T** calls `openMoveModal(S, T)`, which fetches
+`/api/org-change/prefill` to pre-fill the new manager (= T) and T's unit/location, all overridable via
+company-scoped selects, plus a mandatory reason. Submit → `POST /api/org-change/request`.
+
+### 22.6 Tests
+
+`tests/test_org_change.py` (17 tests): initiator permission matrix (employee blocked, manager
+limited to own reports, HR/Portal unrestricted), sequential `decide` (advance / reject-stops /
+final-applies), approver eligibility, `apply_change` SQL (assignment + conditional manager re-point),
+`create_request` notifications, and workflow-config save. Full suite: **4,511 passing**.

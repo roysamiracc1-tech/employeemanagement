@@ -111,6 +111,7 @@ def step4_seed_portal_features(cur):
         ('company_settings',     'Company Settings',         'Edit company branding, logo, theme and metadata',           7),
         ('system_config',        'System Configuration',     'Widget settings and global platform config',                8),
         ('skills_intelligence',  'Skills Intelligence',      'Benchmark company skills against industry trends',          9),
+        ('org_change',           'Position Change Requests', 'Raise and approve business unit / department / manager changes', 10),
     ]
     for code, label, desc, order in features:
         cur.execute(
@@ -123,7 +124,8 @@ def step4_seed_portal_features(cur):
         'EMPLOYEE':            [('employee_profiles', True, False, False)],
         'SOLID_LINE_MANAGER':  [('employee_profiles', True, True,  False),
                                 ('skills',            True, True,  True),
-                                ('reports',           True, False, False)],
+                                ('reports',           True, False, False),
+                                ('org_change',        True, True,  False)],
         'DOTTED_LINE_MANAGER': [('employee_profiles', True, False, False),
                                 ('reports',           True, False, False)],
         'HIRING_MANAGER':      [('employee_profiles', True, False, False),
@@ -139,7 +141,8 @@ def step4_seed_portal_features(cur):
                                 ('skills',              True, True,  True),
                                 ('vacations',           True, True,  True),
                                 ('reports',             True, True,  False),
-                                ('skills_intelligence', True, False, False)],
+                                ('skills_intelligence', True, False, False),
+                                ('org_change',          True, True,  False)],
         'PORTAL_ADMIN':        [('employee_profiles',   True, True,  True),
                                 ('org_structure',       True, True,  True),
                                 ('user_accounts',       True, True,  True),
@@ -147,7 +150,8 @@ def step4_seed_portal_features(cur):
                                 ('vacations',           True, True,  True),
                                 ('reports',             True, True,  False),
                                 ('company_settings',    True, True,  False),
-                                ('skills_intelligence', True, True,  False)],
+                                ('skills_intelligence', True, True,  False),
+                                ('org_change',          True, True,  False)],
     }
     for role_name, perms in access_map.items():
         for feat_code, r, w, d in perms:

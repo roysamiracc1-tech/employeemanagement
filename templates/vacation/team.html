@@ -53,6 +53,7 @@
         <button class="modal-close" onclick="closeReview()">×</button>
       </div>
       <div class="modal-body">
+        <div id="rv-balance" style="display:none;padding:10px 14px;border-radius:8px;font-size:.82rem;border:1px solid transparent;margin-bottom:14px"></div>
         <div class="form-group" style="margin:0">
           <label>Note to employee (optional)</label>
           <textarea id="rv-note" class="form-control" rows="2" placeholder="Reason for decision…" style="resize:vertical"></textarea>
@@ -84,6 +85,20 @@ function fmtShort(d){return d?new Date(d).toLocaleDateString('en-GB',{day:'2-dig
 let currentReviewId = null;
 let pendingData = [], upcomingData = [];
 
+// Balance for a request's employee+type. used_days INCLUDES this pending request.
+function balanceParts(r) {
+  if (r.max_days === null || r.max_days === undefined) return null;
+  const max   = r.max_days;
+  const used  = r.used_days || 0;          // incl. this request
+  const before = used - r.working_days;     // used excluding this request
+  return { max, before, remainingNow: max - before, remainingAfter: max - used, over: used > max };
+}
+function balanceText(r) {
+  const b = balanceParts(r);
+  if (!b) return `${r.type_name}: no annual limit`;
+  return `${b.remainingNow} of ${b.max} ${r.type_name} days left · this request ${r.working_days}d → ${b.remainingAfter} left if approved`;
+}
+
 function switchTab(name, btn) {
   document.querySelectorAll('.admin-tab').forEach(b=>b.classList.remove('active'));
   document.querySelectorAll('.admin-panel').forEach(p=>p.style.display='none');
@@ -93,6 +108,7 @@ function switchTab(name, btn) {
 
 // ── Pending ──────────────────────────────────────────────────────────────────
 function buildPendingRow(r) {
+  const bp = balanceParts(r);
   return `<tr id="pr-${r.id}">
     <td>
       <div style="display:flex;align-items:center;gap:8px">
@@ -103,9 +119,14 @@ function buildPendingRow(r) {
         </div>
       </div>
     </td>
-    <td><span style="display:inline-flex;align-items:center;gap:4px;font-size:.78rem">
-      <span style="width:8px;height:8px;border-radius:50%;background:${r.color}"></span>${r.type_name}
-    </span></td>
+    <td>
+      <span style="display:inline-flex;align-items:center;gap:4px;font-size:.78rem">
+        <span style="width:8px;height:8px;border-radius:50%;background:${r.color}"></span>${r.type_name}
+      </span>
+      <div style="font-size:.68rem;margin-top:3px;${bp && bp.over ? 'color:#b91c1c;font-weight:600' : 'color:#64748b'}">
+        ${bp ? `${bp.remainingNow}/${bp.max} left${bp.over ? ' ⚠ over limit' : ''}` : 'no limit'}
+      </div>
+    </td>
     <td style="font-size:.8rem;white-space:nowrap">${fmtShort(r.start_date)}</td>
     <td style="font-size:.8rem;white-space:nowrap">${fmtShort(r.end_date)}</td>
     <td style="font-weight:600;text-align:center">${r.working_days}</td>
@@ -113,8 +134,8 @@ function buildPendingRow(r) {
     <td style="font-size:.72rem;color:#94a3b8;white-space:nowrap">${fmt(r.created_at)}</td>
     <td>
       <div style="display:flex;gap:5px">
-        <button class="btn btn-sm btn-success" onclick="openReview('${r.id}','${r.employee_name}','${r.type_name}','${r.start_date?.slice(0,10)||''}','${r.end_date?.slice(0,10)||''}',${r.working_days})">✓ Approve</button>
-        <button class="btn btn-sm btn-danger"  onclick="openReview('${r.id}','${r.employee_name}','${r.type_name}','${r.start_date?.slice(0,10)||''}','${r.end_date?.slice(0,10)||''}',${r.working_days},'reject')">✕ Reject</button>
+        <button class="btn btn-sm btn-success" onclick="openReview('${r.id}')">✓ Approve</button>
+        <button class="btn btn-sm btn-danger"  onclick="openReview('${r.id}','reject')">✕ Reject</button>
       </div>
     </td>
   </tr>`;
@@ -135,11 +156,32 @@ async function loadPending() {
 
 // ── Review modal ─────────────────────────────────────────────────────────────
 let pendingAction = null;
-function openReview(id, name, type, start, end, days, action) {
+function openReview(id, action) {
+  const r = pendingData.find(x => x.id === id);
+  if (!r) return;
   currentReviewId = id;
   pendingAction   = action || null;
-  document.getElementById('rv-title').textContent = 'Review: '+type;
-  document.getElementById('rv-sub').textContent   = `${name} · ${fmtShort(start)} → ${fmtShort(end)} (${days} day${days!==1?'s':''})`;
+  document.getElementById('rv-title').textContent = 'Review: '+r.type_name;
+  document.getElementById('rv-sub').textContent   =
+    `${r.employee_name} · ${fmtShort(r.start_date)} → ${fmtShort(r.end_date)} (${r.working_days} day${r.working_days!==1?'s':''})`;
+
+  // Balance panel — show the employee's allowance for this type
+  const bal = document.getElementById('rv-balance');
+  const b = balanceParts(r);
+  if (!b) {
+    bal.style.background='#f8fafc'; bal.style.borderColor='#e2e8f0'; bal.style.color='#475569';
+    bal.innerHTML = `<strong>${r.type_name}</strong> · No annual limit`;
+  } else if (b.over) {
+    bal.style.background='#fef2f2'; bal.style.borderColor='#fecaca'; bal.style.color='#b91c1c';
+    bal.innerHTML = `<strong>${r.employee_name}</strong> has <strong>${b.remainingNow}</strong> of ${b.max} ${r.type_name} days left.`
+      + `<br>⚠ Approving this ${r.working_days}-day request exceeds the annual limit (${b.remainingAfter} would remain).`;
+  } else {
+    bal.style.background='#f0fdf4'; bal.style.borderColor='#bbf7d0'; bal.style.color='#166534';
+    bal.innerHTML = `<strong>${r.employee_name}</strong> has <strong>${b.remainingNow}</strong> of ${b.max} ${r.type_name} days left.`
+      + `<br>Approving this ${r.working_days}-day request leaves <strong>${b.remainingAfter}</strong> day${b.remainingAfter!==1?'s':''}.`;
+  }
+  bal.style.display = '';
+
   document.getElementById('rv-note').value = '';
   document.getElementById('review-modal').style.display = 'flex';
   if (action === 'reject') {
