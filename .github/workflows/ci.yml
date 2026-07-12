@@ -1,0 +1,90 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  # ── Fast unit/route suite (DB fully mocked — no Postgres needed) ──────────────
+  unit-tests:
+    name: Unit & route tests (mocked DB)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Run pytest
+        run: python -m pytest -q
+
+  # ── Schema reproducibility + app-boot smoke test against a real Postgres ──────
+  # Builds a fresh DB from database/schema.sql (the authoritative baseline) and
+  # boots the app against it. This catches schema drift — e.g. a feature enabled
+  # in nav whose backing tables are missing from schema.sql — which the mocked
+  # suite cannot detect. (Architecture review F9 / KAN-165, KAN-169.)
+  schema-and-boot:
+    name: Fresh-DB schema + app boot
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: '5432'
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: employee_ci
+      SECRET_KEY: ci-secret
+      APP_ENV: development
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Create database + extension
+        run: |
+          export PGPASSWORD=postgres
+          psql -h localhost -U postgres -d postgres -c "CREATE DATABASE employee_ci;"
+          psql -h localhost -U postgres -d employee_ci -c 'CREATE EXTENSION IF NOT EXISTS "uuid-ossp";'
+      - name: Apply authoritative schema
+        run: |
+          export PGPASSWORD=postgres
+          psql -h localhost -U postgres -d employee_ci -v ON_ERROR_STOP=1 -f database/schema.sql
+      - name: Assert core + org_change tables exist
+        run: |
+          export PGPASSWORD=postgres
+          for t in companies employees vacation_requests user_notifications page_views \
+                   org_change_workflows org_change_workflow_steps org_change_requests org_change_approvals; do
+            psql -h localhost -U postgres -d employee_ci -tAc \
+              "SELECT to_regclass('public.$t')" | grep -qx "$t" \
+              || { echo "MISSING TABLE: $t"; exit 1; }
+          done
+          echo "All expected tables present."
+      - name: Boot the app against the fresh DB (real queries)
+        run: |
+          python -c "
+          from app import app
+          c = app.test_client()
+          r = c.get('/login')          # runs real DB queries against the fresh schema
+          assert r.status_code == 200, r.status_code
+          print('App booted and /login rendered against fresh schema — OK')
+          "
