@@ -90,12 +90,22 @@ pip install -r requirements.txt
 
 ### 3. Set up the database
 
+`database/schema.sql` is the **authoritative, complete schema** (a `pg_dump --schema-only`
+baseline of all 46 tables, indexes, functions and triggers — regenerate with
+`pg_dump -d employee --schema-only --no-owner --no-privileges -f database/schema.sql`).
+Build a fresh database from it, then seed roles/features:
+
 ```bash
 psql -U postgres -c "CREATE DATABASE employee;"
 psql -U postgres -d employee -c "CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\";"
-psql -U postgres -d employee -f database/schema_v2.sql
-psql -U postgres -d employee -f database/seed_data.sql
+psql -U postgres -d employee -f database/schema.sql   # full structure (canonical)
+python scripts/setup_db.py                             # seed roles, portal features, demo data
 ```
+
+> `database/schema_v2.sql` and the numbered files in `database/migrations/` are **historical**
+> — the current structure is already captured in `database/schema.sql`, so a fresh database
+> should not replay the migrations. Add new schema changes as a new numbered migration **and**
+> regenerate `schema.sql`.
 
 ### 4. Configure environment
 
