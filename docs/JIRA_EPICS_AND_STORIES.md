@@ -37,6 +37,16 @@
 | EP25 | Analytics & Reporting Dashboard | KAN-119 · KAN-120 · KAN-121 · KAN-122 · KAN-123 · KAN-124 · KAN-125 · KAN-126 · KAN-127 · KAN-128 · KAN-129 · KAN-130 · KAN-131 · KAN-132 |
 | EP26 | Vacation Balance Visibility | KAN-133 · KAN-134 · KAN-135 · KAN-136 |
 | EP27 | Employee Position Change Workflow | KAN-137 · KAN-138 · KAN-139 · KAN-140 · KAN-141 · KAN-142 · KAN-143 · KAN-144 · KAN-145 · KAN-146 · KAN-147 |
+| EP28 | Security Hardening (Architecture Review) | KAN-148 · KAN-149 · KAN-150 · KAN-151 · KAN-152 · KAN-153 |
+| EP29 | Data Layer & Query Performance | KAN-154 · KAN-155 · KAN-156 · KAN-157 · KAN-158 |
+| EP30 | Scalability & Runtime | KAN-159 · KAN-160 · KAN-161 · KAN-162 · KAN-163 · KAN-164 |
+| EP31 | Schema Source of Truth & Migrations | KAN-165 · KAN-166 · KAN-167 |
+| EP32 | Testing & CI Hardening | KAN-168 · KAN-169 · KAN-170 · KAN-171 |
+| EP33 | Frontend Modernization | KAN-172 · KAN-173 · KAN-174 · KAN-175 · KAN-176 · KAN-177 |
+| EP34 | Architecture & Structure | KAN-178 · KAN-179 · KAN-180 · KAN-181 · KAN-182 |
+
+> **EP28–EP34** are sourced from the architecture review in [`docs/ARCHITECTURE_REVIEW.md`](ARCHITECTURE_REVIEW.md)
+> (finding IDs `Fn` are referenced per story). Unlike EP1–EP27, these are **proposed / not yet implemented**.
 
 ---
 
@@ -413,3 +423,114 @@
 | KAN-145 | As a **requester and employee**, I want to be notified at every step so I know the status. | In-app notifications on submit, each level pass, final approve, and reject (`ORG_CHANGE_*` events, link `/org-change`) to requester; subject notified on final approve and reject. | Must Have |
 | KAN-146 | As a **requester**, I want to see my requests and cancel a pending one so I stay in control. | "My Requests" tab shows status + current level; `POST /api/org-change/<id>/cancel` allowed for the requester or an admin on `PENDING` only. | Should Have |
 | KAN-147 | As a **developer**, I want unit tests covering permissions and the sequential engine so regressions are caught pre-commit. | `tests/test_org_change.py` (17): initiator matrix, `decide` advance/reject/final, approver eligibility, `apply_change` SQL, `create_request` notifications, workflow save; full suite **4,511 passing**. | Must Have |
+
+---
+
+# Architecture Review Backlog (EP28–EP34)
+
+> Proposed epics from the `architect-reviewer` agent's audit. Source: `docs/ARCHITECTURE_REVIEW.md`.
+> Priorities are framed for a **demo/local** app today: security items are **Must Have (pre-prod)** —
+> required before any real deployment, not live incidents. Each story cites its review finding (`Fn`).
+
+## EP28 — Security Hardening
+**Jira:** KAN-148 · **Label:** `security` `hardening` `pre-prod`
+**Description:** Close the authentication, CSRF, and output-escaping gaps and harden session, config, and
+upload handling before the portal is exposed beyond local/demo use. Sourced from review findings F1–F5, F31.
+
+| Story ID | User Story | Acceptance Criteria | Priority |
+|----------|-----------|---------------------|----------|
+| KAN-148 | As the **product owner**, I want real authentication (password hash / SSO-OIDC / signed magic-link) so a session cannot be minted from an email address alone. (F1) | Login requires a verified factor; no session issued on email-only match; the login page no longer renders real user emails to anonymous visitors; existing tests updated. | Must Have (pre-prod) |
+| KAN-149 | As the **system**, I want CSRF protection on every state-changing endpoint so cross-site requests cannot act as a logged-in user. (F2) | Flask-WTF `CSRFProtect` (or a double-submit token for JSON) added as a real dependency; token required on all POST/PUT/DELETE (~44 routes); `api.js` sends the token; tests cover accept/reject. | Must Have (pre-prod) |
+| KAN-150 | As the **system**, I want all dynamic values escaped before insertion into the DOM so stored data cannot execute as script. (F3) | Every `innerHTML` build routes through a shared `escapeHtml`/safe-`html\`\`` helper (or `textContent`); directory, org-tree, team, my-team, admin panels covered; regression test with a `<img onerror>` name renders inert. | Must Have (pre-prod) |
+| KAN-151 | As the **system**, I want company HTML and logo uploads sanitized so a portal admin cannot inject active content to all employees. (F4) | `header_html`/`footer_html` sanitized on write (allowlist) or rendered as text (drop `| safe`); `svg` removed from allowed uploads (or rasterized); uploads served with `Content-Disposition: attachment`; content-type/magic-byte check added. | Must Have (pre-prod) |
+| KAN-152 | As the **operator**, I want secure runtime defaults so a misconfigured deploy fails safe. (F5) | App raises if `SECRET_KEY` unset outside dev; `SESSION_COOKIE_SECURE/SAMESITE/HTTPONLY` set; `debug` driven by env (default off); `MAX_CONTENT_LENGTH` caps request/upload size. | Must Have (pre-prod) |
+| KAN-153 | As the **operator**, I want required DB configuration with no personal defaults so missing config is caught, not masked. (F31) | `app/config.py` requires `PGUSER`/`PGDATABASE` (no `'samirroy'` default); missing values raise a clear error at startup. | Should Have |
+
+---
+
+## EP29 — Data Layer & Query Performance
+**Jira:** KAN-154 · **Label:** `database` `performance` `sql`
+**Description:** Remove the seq-scans and N+1s on hot paths, make multi-statement writes atomic, and stop
+over-fetching the directory. Sourced from F6, F8, F22, F23, F24.
+
+| Story ID | User Story | Acceptance Criteria | Priority |
+|----------|-----------|---------------------|----------|
+| KAN-154 | As a **user**, I want dashboard/directory/analytics queries to use an index on `employees.company_id` so they don't seq-scan the whole table. (F6) | Composite `(company_id, employment_status)` index added (supersedes low-value `idx_employees_status`); `EXPLAIN ANALYZE` shows index usage on the directory + dashboard queries. | Must Have |
+| KAN-155 | As the **system**, I want composite writes to be atomic so a mid-loop failure cannot leave partial data. (F8) | A `transaction()` context manager (single commit/rollback) is added and used by vacation-type create/edit and org-change apply; per-row-loop commits removed; failure rolls back the whole unit; read paths no longer sit idle-in-transaction. | Must Have |
+| KAN-156 | As a **user**, I want list/analytics pages to avoid N+1 queries so they stay fast as data grows. (F22) | Analytics overview replaces the per-feature COUNT loop with one `GROUP BY route`; vacation page computes used-days for all types in one `GROUP BY`; team-pending replaces the per-row correlated subselect with a single windowed/join query. | Should Have |
+| KAN-157 | As the **system**, I want indexes on the org/vacation foreign keys that are filtered/joined so those scans use an index. (F23) | `(company_id)` indexes on `business_units`/`locations`/`functional_units`; `idx` on `vacation_requests(vacation_type_id)`; confirmed via `EXPLAIN`. | Should Have |
+| KAN-158 | As a **user**, I want the employee directory paginated with a light list projection so a large company doesn't load everyone (with full skills/certs) at once. (F24) | Directory API paginates; a lightweight list query is separated from the detail query; skills/cert `JSON_AGG` only run for the detail view; serialization moved toward psycopg2 type adapters. | Should Have |
+
+---
+
+## EP30 — Scalability & Runtime
+**Jira:** KAN-159 · **Label:** `scalability` `runtime` `ops`
+**Description:** Make the app ready to run multi-worker / multi-instance: pool DB connections, bound
+background work, share upload storage, push instead of poll, and slim the session. Sourced from F7, F16, F17, F18, F19, F25.
+
+| Story ID | User Story | Acceptance Criteria | Priority |
+|----------|-----------|---------------------|----------|
+| KAN-159 | As the **operator**, I want a DB connection pool so requests reuse connections instead of opening one each. (F7) | `psycopg2.pool.ThreadedConnectionPool` (or PgBouncer) sits behind `get_db()`; connection open-rate under load drops sharply; background threads draw from the pool. | Must Have |
+| KAN-160 | As a **user**, I want feature-access cached across requests so it isn't re-joined on every page render. (F16) | Short-TTL process cache keyed by `(sorted(roles), company_id)`, invalidated on permission writes; per-request `g` cache retained; correctness preserved (SYSTEM_ADMIN bypass, company scoping). | Should Have |
+| KAN-161 | As the **system**, I want notification/pending counts pushed or combined rather than two polls per user every 60s. (F17) | Bell uses one endpoint returning both counts; polling is visibility-gated (or replaced with SSE/websocket); idle tabs stop querying. | Should Have |
+| KAN-162 | As the **operator**, I want uploaded logos in shared object storage so they survive across instances. (F18) | Logos stored in S3/GCS (or a shared volume) and served via signed URL/CDN; an upload on one instance is visible from another. | Should Have |
+| KAN-163 | As the **system**, I want bounded background workers so a spike or slow SMTP can't spawn unbounded threads/connections or lose work on restart. (F19) | Email + page-view logging go through a bounded worker pool / queue with backpressure and basic retry; work is not silently dropped on SIGTERM. | Should Have |
+| KAN-164 | As the **system**, I want only `company_id` in the session (not branding HTML) so the cookie can't overflow and branding can't go stale. (F25) | `session['branding']` removed; branding loaded server-side via a cached lookup (pairs with KAN-160); cookie size bounded. | Could Have |
+
+---
+
+## EP31 — Schema Source of Truth & Migrations
+**Jira:** KAN-165 · **Label:** `database` `migrations` `devex`
+**Description:** Make the database reproducible from the repo and adopt a real migration tool so schema drift
+can't happen silently (the `org_change` tables currently exist only in migration 06). Sourced from F9.
+
+| Story ID | User Story | Acceptance Criteria | Priority |
+|----------|-----------|---------------------|----------|
+| KAN-165 | As a **developer**, I want one authoritative schema so a fresh database matches production, including all currently-missing tables. (F9) | A single canonical schema (e.g. `pg_dump --schema-only` baseline or complete numbered migrations) recreates every live table — `companies`, `employees.company_id`, `vacation_*`, `page_views`, `user_notifications`, `org_change_*`, etc.; README bootstrap updated to use it. | Must Have |
+| KAN-166 | As a **developer**, I want a migration tool with version tracking so applied migrations are recorded and ordered. (F9) | Alembic (or Flyway) adopted; existing migrations 02–06 folded into the tool; `alembic upgrade head` on a fresh DB yields the full schema. | Should Have |
+| KAN-167 | As a **developer**, I want a single owner for feature/role seeding so `setup_db.py` and `alter_table.sql` can't diverge. (F9) | `portal_features`/`role_feature_access` DDL+seed defined once; the other path references it; onboarding a company is unambiguous. | Should Have |
+
+---
+
+## EP32 — Testing & CI Hardening
+**Jira:** KAN-168 · **Label:** `testing` `ci` `quality`
+**Description:** Add coverage the mocked suite can't provide — real-DB integration tests and a shared CI
+pipeline — so SQL and schema are verified, not just string-matched. Sourced from F10, F11, F12.
+
+| Story ID | User Story | Acceptance Criteria | Priority |
+|----------|-----------|---------------------|----------|
+| KAN-168 | As a **developer**, I want a real-DB integration test tier so SQL is executed against the actual schema. (F10) | Pytest tier spins up disposable Postgres (testcontainers or CI service container), applies schema+migrations, and exercises real routes/services; covers the org_change decide→apply flow asserting row state. | Must Have |
+| KAN-169 | As a **team**, I want CI on every PR so a broken build/migration/test can't reach `main`. (F11) | GitHub Actions runs lint + full pytest + "build fresh DB from migrations then boot the app" smoke test; required status check; not bypassable like the local hook. | Must Have |
+| KAN-170 | As a **developer**, I want coverage measured with a floor so thin/untested modules are visible. (F12) | `pytest-cov` added; `--cov=app --cov-report=term-missing`; CI fails under an agreed floor; `email_service`/`page_tracker`/`skills_intelligence_service` gaps surfaced. | Should Have |
+| KAN-171 | As a **developer**, I want the mocked engine tests backed by behavior tests so they assert outcomes, not internal call order. (F10, testing #4) | The org_change (and vacation) approval flows have integration tests asserting final DB state; brittle SQL-substring/`side_effect`-ordering assertions supplemented rather than relied upon. | Should Have |
+
+---
+
+## EP33 — Frontend Modernization
+**Jira:** KAN-172 · **Label:** `frontend` `refactor` `accessibility`
+**Description:** Evolve the Jinja + vanilla-JS frontend without a rewrite: extract shared JS modules (making
+output-escaping the default), fix accessibility, and add JS tests + asset versioning. Sourced from F3, F20, F21, F26, F27, F28. (Framework migration is explicitly deferred — see `ARCHITECTURE_REVIEW.md` Stage 3.)
+
+| Story ID | User Story | Acceptance Criteria | Priority |
+|----------|-----------|---------------------|----------|
+| KAN-172 | As a **developer**, I want shared JS in `static/js/` ES modules so logic isn't copy-pasted across 7+ templates. (F26) | `dom.js` (escapeHtml + safe `html\`\`` + `el`), `avatar.js`, `format.js`, `api.js` (`postJSON`/`getJSON` + CSRF header), `modal.js` created and loaded once; duplicated `avatarColor`/`initials`/`esc`/`fmt` removed from templates. | Should Have |
+| KAN-173 | As the **system**, I want escaping to be the default path in the shared modules so new code can't reintroduce XSS. (F3) | All `innerHTML` builders use the shared safe helper; a lint/check or code-review note discourages raw `innerHTML` with interpolation. | Should Have |
+| KAN-174 | As a **keyboard/screen-reader user**, I want to propose a position change without a mouse. (F20) | Org-tree cards expose a keyboard "Move…" affordance opening the same modal; `aria-grabbed`/live-region announcements; WCAG 2.1.1 satisfied for the flow. | Should Have |
+| KAN-175 | As a **screen-reader user**, I want modals with proper dialog semantics so focus and context behave. (F21) | Shared `modal.js` adds `role="dialog"`+`aria-modal`, a focus trap, Esc-to-close, and labelledby; adopted by all modals. | Should Have |
+| KAN-176 | As a **developer**, I want JS unit tests and cache-busted assets so client logic is verified and deploys don't serve stale files. (F27) | Vitest units on the pure helpers (avatar/format/escape); static assets get a build hash / `?v=`; optional esbuild minify step. | Could Have |
+| KAN-177 | As a **maintainer**, I want high-traffic inline styles moved to CSS classes and clickables made semantic so the UI is consistent and accessible. (F28) | Inline `style=` migrated to classes on the heaviest templates (start with `admin/panel.html`); non-semantic `onclick` divs replaced with `<button>`/`<a>` + `type`. | Could Have |
+
+---
+
+## EP34 — Architecture & Structure
+**Jira:** KAN-178 · **Label:** `architecture` `refactor` `maintainability`
+**Description:** Make the structure hold as the app grows: an application factory + Blueprints, a real service
+layer, pinned dependencies, and a guard-decorator audit. Sourced from F13, F14, F15, F29, F30.
+
+| Story ID | User Story | Acceptance Criteria | Priority |
+|----------|-----------|---------------------|----------|
+| KAN-178 | As a **developer**, I want a `create_app(config)` factory so the app can be built with test/staging/prod configs and isn't wired as an import side-effect. (F13) | `create_app` builds config, teardown, context processor, and route registration; `run.py` and tests use it; multiple app instances can coexist. | Should Have |
+| KAN-179 | As a **developer**, I want route modules as Blueprints so there's no shared-singleton import cycle and areas can carry prefixes/error handlers. (F14) | Each route module is a `Blueprint` registered in the factory; route→route imports (e.g. `company.py`→`admin.py`) removed; shared helpers moved to services. | Could Have |
+| KAN-180 | As a **developer**, I want pinned dependencies + a lockfile so builds are reproducible. (F15) | `requirements.txt` pins exact versions; a lockfile (`pip-compile`/`uv`) is committed; CI installs from the lock. | Should Have |
+| KAN-181 | As a **developer**, I want `helpers.py` split and business logic out of routes so modules are cohesive and testable. (F29) | `helpers.py` split into `services/{employees,org,vacation}` + `util/uploads`; `admin.py` split by sub-area; routes act as thin controllers. | Could Have |
+| KAN-182 | As a **maintainer**, I want a guard-decorator audit so authorization is consistent and documented. (F30) | Each `@require_roles` route reviewed; genuine feature pages converted to `@require_feature_access`; admin/config gates that stay role-based are documented (per `CLAUDE.md`, not blindly converted). | Could Have |
