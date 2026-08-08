@@ -45,12 +45,12 @@
 | EP25 | Analytics & Reporting Dashboard | KAN-119 · KAN-120 · KAN-121 · KAN-122 · KAN-123 · KAN-124 · KAN-125 · KAN-126 · KAN-127 · KAN-128 · KAN-129 · KAN-130 · KAN-131 · KAN-132 | ✅ Done |
 | EP26 | Vacation Balance Visibility | KAN-133 · KAN-134 · KAN-135 · KAN-136 | ✅ Done |
 | EP27 | Employee Position Change Workflow | KAN-137 · KAN-138 · KAN-139 · KAN-140 · KAN-141 · KAN-142 · KAN-143 · KAN-144 · KAN-145 · KAN-146 · KAN-147 | ✅ Done |
-| EP28 | Security Hardening (Architecture Review) | KAN-148 · KAN-149 · KAN-150 · KAN-151 · KAN-152 · KAN-153 | 🟡 In progress |
+| EP28 | Security Hardening (Architecture Review) | KAN-148 · KAN-149 · KAN-150 · KAN-151 · KAN-152 · KAN-153 | 🟡 In progress · ⏸ **deferred to final stage S5** (D-004; KAN-153 excepted) |
 | EP29 | Data Layer & Query Performance | KAN-154 · KAN-155 · KAN-156 · KAN-157 · KAN-158 | 🟡 In progress |
 | EP30 | Scalability & Runtime | KAN-159 · KAN-160 · KAN-161 · KAN-162 · KAN-163 · KAN-164 | ⬜ Planned |
 | EP31 | Schema Source of Truth & Migrations | KAN-165 · KAN-166 · KAN-167 | 🟡 In progress |
 | EP32 | Testing & CI Hardening | KAN-168 · KAN-169 · KAN-170 · KAN-171 | 🟡 In progress |
-| EP33 | Frontend Modernization | KAN-172 · KAN-173 · KAN-174 · KAN-175 · KAN-176 · KAN-177 | ⬜ Planned |
+| EP33 | Frontend Modernization | KAN-172 · KAN-173 · KAN-174 · KAN-175 · KAN-176 · KAN-177 | ⬜ Planned · ⏸ **S5** (shares code with the escaping sweep; a11y applied as a design standard meanwhile — pending Q5) |
 | EP34 | Architecture & Structure | KAN-178 · KAN-179 · KAN-180 · KAN-181 · KAN-182 | ⬜ Planned |
 
 > **EP28–EP34** are sourced from the architecture review in [`docs/ARCHITECTURE_REVIEW.md`](../ARCHITECTURE_REVIEW.md)
@@ -440,15 +440,37 @@
 > Priorities are framed for a **demo/local** app today: security items are **Must Have (pre-prod)** —
 > required before any real deployment, not live incidents. Each story cites its review finding (`Fn`).
 >
+> **⚠️ SEQUENCING CHANGED — SPM Decision D-004 (2026-08-09).** The **security & login** work is re-sequenced
+> to the **final stage (S5)**, after all requirements are finalised and implemented. Severities below are
+> unchanged — *order of execution* is what moved. Full reasoning + the trigger clause that reverses this:
+> [`../product-team/deliverables/PRODUCT_ROADMAP_GOALS_EPICS_STORIES.md`](../product-team/deliverables/PRODUCT_ROADMAP_GOALS_EPICS_STORIES.md)
+> (amendment + §E) and `SPM_KICKOFF.md` §9 D-004.
+>
+> | Do **now** (S2 — enablers) | Do **last** (S5 — security & hardening sweep) |
+> |---|---|
+> | KAN-153 · KAN-155 · KAN-156 · KAN-158 · KAN-166 · KAN-167 · KAN-168 · KAN-170 · KAN-171 · KAN-178 | KAN-148 (as SSO) · KAN-149 · KAN-150→173 · KAN-151 · KAN-172 · KAN-174 · KAN-175 |
+>
+> **Standing rule while deferred:** new DOM code uses the existing global `escH()` helper, and the escaping
+> already landed under KAN-150 is not to be reverted. The Production-Ready gate remains **NO-GO** throughout.
+>
 > **Delivered so far** (branch `chore/arch-review-and-hardening`, PR #2): **KAN-152** secure runtime
 > defaults · **KAN-154 / KAN-157** missing indexes (migration 07) · **KAN-150** output escaping (4 of the
 > highest-traffic screens; remainder → KAN-173) · **KAN-165** authoritative `schema.sql` baseline ·
 > **KAN-169** GitHub Actions CI. Status shown in the Priority column below (✅ Done · 🟡 Partial).
 
-## EP28 — Security Hardening  —  🟡 In progress
-**ID:** KAN-148 · **Label:** `security` `hardening` `pre-prod`
+## EP28 — Security Hardening  —  🟡 In progress · ⏸ **deferred to final stage S5 (D-004)**
+**ID:** KAN-148 · **Label:** `security` `hardening` `pre-prod` `stage-S5`
 **Description:** Close the authentication, CSRF, and output-escaping gaps and harden session, config, and
 upload handling before the portal is exposed beyond local/demo use. Sourced from review findings F1–F5, F31.
+
+> **⏸ Scheduling (SPM D-004, 2026-08-09):** KAN-148/149/150→173/151 are **not to be started now** — they run as
+> one sweep in **S5**, after the functional backlog is complete and feature-frozen, because they are
+> cross-cutting (~44 endpoints, every DOM builder) and every remaining epic adds to those same surfaces.
+> **KAN-153 is the exception and stays in the current stage** (single-file config change, no feature coupling).
+> **KAN-148 is to be delivered as SSO/OIDC** (roadmap EP40-S1), not throwaway password auth.
+> **Escalation:** if the app becomes externally reachable (T1), gets real employee PII (T2), is demoed to a
+> customer/prospect on real data (T3), or gets an account for anyone outside the build team (T4), these revert
+> to **live P0** immediately.
 
 | Story ID | User Story | Acceptance Criteria | Priority |
 |----------|-----------|---------------------|----------|

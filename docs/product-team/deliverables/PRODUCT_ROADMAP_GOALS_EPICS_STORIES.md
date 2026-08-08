@@ -14,6 +14,56 @@
 
 ---
 
+## ⚠️ AMENDMENT — 2026-08-09 — Security & login re-sequenced to the FINAL stage (Decision D-004)
+
+**Direction from the product owner (2026-08-09):** *"Security and login are last priority until the last stage,
+where all requirements are finalised and implemented — login and security only add complexity at this point."*
+
+**SPM verdict: accepted, with a trigger clause.** I agree on the sequencing and I want the reasoning on record,
+because this is a *rework-economics* decision, not a change in risk appetite:
+
+- **Auth, CSRF and output-escaping are cross-cutting, not features.** KAN-149 touches **~44 state-changing
+  endpoints**; KAN-150/173 touches **every `innerHTML` builder across 7+ templates**; KAN-151 touches the
+  branding/upload surface. Every epic still ahead of us — EP35 import wizard, EP38 lifecycle workflows, EP39
+  accrual engine, EP37 gap views — **adds new endpoints and new DOM builders to exactly those surfaces.**
+  Hardening now means hardening the same surface twice and re-litigating escaping regressions on every new
+  screen. Doing it once, over a frozen functional surface, is materially cheaper and more complete.
+- **Real login actively slows the build.** The one-click demo personas are how the team, UAT and stakeholders
+  exercise four roles across two tenants today (kickoff §7 Q2 — email-only login is a *deliberate* demo
+  shortcut, already confirmed). Replacing it before the requirements settle taxes every subsequent
+  demo/test cycle for zero functional gain.
+- **This does not move the gate — it moves when we reach it.** Per the SPM guardrails I still will not
+  recommend **GO** with an open P0. The Production-Ready gate stays **NO-GO**; EP28 simply becomes the
+  *final* phase before that gate rather than the first.
+
+**Trigger clause — these items snap back to live P0 immediately, no discussion, if ANY of the following becomes
+true.** This is the condition under which the deferral is safe; it is not a standing exemption:
+
+| # | Trigger | Because |
+|---|---|---|
+| T1 | The app becomes reachable from anything beyond localhost / a trusted private network | F1 (email-only session) becomes a live account-takeover path, not a gate item |
+| T2 | Any **real employee PII** is loaded (replacing the synthetic seed data) | GDPR exposure; Charter §1 compliance is first-class |
+| T3 | A named customer, pilot, or prospect demo runs on non-synthetic data | Customer-Readiness gate engages |
+| T4 | Any account is created for a user outside the build team | Auth becomes a real trust boundary |
+
+**Cheap safeguards that stay in force while deferred** (these cost nothing and do not churn with features):
+KAN-152 ✅ secure runtime defaults stays; **KAN-153** (required DB config, no personal defaults) stays in the
+current phase — it is a 1-file change with no feature coupling; the escaping already landed under KAN-150
+(directory, org-tree, team, my-team) is **not** to be reverted; synthetic data only; demo/local network only.
+
+**Standing engineering rule (free, not a project):** where the shared `escH()` helper already exists, new code
+uses it. That costs nothing today and shrinks the KAN-173 sweep later. `CLAUDE.md` invariants — feature-access
+model, company scoping, org-change rules — are **unaffected by this decision and remain non-negotiable**; they
+are correctness and tenancy rules, not the security-hardening backlog.
+
+**Open question this creates → for the product owner:** accessibility (EP33 KAN-174/175) was previously bracketed
+with security as a "Now" gate item. It is **not** security, but it has the same rework economics — retro-fitting
+a11y onto screens that are still changing gets redone. My recommendation is to treat WCAG 2.2 AA as a **design
+standard applied to new work now** and schedule the retro-fit sweep alongside the final hardening phase. I have
+**not** moved it unilaterally — see §F Q5.
+
+---
+
 ## A. What I confirmed hands-on (grounds everything below)
 
 I logged in as **SYSTEM_ADMIN** (Oliver Hartmann, cross-company), **PORTAL_ADMIN/HR/manager** (Ingrid
@@ -52,17 +102,18 @@ platform") and rewards adoption + trust, not feature count.
 
 ## C. Business Goals (the spine of the roadmap)
 
-| # | Business Goal | Serves which product pillar | Outcome | Horizon |
+| # | Business Goal | Serves which product pillar | Outcome | Horizon *(revised D-004)* |
 |---|---|---|---|---|
-| **BG1** | **Be safe & trustworthy enough for a real customer** (Production-Ready). | RBAC / all | Real auth, CSRF, output/upload sanitisation; reproducible schema; real-DB CI. | **Now** |
-| **BG2** | **Land the first customer** (Customer-Ready). | All | Onboarding, data import/migration, provisioning, training, support, hypercare. | **Now/Next** |
-| **BG3** | **Own the competency-intelligence differentiator.** | Competency tracking | Skills gaps, competency frameworks, expiry alerting, development plans. | **Next** |
-| **BG4** | **Complete the people-ops lifecycle.** | Org structure + leave | Onboarding/offboarding workflows, transfers, rehire, vacation balances/accruals. | **Next** |
-| **BG5** | **Be enterprise-ready & connected.** | Multi-company + RBAC | SSO/OIDC, SCIM, HRIS import/export, calendar; multi-tenant scale (EP30). | **Next/Later** |
-| **BG6** | **Be usable by the whole workforce** (a11y + mobile). | All (deskless employees) | WCAG 2.2 AA on core flows; mobile self-service. | **Now (a11y gate) / Next (mobile)** |
+| **BG1** | **Be safe & trustworthy enough for a real customer** (Production-Ready). | RBAC / all | Real auth, CSRF, output/upload sanitisation; reproducible schema; real-DB CI. | **Split:** non-security enablers (schema, CI, data-layer, factory) **Now** · security & login (EP28, EP40-S1) **Final phase — see D-004** |
+| **BG2** | **Land the first customer** (Customer-Ready). | All | Onboarding, data import/migration, provisioning, training, support, hypercare. | **Now** |
+| **BG3** | **Own the competency-intelligence differentiator.** | Competency tracking | Skills gaps, competency frameworks, expiry alerting, development plans. | **Now/Next** |
+| **BG4** | **Complete the people-ops lifecycle.** | Org structure + leave | Onboarding/offboarding workflows, transfers, rehire, vacation balances/accruals. | **Now/Next** |
+| **BG5** | **Be enterprise-ready & connected.** | Multi-company + RBAC | SSO/OIDC, SCIM, HRIS import/export, calendar; multi-tenant scale (EP30). | SSO **Final phase** (it *is* the login work) · SCIM/HRIS/scale **Later** |
+| **BG6** | **Be usable by the whole workforce** (a11y + mobile). | All (deskless employees) | WCAG 2.2 AA on core flows; mobile self-service. | a11y **standard now, retro-fit sweep at the end** (pending Q5) / mobile **Next** |
 
-Priorities use Charter P0–P4 and MoSCoW. **BG1 and the a11y slice of BG6 are gate-blocking (Now).** Everything
-in BG3–BG5 is deliberately deferred behind them — MVP first.
+Priorities use Charter P0–P4 and MoSCoW. **Under D-004 the functional backlog (BG2–BG4) is pulled forward and
+the security/login slice of BG1+BG5 is pushed to the final phase.** The Production-Ready **gate itself has not
+moved** — it is still NO-GO until EP28 closes; we simply reach it last, over a frozen functional surface.
 
 ---
 
@@ -71,21 +122,37 @@ in BG3–BG5 is deliberately deferred behind them — MVP first.
 > Story acceptance criteria follow the existing `project-management/BACKLOG.md` house style. Each story is sized
 > MoSCoW and P0–P4.
 
-### BG1 — Production-Ready (Now) → **existing EP28–EP32, EP34; do not re-create**
+### BG1 — Production-Ready → **existing EP28–EP32, EP34; do not re-create** *(split by D-004)*
 
-This goal is **already scoped** in the architecture backlog. I am adopting it wholesale as the Phase-0 gate,
-not writing new epics. Drive these to done first:
+This goal is **already scoped** in the architecture backlog — I adopt it wholesale rather than writing new
+epics. **D-004 splits it in two.** The non-security half stays **Now**, because it is what makes a churning
+functional backlog cheap to build (reproducible schema, real-DB tests, atomic writes, an app factory). The
+security half moves to the **final phase**.
+
+**Now — foundation enablers (keep, they reduce the cost of everything else):**
+
+| Epic (existing) | Must-close stories | Why it stays Now |
+|---|---|---|
+| **EP31 Schema Source of Truth** | KAN-166 migration tool · KAN-167 single seeding owner | EP35/EP38/EP39 all add tables. Without version-tracked migrations, schema churn becomes drift. **P1** |
+| **EP32 Testing & CI** | KAN-168 real-DB tier · KAN-170 coverage floor · KAN-171 behavior tests | New workflow engines must be verified against a real schema, not mocks. **P1** |
+| **EP29 Data Layer** | KAN-155 atomic writes · KAN-156 N+1s · KAN-158 directory pagination | KAN-155 is a **direct dependency of EP35-S2** (atomic bulk import). **P1/P2** |
+| **EP34 Architecture** | KAN-178 app factory | Enables test/stage configs for the above. **P2** |
+| **EP28 (partial)** | **KAN-153** required DB config | 1-file change, zero feature coupling — no reason to defer it. **P2** |
+
+**Final phase — security & login gate (deferred by D-004, unchanged in scope):**
 
 | Epic (existing) | Must-close stories | Gate role |
 |---|---|---|
-| **EP28 Security Hardening** | KAN-148 real auth · KAN-149 CSRF · KAN-150+173 output-escaping · KAN-151 HTML/upload sanitisation · KAN-153 config | **P0 — blocks Production gate** |
-| **EP31 Schema Source of Truth** | KAN-166 migration tool · KAN-167 single seeding owner | P1 |
-| **EP32 Testing & CI** | KAN-168 real-DB tier · KAN-170 coverage floor · KAN-171 behavior tests | P1 |
-| **EP29 Data Layer** | KAN-155 atomic writes · KAN-156 N+1s · KAN-158 directory pagination | P1/P2 |
-| **EP34 Architecture** | KAN-178 app factory (enables test/stage/prod configs) | P2 |
+| **EP28 Security Hardening** | KAN-148 real auth · KAN-149 CSRF · KAN-150+173 output-escaping · KAN-151 HTML/upload sanitisation | **P0 — blocks the Production gate, executed last** |
+| **EP40-S1 (proposed)** | SSO/OIDC — **this is the delivery vehicle for KAN-148** | P0, same phase |
 
-*SPM note:* **KAN-148 should be delivered as SSO/OIDC** (see EP37-S1) — it closes F1 *and* delivers the
-enterprise-auth customers will demand, instead of building throwaway password auth for a demo.
+*SPM note (unchanged, now scheduled later):* **KAN-148 should be delivered as SSO/OIDC** (see EP40-S1) — it
+closes F1 *and* delivers the enterprise auth customers will demand, instead of building throwaway password auth
+for a demo. Deferring it to the end makes this *more* likely, not less: by then the role/tenant model the SSO
+mapping has to target is finalised.
+
+*Entry condition for this phase:* the functional backlog is **feature-frozen** — no new endpoints or DOM
+builders queued. That freeze is what makes a single hardening sweep complete instead of perpetual.
 
 ---
 
@@ -167,7 +234,7 @@ customers require SSO/SCIM; also the clean fix for F1.
 
 | Story | User story | Acceptance criteria | MoSCoW · P |
 |---|---|---|---|
-| EP40-S1 | As an **IT admin**, I want SSO via OIDC/SAML so employees use corporate identity (and email-only login is retired). | OIDC/SAML login; JIT provisioning optional; **replaces** the demo email-login; closes F1/KAN-148. | Must (enterprise) · P1 |
+| EP40-S1 | As an **IT admin**, I want SSO via OIDC/SAML so employees use corporate identity (and email-only login is retired). | OIDC/SAML login; JIT provisioning optional; **replaces** the demo email-login; closes F1/KAN-148. | Must (enterprise) · P0 — **final phase per D-004**; keep demo personas working until this lands |
 | EP40-S2 | As an **IT admin**, I want SCIM user/role provisioning so joiners/leavers sync automatically. | SCIM 2.0 create/update/deactivate mapped to employees + roles + company scope. | Should · P2 |
 | EP40-S3 | As a **customer admin**, I want HRIS export (CSV/API) so downstream payroll/BI systems get our data. | Scheduled/on-demand export; documented schema; company-scoped; auditable. | Could · P3 |
 
@@ -179,9 +246,13 @@ back the "built for scale" promise — **Later**, after a first customer proves 
 
 ### BG6 — Usable by the whole workforce — **EP33 (existing) + EP41 (proposed)**
 
-**Accessibility (existing EP33 — gate-relevant, do first):** KAN-174 keyboard path for org-tree drag-drop
-(F20), KAN-175 modal dialog semantics/focus trap (F21), KAN-172/173 shared JS modules with escape-by-default.
-**WCAG 2.2 AA on the two flagship flows is a release gate (Charter §1), not polish.**
+**Accessibility (existing EP33):** KAN-174 keyboard path for org-tree drag-drop (F20), KAN-175 modal dialog
+semantics/focus trap (F21), KAN-172/173 shared JS modules with escape-by-default.
+**WCAG 2.2 AA on the two flagship flows remains a release gate (Charter §1), not polish** — D-004 does not
+weaken the gate. What is in question is *when* the retro-fit sweep runs (§F Q5): my recommendation is a11y as a
+**design standard on all new work from now**, with the sweep executed alongside the final hardening phase, since
+KAN-172/173 (shared JS modules + escape-by-default) is the same code as the KAN-150/173 escaping work and should
+be done once, together.
 
 **EP41 — Mobile Self-Service (proposed)**
 *Why:* HR-UX reality (Charter/UX role) — many employees are deskless with a phone; the employee nav is already
@@ -194,13 +265,23 @@ lean (Dashboard/Org Tree/Vacation/Leave Calendar/Profile), a good mobile target.
 
 ---
 
-## E. Sequencing (Now / Next / Later) & phase mapping
+## E. Sequencing (revised by D-004, 2026-08-09)
 
-| Horizon | Goals / Epics | Ties to Delivery phase (`06_*`) |
-|---|---|---|
-| **Now (P0–P1, gate-blocking)** | BG1 (EP28/31/32/29/34) · BG6 accessibility slice (EP33 KAN-174/175/172/173) | **Phase 0 — Foundation & Hardening** |
-| **Next (first customer)** | BG2 (EP35/EP36) · BG4 offboarding+transfer (EP38-S2/S3) · BG3 framework+gaps (EP37-S1/S2) · BG5 SSO (EP40-S1) | **Phase 1 — MVP/GA-lite → Phase 3 — Customer Launch** |
-| **Later (grow & scale)** | BG3 depth (EP37-S3/S4) · BG4 balances/rehire (EP39, EP38-S4) · BG5 SCIM/HRIS/scale (EP40-S2/S3, EP30) · BG6 mobile (EP41) · any **compliance-gated AI** | **Phase 4 — Expansion → Phase 5 — Scale** |
+The old order was *harden → build*. The revised order is **build → freeze → harden**. Nothing is removed from
+scope; the security/login block moves from first to last.
+
+| Stage | Goals / Epics | Exit criteria | Ties to Delivery phase (`06_*`) |
+|---|---|---|---|
+| **S1 — Requirements finalisation** *(Now)* | BA + UX + Strategist close the functional scope: EP35, EP36, EP37, EP38, EP39, EP41 written to full acceptance criteria; product owner answers Q1/Q3 (§F) | Functional scope signed off; no open "we might also…" items | Phase 1 intake |
+| **S2 — Foundation enablers** *(Now, parallel to S1)* | EP31 (KAN-166/167) · EP32 (KAN-168/170/171) · EP29 (KAN-155/156/158) · EP34 (KAN-178) · EP28 **KAN-153 only** | Schema rebuildable + versioned; real-DB test tier green; atomic writes in place (unblocks EP35-S2) | **Phase 0 (non-security half)** |
+| **S3 — Build the functional product** *(Now/Next)* | BG2 EP35 + EP36 · BG4 EP38 (S2/S3 first) + EP39 · BG3 EP37 (S1/S2) · BG6 EP41 | All finalised requirements implemented; pytest + regression flow test green per `CLAUDE.md`; **a11y applied as a standard to new screens** | Phase 1 — MVP/GA-lite |
+| **S4 — Feature freeze** | No new endpoints or DOM builders queued | Written freeze declared by SPM | Gate into S5 |
+| **S5 — Security, login & hardening sweep** *(FINAL — D-004)* | **EP28 in full** (KAN-148 auth via **EP40-S1 SSO**, KAN-149 CSRF, KAN-150+173 escaping, KAN-151 sanitisation) · EP33 a11y retro-fit sweep (pending Q5) | Production Readiness checklist green; UAT signs off flagship flows; **only now can the Production gate go GO** | **Phase 2 — Production Readiness → Phase 3 — Customer Launch** |
+| **Later (grow & scale)** | BG3 depth (EP37-S3/S4) · BG4 rehire (EP38-S4) · BG5 SCIM/HRIS (EP40-S2/S3) · EP30 scale · any **compliance-gated AI** | — | Phase 4 → Phase 5 |
+
+**S5 is not optional and not reducible.** Deferring it is a sequencing choice justified by the demo-grade,
+synthetic-data status quo (D-001). Any trigger T1–T4 in the amendment above pulls S5 forward immediately,
+regardless of where S3 has got to.
 
 ---
 
@@ -208,21 +289,34 @@ lean (Dashboard/Org Tree/Vacation/Leave Calendar/Profile), a good mobile target.
 
 | # | Item | My recommendation | Needs |
 |---|---|---|---|
-| Q1 | Is there a target first customer / segment (SMB vs enterprise)? | Assume **enterprise-leaning** (multi-company + RBAC + SSO demand) → prioritise EP40-S1 SSO as the auth solution. | Product owner confirm. |
-| Q2 | Deliver auth (KAN-148) as throwaway password login **or** go straight to SSO/OIDC (EP40-S1)? | **SSO/OIDC** — closes F1 and delivers enterprise value in one move. | Product owner + eng sizing. |
-| Q3 | Is competency-intelligence (BG3) the intended wedge vs generic HRIS? | The product's own copy + dashboard say **yes** — invest in EP37 as the differentiator. | Strategist to RICE-rank vs BG4. |
+| Q1 | Is there a target first customer / segment (SMB vs enterprise)? | Assume **enterprise-leaning** (multi-company + RBAC + SSO demand) → EP40-S1 SSO is the auth solution when S5 runs. **Now urgent:** a named customer trips trigger T3. | Product owner confirm. |
+| Q2 | Deliver auth (KAN-148) as throwaway password login **or** go straight to SSO/OIDC (EP40-S1)? | **ANSWERED (2026-08-09).** SSO/OIDC, **and scheduled in S5, not now** — D-004. Deferral strengthens the choice: the tenant/role model SSO maps onto will be final by then. | Closed. |
+| Q3 | Is competency-intelligence (BG3) the intended wedge vs generic HRIS? | The product's own copy + dashboard say **yes** — invest in EP37 as the differentiator. **Now blocking S1**: functional scope can't be frozen until this is settled. | Strategist to RICE-rank vs BG4 — **needed to close S1**. |
 | Q4 | Any AI ambitions? | **Defer** behind EU AI Act / GDPR Art. 22 gate (D-003). Do not enter this cycle. | Compliance/DPO validation when raised. |
+| **Q5** | **New (D-004):** does accessibility (EP33 KAN-174/175) move to the final sweep with security, or stay a per-screen "Now" requirement? | **Move the retro-fit sweep to S5** (it shares code with the escaping work — KAN-172/173), **but apply WCAG 2.2 AA as a design standard to every new screen built in S3** so the sweep stays small. The gate is unchanged either way. | **Product owner decision** — I have not moved it unilaterally. |
+| **Q6** | **New (D-004):** who confirms the environment stays demo-grade (localhost/private network, synthetic data only) for the duration of S1–S4? | Assign an owner. The whole deferral rests on triggers T1–T4 staying false; unowned, that assumption rots silently. | **Delivery/Release Manager** to own as a standing risk-register entry. |
 
 ---
 
-## G. Immediate next actions (tasking)
+## G. Immediate next actions (re-tasked under D-004, 2026-08-09)
 
-1. **Delivery/Release Mgr:** fold BG1 into the Phase-0 gate; add EP35/EP36 to the Customer-Readiness checklist; keep the Release Gate at **NO-GO** until EP28 P0s close.
-2. **Business Analyst:** write full acceptance criteria + traceability for EP35 (onboarding/import) and EP38-S2 (offboarding); open compliance gaps for GDPR retention/erasure on offboarding.
-3. **UX:** design the EP35-S1 setup wizard and the EP35-S2 import dry-run; complete the a11y fixes (EP33) on the two flagship flows.
-4. **UAT:** build test cases for EP35 import (happy/edge/adversarial CSV, tenant isolation) and the offboarding audit trail.
-5. **Strategist:** RICE-rank BG3 vs BG4 vs BG5-SSO for the "Next" slot; keep AI out of scope this cycle.
-6. **SPM (me):** confirm Q1–Q3 with the business, then approve the "Next" scope and re-task for Phase 1.
+1. **Delivery/Release Mgr:** re-cut the phase plan to **S1–S5** (§E) — the Phase-0 gate is now the *non-security*
+   enabler set only, and EP28+EP40-S1 become the S5 pre-production gate. Keep the Release Gate at **NO-GO**
+   (unchanged — D-004 does not touch it). **Add triggers T1–T4 to the Risk Register with a named owner (Q6),**
+   and add "environment stays demo-grade / synthetic data only" as a monitored standing risk.
+2. **Business Analyst:** priority shifts to **closing S1**. Full acceptance criteria + traceability for EP35
+   (onboarding/import), EP38-S2 (offboarding), EP39-S1/S2 (balances/accruals) — plus GDPR retention/erasure gaps
+   on offboarding. **Nothing can be frozen until these are written.**
+3. **UX:** design the EP35-S1 setup wizard and the EP35-S2 import dry-run. **Apply WCAG 2.2 AA as a design
+   standard to every new screen now** (cheap at design time); hold the EP33 retro-fit sweep for S5 pending Q5.
+4. **UAT:** test cases for EP35 import (happy/edge/adversarial CSV, tenant isolation) and the offboarding audit
+   trail. **Note:** UAT continues to run against demo personas — that is now the *supported* path until S5.
+5. **Strategist:** RICE-rank BG3 vs BG4 to settle **Q3**, which is on the S1 critical path. SSO drops out of the
+   "Next" ranking entirely — it is scheduled in S5. AI stays out of scope.
+6. **Engineering (Architect):** keep the standing rule — **new DOM code uses the existing `escH()` helper**. Do
+   not start KAN-148/149/151; do proceed with KAN-153, KAN-155, KAN-166/167, KAN-168, KAN-178.
+7. **SPM (me):** confirm **Q1, Q3, Q5, Q6** with the business; declare the S4 feature freeze in writing when S3
+   completes; then convene the S5 hardening phase.
 
 *All engineering obeys `CLAUDE.md` — feature-access model, company scoping, org-change invariants, and the
 regression flow-test discipline. Nothing is "done" until pytest + the regression flow test pass.*
