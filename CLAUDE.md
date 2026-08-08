@@ -1,5 +1,10 @@
 # CLAUDE.md — Project Rules
 
+> **Product governance (pointer, not a rule change):** product direction is run by the SPM-led product team in
+> `docs/product-team/`. The current roadmap and per-role task assignments live in
+> `docs/product-team/08_SPM_KICKOFF.md`. The engineering invariants below are the guardrails that team's work
+> must obey — they always win.
+
 ## FLOW TESTS — How to run any "flow test" the user asks for
 
 **⚠️ NON-NEGOTIABLE. This applies the moment the user's request contains the words "flow test" in

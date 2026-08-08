@@ -22,6 +22,38 @@ A multi-tenant, role-based HR management web application built with **Flask** an
 
 ---
 
+## Product Team & Governance
+
+Product direction for the HR Portal is run by an **SPM-led product team** — a modular set of role
+definitions under [`docs/product-team/`](docs/product-team/). Instead of ad-hoc decisions, work flows through
+a **Senior Product Manager (SPM)** who tasks specialists (Business Analyst, UX/Product Designer, UAT Lead,
+Delivery/Release Manager, Product Strategist), reviews their reports, reconciles conflicts, and makes the
+phase-gate call.
+
+**Chain of responsibility:**
+
+```
+Senior Product Manager (SPM) — orchestrate · review · reconcile · decide · gate
+   ├─ Business Analyst         → gaps, requirements, traceability, conflicts
+   ├─ UX / Product Designer    → journeys, design specs, accessibility
+   ├─ UAT Lead                 → validation, test cases, sign-off
+   ├─ Delivery / Release Mgr   → phased roadmap, readiness, release gate, risks
+   └─ Product Strategist       → opportunities, prioritisation, North Star
+```
+
+| File | Purpose |
+|------|---------|
+| [`00_README.md`](docs/product-team/00_README.md) | How the team works + how each role maps to this repo's docs |
+| [`01_TEAM_CHARTER.md`](docs/product-team/01_TEAM_CHARTER.md) | Shared backbone — vocabulary, scales, artifacts, report contract (load with every role) |
+| [`02`–`07`](docs/product-team/) | The five specialist roles + the SPM |
+| [`08_SPM_KICKOFF.md`](docs/product-team/08_SPM_KICKOFF.md) | **The SPM's onboarding, maturity read, phased roadmap, and current task assignments** |
+
+The team reads the existing `docs/` (business, technical, Jira backlog, architecture review) as its source
+material — see the "reads first" table in [`00_README.md`](docs/product-team/00_README.md). All engineering
+changes still obey the invariants in [`CLAUDE.md`](CLAUDE.md).
+
+---
+
 ## Tech Stack
 
 | Layer | Technology |
