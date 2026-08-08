@@ -1,69 +1,99 @@
-# HR Product Team — AI Persona System (README)
+# HR Product & Engineering — AI Persona System (README)
 
-A modular set of AI role instructions that together act as a product organisation for taking an HR product from its current state to a **production-ready, customer-ready release, in phases**. Instead of one giant prompt, work is split across focused specialist roles that report to a **Senior Product Manager (SPM)**, who reviews their output, corrects it, reconciles conflicts, decides, and runs the cycle again.
+A modular set of AI role instructions that together act as **two connected organisations** — a **Product org**
+and an **Engineering org** — for taking an HR product from its current state to a **production-ready,
+customer-ready release, in phases**. Instead of one giant prompt, work is split across focused roles. Each org
+has a lead who reviews their team's output, corrects it, reconciles conflicts, decides, and loops. The two orgs
+share one language and hand off through a defined interface.
 
 ## Why it's built this way
-- **Focused instructions stay strong.** Loading one role file means the model sees only that role's instructions at full weight — nothing important is buried under unrelated checklists.
-- **Modular & maintainable.** Update the UX role without touching UAT.
-- **Composable.** Run one specialist in isolation, or run the whole cycle.
-- **Consistent.** A shared **Team Charter** gives every role the same vocabulary, scales, definitions, and report format, so their outputs reconcile.
+- **Focused instructions stay strong.** Loading one role file means the model sees only that role's instructions at full weight — nothing important is buried under unrelated checklists. Total lines across the system are large, but no single file you load is heavy.
+- **Modular & maintainable.** Update the UX role without touching UAT; update DevOps without touching the Architect.
+- **Composable.** Run one role in isolation, one org, or the whole system.
+- **Consistent.** A shared **Team Charter** gives *every* role — product and engineering — the same vocabulary, scales, definitions, and report format, so their outputs reconcile. The **Engineering Charter** inherits it and adds technical standards.
 
-## The team (org chart)
+## The two orgs (org chart)
 ```
-                        Senior Product Manager (SPM)
-                        orchestrate · review · correct · decide · gate
-        ┌───────────────┬───────────────┬───────────────┬───────────────┐
-   Business         UX / Product        UAT Lead        Delivery /      Product
-   Analyst          Designer                            Release Mgr     Strategist
-   gaps · reqs      experience ·        validation ·    roadmap ·       ideas ·
-   traceability     journeys · a11y     test · sign-off phases · gates  prioritise
+        Senior Product Manager (SPM)  ◄──── peer leads, joint release gate ────►  Senior Architect
+        orchestrate · review · gate                                              architecture · standards · review · tech readiness
+   ┌──────────┬───────────┬──────────┬──────────┐                    ┌──────────────┬──────────────┬──────────────┐
+ Business   UX/Product   UAT Lead   Delivery/   Product        Senior SW       Mid-Level        Senior
+ Analyst    Designer                Release Mgr Strategist     Engineers        Engineers        DevOps
+ gaps·reqs  UX·a11y      validation roadmap·    ideas·         hard problems·   scoped work·     CI/CD·infra·
+ traceab.   ·journeys    ·sign-off  gates       prioritise     review·mentor    escalate early   observ.·release
 ```
 
 ## Files
+**Shared + Product org**
 | File | Role | Owns |
 |---|---|---|
-| `01_TEAM_CHARTER.md` | **Shared backbone (load with every role)** | Domain primer, vocabulary, scales, definitions, artifact ownership, report contract, the cycle |
+| `01_TEAM_CHARTER.md` | **Shared backbone (load with every role, both orgs)** | Domain primer, vocabulary, scales, definitions, artifact ownership, report contract, the cycle |
 | `02_SENIOR_PRODUCT_MANAGER.md` | **Senior Product Manager** | Orchestration, review, conflict resolution, prioritisation & roadmap decisions, phase gates, decision log |
 | `03_BUSINESS_ANALYST.md` | Business Analyst | Product understanding, requirement quality, gap register, traceability, conflicts, assumptions, problem backlog, data/source-of-truth |
 | `04_UX_PRODUCT_DESIGNER.md` | UX / Product Designer | Journeys, design specs, UX/UI review, accessibility, states, microcopy |
 | `05_UAT_LEAD.md` | UAT Lead / Tester | UAT plan, test cases, defect log, exit criteria, sign-off |
 | `06_DELIVERY_RELEASE_MANAGER.md` | Delivery / Release Manager (Project Manager) | Phased roadmap, production & customer readiness, release gate, risk & dependency registers |
 | `07_PRODUCT_STRATEGIST.md` | Product Strategist | Feature ideation & evaluation, prioritisation, automation & AI opportunities, North Star |
-| `08_SPM_KICKOFF.md` | **SPM onboarding & first tasking (this project)** | The SPM's intake against the existing docs, maturity read, phased roadmap, and task assignments to each specialist |
-| `09_PRODUCT_ROADMAP_GOALS_EPICS_STORIES.md` | **SPM product review & roadmap (this project)** | Written after the SPM drove the running app; turns the company's intent into Business Goals → Epics → User Stories, Jira-ready |
 
-## How this maps to THIS project (chain of responsibility)
-The team does not start from a blank page. This repository already contains the source material each role must read before acting. The SPM's first act (see `08_SPM_KICKOFF.md`) is to route the team to it:
+**Engineering org**
+| File | Role | Owns |
+|---|---|---|
+| `08_ENGINEERING_CHARTER.md` | **Engineering backbone (load with every engineering role)** | Inherits the Team Charter; adds stack, architecture principles, code-level DoD, review protocol, testing, security baseline, engineering artifacts, **the product–engineering interface** |
+| `09_SENIOR_ARCHITECT.md` | **Senior Architect** (peer to SPM) | Architecture decisions (ADRs), technical standards, review, tech debt & risk registers, technical-readiness verdict |
+| `10_SENIOR_SOFTWARE_ENGINEER.md` | Senior Software Engineer (full-stack) | Complex/cross-cutting features, tests, code review, mentoring |
+| `11_MIDLEVEL_ENGINEER.md` | Mid-Level Engineer (full-stack) | Well-scoped features, tests, early escalation of ambiguity |
+| `12_SENIOR_DEVOPS_ENGINEER.md` | Senior DevOps Engineer | CI/CD, IaC, observability, deployment & rollback, security posture, production-readiness evidence |
+
+**Produced for THIS project** (`deliverables/`)
+| File | Produced by | Contents |
+|---|---|---|
+| `deliverables/SPM_KICKOFF.md` | Senior Product Manager | Intake against the existing docs, maturity read, phased roadmap, task assignments to each product specialist |
+| `deliverables/PRODUCT_ROADMAP_GOALS_EPICS_STORIES.md` | Senior Product Manager | Written after driving the running app; Business Goals → Epics → User Stories, Jira-ready |
+| `deliverables/ARCHITECT_KICKOFF_AND_TASK_BREAKDOWN.md` | Senior Architect | Knowledge transfer to the engineering team + user stories subdivided into technical tasks assigned to Senior SWE / Mid-level / DevOps |
+
+## How this maps to THIS project (reads-first / chain of responsibility)
+Neither org starts from a blank page — this repo already contains the source material. Read your set before acting:
 
 | Role | Reads first (in this repo) | Produces / maintains |
 |---|---|---|
 | **All** | `../BUSINESS_DOCUMENTATION.md`, `../TECHNICAL_DOCUMENTATION.md`, `../../CLAUDE.md`, `../../README.md` | — |
 | Business Analyst | `../BUSINESS_DOCUMENTATION.md`, `../JIRA_EPICS_AND_STORIES.md` | Gap Register, Traceability, Conflict Log, Problem Backlog |
-| UX / Product Designer | `../TECHNICAL_DOCUMENTATION.md` (§7 org tree, §20–22 flows), `../ARCHITECTURE_REVIEW.md` (a11y findings F20/F21) | Journeys, design specs, accessibility audit |
-| UAT Lead | `../JIRA_EPICS_AND_STORIES.md`, the two regression suites in `../../tests/ui/` | UAT plan, test cases, defect log, sign-off |
-| Delivery / Release Mgr | `../ARCHITECTURE_REVIEW.md`, `../JIRA_EPICS_AND_STORIES.md` (EP28–34) | Phased roadmap, readiness checklists, release gate, risk/dependency registers |
-| Product Strategist | `../BUSINESS_DOCUMENTATION.md` (§6 integrations), `../JIRA_EPICS_AND_STORIES.md` | Feature backlog (Now/Next/Later), AI/automation assessments, North Star |
-| Senior Product Manager | **everything above** | Health scorecard, maturity assessment, decision log, phase-gate decision |
+| UX / Product Designer | `../TECHNICAL_DOCUMENTATION.md` (§7, §20–22), `../ARCHITECTURE_REVIEW.md` (F20/F21) | Journeys, design specs, accessibility audit |
+| UAT Lead | `../JIRA_EPICS_AND_STORIES.md`, `../../tests/ui/` | UAT plan, test cases, defect log, sign-off |
+| Delivery / Release Mgr | `../ARCHITECTURE_REVIEW.md`, `../JIRA_EPICS_AND_STORIES.md` (EP28–34) | Phased roadmap, readiness checklists, release gate, registers |
+| Product Strategist | `../BUSINESS_DOCUMENTATION.md` (§6), `../JIRA_EPICS_AND_STORIES.md` | Feature backlog, AI/automation assessments, North Star |
+| **Senior Architect** | `../ARCHITECTURE_REVIEW.md` (F1–F31), `../TECHNICAL_DOCUMENTATION.md`, `../../CLAUDE.md`, `../../app/`, `../../database/` | ADRs, tech-debt & risk registers, technical-readiness verdict, task breakdown |
+| Senior / Mid Engineer | `../TECHNICAL_DOCUMENTATION.md`, the relevant `app/` module, `../../tests/` | Reviewed, tested code (PRs); traceability Test/Impl links |
+| Senior DevOps | `../../.github/workflows/`, `../TECHNICAL_DOCUMENTATION.md` §10–§11, `../../database/schema.sql` | CI/CD, IaC, observability, release/rollback, prod-readiness evidence |
+
+## How the two orgs connect
+- **SPM and Senior Architect are peer leads.** Product owns *what / why / priority*; engineering owns *how / feasibility*. Scope-vs-feasibility trade-offs are negotiated between them and recorded in the SPM's Decision Log.
+- **A release is gated jointly:** the SPM's phase gate and the Delivery Manager's release gate both consume the **Architect's technical-readiness verdict** and **DevOps's production-readiness evidence**.
+- **Handoffs (see `08_ENGINEERING_CHARTER.md` §10):** BA → engineering (requirements, acceptance criteria, data model, traceability); UX → front-end (design specs, states); SPM/Delivery → engineering (ready backlog, phase, NFRs). Engineering → BA (implementation + test links in the traceability matrix); engineering → UAT (deployed builds + release notes + defect fixes); DevOps → Delivery Manager (release plan, rollback, monitoring, release gate).
+- **One report format.** Everyone reports in the Team Charter §6 standard format, so product and engineering outputs reconcile.
 
 ## How to run it — two modes
 
 **Manual (one chat/tool at a time):**
-1. Load `01_TEAM_CHARTER.md` + one specialist role file (e.g. Business Analyst). Give it the product inputs.
-2. It returns a **Specialist Report** in the charter's standard format.
-3. Load `01_TEAM_CHARTER.md` + `02_SENIOR_PRODUCT_MANAGER.md`, paste the report(s). The SPM reviews, challenges weak evidence, reconciles across reports, decides priorities, and issues the next tasking.
-4. Feed that tasking back to the relevant specialist(s). Repeat.
+1. Load the relevant charter(s) + one role file, and give it the inputs.
+   - Product role → `01_TEAM_CHARTER.md` + the role file.
+   - Engineering role → `01_TEAM_CHARTER.md` + `08_ENGINEERING_CHARTER.md` + the role file.
+2. It returns a report in the standard format.
+3. Load the charter(s) + the lead (SPM for product, Architect for engineering), paste the report(s). The lead reviews, challenges weak evidence, reconciles, decides, and issues the next tasking.
+4. Feed that tasking back to the relevant role(s). Repeat. Across orgs, the SPM and Architect exchange their integrated reports at the interface points above.
 
 **Agentic (orchestrated, e.g. subagents / an MCP setup):**
-- The orchestrator loads Charter + SPM. The SPM dispatches tasks to specialist subagents (each loaded with Charter + its role file), collects their reports, reviews and reconciles, updates the master status, and loops until the phase gate passes.
+- Two orchestrators (SPM, Architect) each dispatch to their specialist subagents, collect and reconcile reports, and exchange readiness at the interface. Loop until the joint gate passes.
 
-## The operating cycle
+## The operating cycle (both orgs mirror it)
 ```
-Intake → SPM tasks specialists → Specialists analyse & report
-   → SPM reviews / challenges / corrects → SPM reconciles conflicts
-   → SPM updates master status & decides priorities
+Intake → lead tasks the team → members analyse / build & report
+   → lead reviews / challenges / corrects → lead reconciles conflicts
+   → lead updates master status & decides priorities
    → (rework loop if evidence is weak or gaps remain)
-   → Phase-gate decision (GO / CONDITIONAL / NO-GO) → next iteration
+   → interface exchange (product ↔ engineering readiness)
+   → joint gate decision (GO / CONDITIONAL / NO-GO) → next iteration
 ```
 
 ## Inputs to provide at intake
-Business docs (vision, BRD/PRD, personas, requirements, success metrics), the backlog (epics/stories with acceptance criteria), technical docs (architecture, data model, API/integration specs, security & tenancy model, test coverage), access to or a demo of the current build, and constraints (target customers, timeline, capacity, regulatory scope, stack). Missing inputs are not a blocker — every role labels what's Known vs Assumption vs Unknown and states what it needs (see Charter).
+Business docs (vision, BRD/PRD, personas, requirements, success metrics), the backlog (epics/stories with acceptance criteria), technical docs (architecture, data model, API/integration specs, security & tenancy model, test coverage), access to or a demo of the current build, and constraints (target customers, timeline, capacity, regulatory scope, and the real tech stack). Missing inputs are not a blocker — every role labels what's Known vs Assumption vs Unknown and states what it needs (see Charter).

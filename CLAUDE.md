@@ -1,9 +1,10 @@
 # CLAUDE.md — Project Rules
 
-> **Product governance (pointer, not a rule change):** product direction is run by the SPM-led product team in
-> `docs/product-team/`. The current roadmap and per-role task assignments live in
-> `docs/product-team/08_SPM_KICKOFF.md`. The engineering invariants below are the guardrails that team's work
-> must obey — they always win.
+> **Product & engineering governance (pointer, not a rule change):** work is run by two connected persona orgs
+> in `docs/product-team/` — a Product org (SPM + specialists) and an Engineering org (Senior Architect +
+> engineers + DevOps). Produced artifacts live in `docs/product-team/deliverables/`: the SPM kickoff, the
+> product roadmap, and the Architect's technical task breakdown. The engineering invariants below are the
+> guardrails all that work must obey — they always win.
 
 ## FLOW TESTS — How to run any "flow test" the user asks for
 

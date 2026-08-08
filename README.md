@@ -22,33 +22,34 @@ A multi-tenant, role-based HR management web application built with **Flask** an
 
 ---
 
-## Product Team & Governance
+## Product & Engineering Team — Governance
 
-Product direction for the HR Portal is run by an **SPM-led product team** — a modular set of role
-definitions under [`docs/product-team/`](docs/product-team/). Instead of ad-hoc decisions, work flows through
-a **Senior Product Manager (SPM)** who tasks specialists (Business Analyst, UX/Product Designer, UAT Lead,
-Delivery/Release Manager, Product Strategist), reviews their reports, reconciles conflicts, and makes the
-phase-gate call.
+Work on the HR Portal is run by **two connected AI-persona orgs** — a **Product org** and an **Engineering
+org** — defined under [`docs/product-team/`](docs/product-team/). The **Senior Product Manager (SPM)** and the
+**Senior Architect** are peer leads: product owns *what/why/priority*, engineering owns *how/feasibility*, and
+a release is gated **jointly** on the Architect's technical-readiness verdict and DevOps's production-readiness
+evidence.
 
 **Chain of responsibility:**
 
 ```
-Senior Product Manager (SPM) — orchestrate · review · reconcile · decide · gate
-   ├─ Business Analyst         → gaps, requirements, traceability, conflicts
-   ├─ UX / Product Designer    → journeys, design specs, accessibility
-   ├─ UAT Lead                 → validation, test cases, sign-off
-   ├─ Delivery / Release Mgr   → phased roadmap, readiness, release gate, risks
-   └─ Product Strategist       → opportunities, prioritisation, North Star
+Senior Product Manager (SPM)  ◄──peer leads · joint gate──►  Senior Architect
+   ├─ Business Analyst          → gaps, requirements, traceability      ├─ Senior Software Engineer → hard/cross-cutting features, review
+   ├─ UX / Product Designer     → journeys, design specs, a11y          ├─ Mid-Level Engineer       → well-scoped features, escalate early
+   ├─ UAT Lead                  → validation, test cases, sign-off      └─ Senior DevOps Engineer   → CI/CD, infra, observability, release
+   ├─ Delivery / Release Mgr    → roadmap, readiness, release gate
+   └─ Product Strategist        → opportunities, prioritisation, North Star
 ```
 
 | File | Purpose |
 |------|---------|
-| [`00_README.md`](docs/product-team/00_README.md) | How the team works + how each role maps to this repo's docs |
-| [`01_TEAM_CHARTER.md`](docs/product-team/01_TEAM_CHARTER.md) | Shared backbone — vocabulary, scales, artifacts, report contract (load with every role) |
-| [`02`–`07`](docs/product-team/) | The five specialist roles + the SPM |
-| [`08_SPM_KICKOFF.md`](docs/product-team/08_SPM_KICKOFF.md) | **The SPM's onboarding, maturity read, phased roadmap, and current task assignments** |
+| [`00_README.md`](docs/product-team/00_README.md) | How the two orgs work + how each role maps to this repo's docs |
+| [`01_TEAM_CHARTER.md`](docs/product-team/01_TEAM_CHARTER.md) | Shared backbone (load with every role, both orgs) |
+| [`02`–`07`](docs/product-team/) | Product org — SPM + five specialists |
+| [`08_ENGINEERING_CHARTER.md`](docs/product-team/08_ENGINEERING_CHARTER.md) · [`09`–`12`](docs/product-team/) | Engineering backbone + Architect, Senior/Mid engineers, DevOps |
+| [`deliverables/`](docs/product-team/deliverables/) | **Produced for this project** — SPM kickoff, product roadmap (goals→epics→stories), and the Architect's knowledge-transfer + technical task breakdown |
 
-The team reads the existing `docs/` (business, technical, Jira backlog, architecture review) as its source
+Both orgs read the existing `docs/` (business, technical, Jira backlog, architecture review) as source
 material — see the "reads first" table in [`00_README.md`](docs/product-team/00_README.md). All engineering
 changes still obey the invariants in [`CLAUDE.md`](CLAUDE.md).
 
