@@ -68,7 +68,7 @@ in BG3–BG5 is deliberately deferred behind them — MVP first.
 
 ## D. Roadmap detail — Epics & User Stories
 
-> Story acceptance criteria follow the existing `JIRA_EPICS_AND_STORIES.md` house style. Each story is sized
+> Story acceptance criteria follow the existing `project-management/BACKLOG.md` house style. Each story is sized
 > MoSCoW and P0–P4.
 
 ### BG1 — Production-Ready (Now) → **existing EP28–EP32, EP34; do not re-create**

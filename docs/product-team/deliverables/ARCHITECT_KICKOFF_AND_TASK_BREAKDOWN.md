@@ -37,7 +37,7 @@ one is below. Build to what exists; don't smuggle in a framework nobody agreed t
 | `CLAUDE.md`, `README.md` | Read | Invariants + bootstrap + Jira map. |
 | `docs/TECHNICAL_DOCUMENTATION.md` | Read | 22 sections, schema, APIs, engines. |
 | `docs/ARCHITECTURE_REVIEW.md` | Read | F1–F31 (this review was itself produced by an architect-reviewer agent — I am building on it, not redoing it). |
-| `docs/JIRA_EPICS_AND_STORIES.md` | Read | EP28–34 hardening backlog (KAN-148…182). |
+| `docs/project-management/BACKLOG.md` | Read | EP28–34 hardening backlog (KAN-148…182). |
 | `app/` source | Read | `__init__.py`, `db.py`, `config.py`, `auth.py`, `helpers.py`, 15 `routes/`, 9 `services/`. |
 | `database/`, `requirements.txt`, `.github/workflows/` | Read | Schema baseline, deps, CI. |
 | SPM deliverables | Read | Kickoff + roadmap; I adopt their Phase-0 gate as my first sprint. |

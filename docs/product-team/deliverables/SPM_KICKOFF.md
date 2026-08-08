@@ -7,7 +7,7 @@
 >
 > **Standing rule for the team:** everything below is evidence-led. Every claim cites a source already in the
 > repo — `docs/BUSINESS_DOCUMENTATION.md`, `docs/TECHNICAL_DOCUMENTATION.md`, `docs/ARCHITECTURE_REVIEW.md`
-> (findings `F1`–`F31`), `docs/JIRA_EPICS_AND_STORIES.md` (epics `EP1`–`EP34`, stories `KAN-*`), and
+> (findings `F1`–`F31`), `docs/project-management/BACKLOG.md` (epics `EP1`–`EP34`, stories `KAN-*`), and
 > `CLAUDE.md`. Where evidence is missing it is labelled **Assumption** or **Unknown**, not asserted.
 
 ---
@@ -22,7 +22,7 @@ an unusually thorough paper trail. Our job is to judge it, not to re-imagine it.
 1. `README.md` — what the product is, how to run it, the Jira map.
 2. `docs/BUSINESS_DOCUMENTATION.md` — purpose, roles, the real business processes, retention/privacy, metrics, integration gaps.
 3. `docs/TECHNICAL_DOCUMENTATION.md` — architecture, data model, APIs, security, the vacation engine, org-change workflow.
-4. `docs/JIRA_EPICS_AND_STORIES.md` — 27 delivered epics + the EP28–34 hardening backlog with per-story acceptance criteria and current status.
+4. `docs/project-management/BACKLOG.md` — 27 delivered epics + the EP28–34 hardening backlog with per-story acceptance criteria and current status.
 5. `docs/ARCHITECTURE_REVIEW.md` — the read-only audit; findings `F1`–`F31`, strengths, and the "Needs measurement" list.
 6. `CLAUDE.md` — the **non-negotiable engineering invariants** (feature-access model, company scoping, org-change rules, the regression flow-test discipline). These are guardrails, not suggestions.
 
@@ -38,7 +38,7 @@ to *read first*. Report back to me in the Charter §6 format. I will challenge a
 | `README.md` | Read | Product overview, tech stack, bootstrap, Jira epic map (KAN). |
 | `docs/BUSINESS_DOCUMENTATION.md` | Read | Purpose, 9 roles, business processes (onboarding, vacation, org-change), retention/privacy, metrics, integration points. |
 | `docs/TECHNICAL_DOCUMENTATION.md` | Read | 22 sections incl. schema (46 tables), feature-permission matrix, two-tier admin, org-change engine, analytics. |
-| `docs/JIRA_EPICS_AND_STORIES.md` | Read | EP1–EP27 (✅ Done), EP28–EP34 (hardening; mixed 🟡/⬜). |
+| `docs/project-management/BACKLOG.md` | Read | EP1–EP27 (✅ Done), EP28–EP34 (hardening; mixed 🟡/⬜). |
 | `docs/ARCHITECTURE_REVIEW.md` | Read | Six-dimension audit, findings F1–F31, ranked, with `file:line` evidence. |
 | `CLAUDE.md` | Read | Engineering invariants + regression flow-test protocol. |
 | **The running build** | **Not yet exercised by this team** | App boots on `localhost:8000`; a hands-on UAT pass has not been run *by us*. Flagged as an entry task for UAT. |

@@ -6,6 +6,23 @@
 > product roadmap, and the Architect's technical task breakdown. The engineering invariants below are the
 > guardrails all that work must obey — they always win.
 
+## DOCUMENTATION LIVES IN GIT — never in Jira or Confluence
+
+**Atlassian was retired on 8 August 2026.** Jira and Confluence are not used on this project.
+When the user asks to update business documentation, technical documentation, the product roadmap,
+the backlog, or any project-management documentation:
+
+1. **Edit the markdown in this repo.** Never call the Atlassian/Jira/Confluence MCP tools to create
+   or update project documentation, and never link to `*.atlassian.net` — those URLs are dead.
+2. **Find the right file** using the routing table in
+   [`docs/project-management/README.md`](docs/project-management/README.md). The backlog is
+   `docs/project-management/BACKLOG.md`; do not recreate `docs/JIRA_EPICS_AND_STORIES.md`.
+3. **Commit, then push** (branch first if on `main`). Keep a doc change and the code change it
+   describes in the same commit so they cannot drift.
+4. `docs/archive/confluence-export/` holds frozen historical snapshots. **Read-only** — never edit
+   them and never cite them as current documentation.
+5. `KAN-###` are local story IDs, not Jira issues. Keep them plain text, never hyperlinked.
+
 ## FLOW TESTS — How to run any "flow test" the user asks for
 
 **⚠️ NON-NEGOTIABLE. This applies the moment the user's request contains the words "flow test" in

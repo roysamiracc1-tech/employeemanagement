@@ -57,11 +57,11 @@ Neither org starts from a blank page — this repo already contains the source m
 | Role | Reads first (in this repo) | Produces / maintains |
 |---|---|---|
 | **All** | `../BUSINESS_DOCUMENTATION.md`, `../TECHNICAL_DOCUMENTATION.md`, `../../CLAUDE.md`, `../../README.md` | — |
-| Business Analyst | `../BUSINESS_DOCUMENTATION.md`, `../JIRA_EPICS_AND_STORIES.md` | Gap Register, Traceability, Conflict Log, Problem Backlog |
+| Business Analyst | `../BUSINESS_DOCUMENTATION.md`, `../project-management/BACKLOG.md` | Gap Register, Traceability, Conflict Log, Problem Backlog |
 | UX / Product Designer | `../TECHNICAL_DOCUMENTATION.md` (§7, §20–22), `../ARCHITECTURE_REVIEW.md` (F20/F21) | Journeys, design specs, accessibility audit |
-| UAT Lead | `../JIRA_EPICS_AND_STORIES.md`, `../../tests/ui/` | UAT plan, test cases, defect log, sign-off |
-| Delivery / Release Mgr | `../ARCHITECTURE_REVIEW.md`, `../JIRA_EPICS_AND_STORIES.md` (EP28–34) | Phased roadmap, readiness checklists, release gate, registers |
-| Product Strategist | `../BUSINESS_DOCUMENTATION.md` (§6), `../JIRA_EPICS_AND_STORIES.md` | Feature backlog, AI/automation assessments, North Star |
+| UAT Lead | `../project-management/BACKLOG.md`, `../../tests/ui/` | UAT plan, test cases, defect log, sign-off |
+| Delivery / Release Mgr | `../ARCHITECTURE_REVIEW.md`, `../project-management/BACKLOG.md` (EP28–34) | Phased roadmap, readiness checklists, release gate, registers |
+| Product Strategist | `../BUSINESS_DOCUMENTATION.md` (§6), `../project-management/BACKLOG.md` | Feature backlog, AI/automation assessments, North Star |
 | **Senior Architect** | `../ARCHITECTURE_REVIEW.md` (F1–F31), `../TECHNICAL_DOCUMENTATION.md`, `../../CLAUDE.md`, `../../app/`, `../../database/` | ADRs, tech-debt & risk registers, technical-readiness verdict, task breakdown |
 | Senior / Mid Engineer | `../TECHNICAL_DOCUMENTATION.md`, the relevant `app/` module, `../../tests/` | Reviewed, tested code (PRs); traceability Test/Impl links |
 | Senior DevOps | `../../.github/workflows/`, `../TECHNICAL_DOCUMENTATION.md` §10–§11, `../../database/schema.sql` | CI/CD, IaC, observability, release/rollback, prod-readiness evidence |

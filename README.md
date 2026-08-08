@@ -9,16 +9,23 @@ A multi-tenant, role-based HR management web application built with **Flask** an
 | Resource | URL |
 |----------|-----|
 | **GitHub Repository** | https://github.com/roysamiracc1-tech/employeemanagement |
-| **Jira Board** | https://roysamiracc1-1777144763345.atlassian.net/jira/software/projects/KAN/boards |
-| **Confluence Space** | https://roysamiracc1-1777144763345.atlassian.net/wiki/spaces/EmployeeMa |
 
-### Confluence Documentation Pages
+### Documentation
 
-| Page | Link |
-|------|------|
-| Technical Documentation | https://roysamiracc1-1777144763345.atlassian.net/wiki/spaces/EmployeeMa/pages/360451 |
-| Business Documentation | https://roysamiracc1-1777144763345.atlassian.net/wiki/spaces/EmployeeMa/pages/327683 |
-| Jira Epics & User Stories | https://roysamiracc1-1777144763345.atlassian.net/wiki/spaces/EmployeeMa/pages/393217 |
+All business, technical, and project-management documentation lives in this repository as markdown.
+**Jira and Confluence were retired on 8 August 2026** — see
+[`docs/project-management/README.md`](docs/project-management/README.md) for how documentation and the
+backlog are maintained now.
+
+| Document | Path |
+|----------|------|
+| Business documentation | [`docs/BUSINESS_DOCUMENTATION.md`](docs/BUSINESS_DOCUMENTATION.md) |
+| Business overview, features & access rights | [`docs/BUSINESS_OVERVIEW_FEATURES_AND_ACCESS.md`](docs/BUSINESS_OVERVIEW_FEATURES_AND_ACCESS.md) |
+| Technical documentation | [`docs/TECHNICAL_DOCUMENTATION.md`](docs/TECHNICAL_DOCUMENTATION.md) |
+| Product backlog (epics & user stories) | [`docs/project-management/BACKLOG.md`](docs/project-management/BACKLOG.md) |
+| Product roadmap | [`docs/product-team/deliverables/PRODUCT_ROADMAP_GOALS_EPICS_STORIES.md`](docs/product-team/deliverables/PRODUCT_ROADMAP_GOALS_EPICS_STORIES.md) |
+| Architecture review | [`docs/ARCHITECTURE_REVIEW.md`](docs/ARCHITECTURE_REVIEW.md) |
+| Confluence archive (frozen) | [`docs/archive/confluence-export/`](docs/archive/confluence-export/) |
 
 ---
 
@@ -101,7 +108,11 @@ employeemanagement/
 ├── docs/
 │   ├── TECHNICAL_DOCUMENTATION.md
 │   ├── BUSINESS_DOCUMENTATION.md
-│   └── JIRA_EPICS_AND_STORIES.md
+│   ├── BUSINESS_OVERVIEW_FEATURES_AND_ACCESS.md
+│   ├── ARCHITECTURE_REVIEW.md
+│   ├── project-management/       # backlog + how docs are maintained
+│   ├── product-team/             # product & engineering persona orgs
+│   └── archive/confluence-export/  # frozen Confluence snapshots
 ├── run.py
 └── requirements.txt
 ```
@@ -199,12 +210,16 @@ catches schema drift. See `docs/TECHNICAL_DOCUMENTATION.md` §11 and the improve
 
 ---
 
-## Jira Project — KAN
+## Backlog — Foundational Epics
 
-10 Epics · 52 User Stories — all tracked at:
-https://roysamiracc1-1777144763345.atlassian.net/jira/software/projects/KAN/boards
+The first 10 epics (52 user stories) that built the portal. The full backlog — all 34 epics
+including the in-flight architecture-hardening work — is in
+[`docs/project-management/BACKLOG.md`](docs/project-management/BACKLOG.md).
 
-| Epic | Key | Stories |
+`KAN-###` are local story IDs, not links. They came from a Jira project that was retired on
+8 August 2026.
+
+| Epic | ID | Stories |
 |------|-----|---------|
 | Authentication & Session Management | KAN-2 | KAN-12 to KAN-15 |
 | Role-Based Access Control | KAN-3 | KAN-16 to KAN-19 |

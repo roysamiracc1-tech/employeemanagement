@@ -1,31 +1,39 @@
-# HR Portal — Jira Epics & User Stories
+# HR Portal — Product Backlog (Epics & User Stories)
 
-> **Jira Project:** EmployeeManagementKanban (KAN)
-> **Board URL:** https://roysamiracc1-1777144763345.atlassian.net/jira/software/projects/KAN/boards
-> All issues are live in Jira. **EP1–EP27 are completed and deployed** to `main`; **EP28–EP34** (architecture-review backlog) are partially delivered — see the Status column and per-story markers below.  Legend: ✅ Done · 🟡 In progress · ⬜ Planned.
+> **This is the backlog. It lives in git, not in Jira.** See
+> [`README.md`](README.md) for how to update it.
+>
+> **`KAN-###` identifiers are local story IDs, not Jira issues.** They are kept because
+> `../ARCHITECTURE_REVIEW.md` and the product-team deliverables cross-reference them. The Jira
+> project they originally came from was retired on 8 Aug 2026 with zero issues remaining in it —
+> the markdown below is the only surviving record of this backlog.
+>
+> **EP1–EP27 are completed and deployed** to `main`; **EP28–EP34** (architecture-review backlog)
+> are partially delivered — see the Status column and per-story markers below.
+> Legend: ✅ Done · 🟡 In progress · ⬜ Planned.
 
 ---
 
 ## Epic Summary
 
-| Jira Key | Epic | Stories | Status |
+| ID | Epic | Stories | Status |
 |----------|------|---------|--------|
-| [KAN-2](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-2) | EP1 — Authentication & Session Management | KAN-12 · KAN-13 · KAN-14 · KAN-15 | ✅ Done |
-| [KAN-3](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-3) | EP2 — Role-Based Access Control (RBAC) | KAN-16 · KAN-17 · KAN-18 · KAN-19 | ✅ Done |
-| [KAN-4](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-4) | EP3 — Employee Registry & Directory | KAN-20 · KAN-21 · KAN-22 · KAN-23 · KAN-24 | ✅ Done |
-| [KAN-5](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-5) | EP4 — Employee Profile & Self-Service | KAN-25 · KAN-26 · KAN-27 · KAN-28 · KAN-29 · KAN-30 · KAN-31 | ✅ Done |
-| [KAN-6](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-6) | EP5 — Organisational Structure | KAN-32 · KAN-33 · KAN-34 · KAN-35 · KAN-36 | ✅ Done |
-| [KAN-7](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-7) | EP6 — Manager Self-Service | KAN-37 · KAN-38 | ✅ Done |
-| [KAN-8](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-8) | EP7 — Vacation & Leave Management | KAN-39 · KAN-40 · KAN-41 · KAN-42 · KAN-43 · KAN-44 · KAN-45 · KAN-46 · KAN-48 · KAN-49 · KAN-50 · KAN-51 | ✅ Done |
-| [KAN-9](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-9) | EP8 — Company Branding & Theming | KAN-52 · KAN-53 · KAN-54 · KAN-55 · KAN-56 · KAN-57 · KAN-58 | ✅ Done |
-| [KAN-10](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-10) | EP9 — Dashboard & Real-Time Metrics | KAN-59 · KAN-60 · KAN-61 · KAN-62 | ✅ Done |
-| [KAN-11](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-11) | EP10 — Work Anniversary Recognition | KAN-63 · KAN-64 | ✅ Done |
-| [KAN-65](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-65) | EP11 — Two-Tier Admin System | Stories below | ✅ Done |
-| [KAN-66](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-66) | EP12 — Multi-Company Org CRUD | Stories below | ✅ Done |
-| [KAN-67](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-67) | EP13 — Feature-Level Permission Matrix | Stories below | ✅ Done |
-| [KAN-68](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-68) | EP14 — Test Automation & Quality Gates | Stories below | ✅ Done |
-| [KAN-69](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-69) | EP15 — Login Page Redesign | Stories below | ✅ Done |
-| [KAN-70](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-70) | EP16 — Multi-Company Seed Data (Telia) | Stories below | ✅ Done |
+| KAN-2 | EP1 — Authentication & Session Management | KAN-12 · KAN-13 · KAN-14 · KAN-15 | ✅ Done |
+| KAN-3 | EP2 — Role-Based Access Control (RBAC) | KAN-16 · KAN-17 · KAN-18 · KAN-19 | ✅ Done |
+| KAN-4 | EP3 — Employee Registry & Directory | KAN-20 · KAN-21 · KAN-22 · KAN-23 · KAN-24 | ✅ Done |
+| KAN-5 | EP4 — Employee Profile & Self-Service | KAN-25 · KAN-26 · KAN-27 · KAN-28 · KAN-29 · KAN-30 · KAN-31 | ✅ Done |
+| KAN-6 | EP5 — Organisational Structure | KAN-32 · KAN-33 · KAN-34 · KAN-35 · KAN-36 | ✅ Done |
+| KAN-7 | EP6 — Manager Self-Service | KAN-37 · KAN-38 | ✅ Done |
+| KAN-8 | EP7 — Vacation & Leave Management | KAN-39 · KAN-40 · KAN-41 · KAN-42 · KAN-43 · KAN-44 · KAN-45 · KAN-46 · KAN-48 · KAN-49 · KAN-50 · KAN-51 | ✅ Done |
+| KAN-9 | EP8 — Company Branding & Theming | KAN-52 · KAN-53 · KAN-54 · KAN-55 · KAN-56 · KAN-57 · KAN-58 | ✅ Done |
+| KAN-10 | EP9 — Dashboard & Real-Time Metrics | KAN-59 · KAN-60 · KAN-61 · KAN-62 | ✅ Done |
+| KAN-11 | EP10 — Work Anniversary Recognition | KAN-63 · KAN-64 | ✅ Done |
+| KAN-65 | EP11 — Two-Tier Admin System | Stories below | ✅ Done |
+| KAN-66 | EP12 — Multi-Company Org CRUD | Stories below | ✅ Done |
+| KAN-67 | EP13 — Feature-Level Permission Matrix | Stories below | ✅ Done |
+| KAN-68 | EP14 — Test Automation & Quality Gates | Stories below | ✅ Done |
+| KAN-69 | EP15 — Login Page Redesign | Stories below | ✅ Done |
+| KAN-70 | EP16 — Multi-Company Seed Data (Telia) | Stories below | ✅ Done |
 | EP17 | Family Tree Org Chart & Employee-Centric Navigation | KAN-81 · KAN-82 · KAN-83 · KAN-84 · KAN-85 · KAN-86 · KAN-87 | ✅ Done |
 | EP18 | Email Notification System | KAN-88 · KAN-89 · KAN-90 · KAN-91 | ✅ Done |
 | EP19 | Full-Text Search | KAN-92 · KAN-93 · KAN-94 · KAN-95 | ✅ Done |
@@ -45,152 +53,152 @@
 | EP33 | Frontend Modernization | KAN-172 · KAN-173 · KAN-174 · KAN-175 · KAN-176 · KAN-177 | ⬜ Planned |
 | EP34 | Architecture & Structure | KAN-178 · KAN-179 · KAN-180 · KAN-181 · KAN-182 | ⬜ Planned |
 
-> **EP28–EP34** are sourced from the architecture review in [`docs/ARCHITECTURE_REVIEW.md`](ARCHITECTURE_REVIEW.md)
+> **EP28–EP34** are sourced from the architecture review in [`docs/ARCHITECTURE_REVIEW.md`](../ARCHITECTURE_REVIEW.md)
 > (finding IDs `Fn` are referenced per story). Unlike EP1–EP27, these are **partially delivered**: ✅ KAN-152 · KAN-154 · KAN-157 · KAN-165 · KAN-169 done, 🟡 KAN-150 partial; the rest are ⬜ planned.
 
 ---
 
 ## EPIC 1 — Authentication & Session Management  —  ✅ Done
-**Jira:** [KAN-2](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-2) · **Label:** `auth` `security`
+**ID:** KAN-2 · **Label:** `auth` `security`
 **Description:** Secure login/logout with role-aware sessions. All portal activity requires authentication.
 
-| Jira Key | User Story | Acceptance Criteria | Priority |
+| ID | User Story | Acceptance Criteria | Priority |
 |----------|-----------|---------------------|----------|
-| ✅ [KAN-12](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-12) | As an **employee**, I want to log in with my work email so I can access the portal. | Login accepts email; invalid email shows error; redirects to dashboard on success. | Must Have |
-| ✅ [KAN-13](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-13) | As any **logged-in user**, I want my session to persist for 8 hours so I do not need to re-login constantly. | Session cookie TTL = 8 h; logout clears session immediately. | Must Have |
-| ✅ [KAN-14](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-14) | As any **user**, I want to log out securely so no one else can access my account on shared devices. | `/logout` clears session and redirects to login. | Must Have |
-| ✅ [KAN-15](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-15) | As a **developer/demo**, I want quick-access demo user tiles on the login page so testers can log in without credentials. | Login page shows up to 6 demo user cards; clicking one pre-fills email. | Should Have |
+| ✅ KAN-12 | As an **employee**, I want to log in with my work email so I can access the portal. | Login accepts email; invalid email shows error; redirects to dashboard on success. | Must Have |
+| ✅ KAN-13 | As any **logged-in user**, I want my session to persist for 8 hours so I do not need to re-login constantly. | Session cookie TTL = 8 h; logout clears session immediately. | Must Have |
+| ✅ KAN-14 | As any **user**, I want to log out securely so no one else can access my account on shared devices. | `/logout` clears session and redirects to login. | Must Have |
+| ✅ KAN-15 | As a **developer/demo**, I want quick-access demo user tiles on the login page so testers can log in without credentials. | Login page shows up to 6 demo user cards; clicking one pre-fills email. | Should Have |
 
 ---
 
 ## EPIC 2 — Role-Based Access Control (RBAC)  —  ✅ Done
-**Jira:** [KAN-3](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-3) · **Label:** `rbac` `security`
+**ID:** KAN-3 · **Label:** `rbac` `security`
 **Description:** Eight distinct roles gate access to views and APIs. Roles are cumulative and checked server-side on every protected endpoint.
 
 **Roles:** `SYSTEM_ADMIN` · `HR_ADMIN` · `SOLID_LINE_MANAGER` · `DOTTED_LINE_MANAGER` · `DEPARTMENT_HEAD` · `LOCATION_HEAD` · `HIRING_MANAGER` · `EMPLOYEE`
 
-| Jira Key | User Story | Acceptance Criteria | Priority |
+| ID | User Story | Acceptance Criteria | Priority |
 |----------|-----------|---------------------|----------|
-| ✅ [KAN-16](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-16) | As a **SYSTEM_ADMIN**, I want to assign and revoke roles for any user so I can control access. | Role edit modal on admin panel; changes take effect immediately; own roles cannot be removed. | Must Have |
-| ✅ [KAN-17](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-17) | As a **SYSTEM_ADMIN**, I want to enable or disable a user account so ex-employees cannot log in. | Toggle active/inactive; inactive users are rejected at login with clear error. | Must Have |
-| ✅ [KAN-18](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-18) | As a **non-admin user**, I want to be redirected with an error message if I try to access a restricted page. | HTTP redirect to dashboard with flash error; no data leaked. | Must Have |
-| ✅ [KAN-19](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-19) | As a **SYSTEM_ADMIN**, I want the admin panel to show all users with their roles and last-login timestamp. | Admin panel loads all users; shows role badges; shows "Never" if no login recorded. | Should Have |
+| ✅ KAN-16 | As a **SYSTEM_ADMIN**, I want to assign and revoke roles for any user so I can control access. | Role edit modal on admin panel; changes take effect immediately; own roles cannot be removed. | Must Have |
+| ✅ KAN-17 | As a **SYSTEM_ADMIN**, I want to enable or disable a user account so ex-employees cannot log in. | Toggle active/inactive; inactive users are rejected at login with clear error. | Must Have |
+| ✅ KAN-18 | As a **non-admin user**, I want to be redirected with an error message if I try to access a restricted page. | HTTP redirect to dashboard with flash error; no data leaked. | Must Have |
+| ✅ KAN-19 | As a **SYSTEM_ADMIN**, I want the admin panel to show all users with their roles and last-login timestamp. | Admin panel loads all users; shows role badges; shows "Never" if no login recorded. | Should Have |
 
 ---
 
 ## EPIC 3 — Employee Registry & Directory  —  ✅ Done
-**Jira:** [KAN-4](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-4) · **Label:** `employees` `directory`
+**ID:** KAN-4 · **Label:** `employees` `directory`
 **Description:** Central record of all employees with full personal, employment, and org data. Searchable, filterable directory available to authorised roles.
 
-| Jira Key | User Story | Acceptance Criteria | Priority |
+| ID | User Story | Acceptance Criteria | Priority |
 |----------|-----------|---------------------|----------|
-| ✅ [KAN-20](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-20) | As an **HR_ADMIN / SYSTEM_ADMIN**, I want to register a new employee through a guided multi-step form so data is captured completely. | 6-step form: Personal Info → Employment → Organisation → Reporting → Skills → Portal Access; auto-generates EMP-XXX number; creates all records atomically. | Must Have |
-| ✅ [KAN-21](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-21) | As a **registrar**, I want the employee number to be auto-generated sequentially so I don't assign duplicates. | `_next_employee_number()` selects MAX and increments; zero-pads to 3 digits. | Must Have |
-| ✅ [KAN-22](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-22) | As an **HR_ADMIN**, I want to search and filter the employee directory by name, location, business unit, and employment type. | Filters applied server-side; results paginate at configurable rows/page. | Must Have |
-| ✅ [KAN-23](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-23) | As a **SYSTEM_ADMIN / HR_ADMIN**, I want to see each employee's manager, location, skills, and certifications in the directory row. | Directory table includes manager pill, location badge, skill bars, cert count. | Should Have |
-| ✅ [KAN-24](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-24) | As a **registrar**, I want to assign solid-line and dotted-line managers to a new employee during registration. | Step 4 lets user search and select solid/dotted manager; records written to `manager_relationships` with `is_current=true`. | Must Have |
+| ✅ KAN-20 | As an **HR_ADMIN / SYSTEM_ADMIN**, I want to register a new employee through a guided multi-step form so data is captured completely. | 6-step form: Personal Info → Employment → Organisation → Reporting → Skills → Portal Access; auto-generates EMP-XXX number; creates all records atomically. | Must Have |
+| ✅ KAN-21 | As a **registrar**, I want the employee number to be auto-generated sequentially so I don't assign duplicates. | `_next_employee_number()` selects MAX and increments; zero-pads to 3 digits. | Must Have |
+| ✅ KAN-22 | As an **HR_ADMIN**, I want to search and filter the employee directory by name, location, business unit, and employment type. | Filters applied server-side; results paginate at configurable rows/page. | Must Have |
+| ✅ KAN-23 | As a **SYSTEM_ADMIN / HR_ADMIN**, I want to see each employee's manager, location, skills, and certifications in the directory row. | Directory table includes manager pill, location badge, skill bars, cert count. | Should Have |
+| ✅ KAN-24 | As a **registrar**, I want to assign solid-line and dotted-line managers to a new employee during registration. | Step 4 lets user search and select solid/dotted manager; records written to `manager_relationships` with `is_current=true`. | Must Have |
 
 ---
 
 ## EPIC 4 — Employee Profile & Self-Service  —  ✅ Done
-**Jira:** [KAN-5](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-5) · **Label:** `profile` `self-service`
+**ID:** KAN-5 · **Label:** `profile` `self-service`
 **Description:** Every employee can view their own profile and self-maintain skills, certifications, and gender. Managers and admins see read-only profiles for others.
 
-| Jira Key | User Story | Acceptance Criteria | Priority |
+| ID | User Story | Acceptance Criteria | Priority |
 |----------|-----------|---------------------|----------|
-| ✅ [KAN-25](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-25) | As any **employee**, I want to view my complete profile including employment details, org placement, manager, skills, and certifications. | `/profile` loads own profile; `/profile/<id>` loads others; `is_own` flag controls edit UI. | Must Have |
-| ✅ [KAN-26](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-26) | As an **employee**, I want to add skills to my profile and self-rate each on a 1–10 scale so my competencies are visible. | Skill modal with 🌱💡⚡🏆 level buttons; POST `/api/profile/skills`; list refreshes in-page. | Must Have |
-| ✅ [KAN-27](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-27) | As an **employee**, I want to remove a skill from my profile so outdated entries do not mislead others. | DELETE `/api/profile/skills/<id>`; list updated in-page. | Must Have |
-| ✅ [KAN-28](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-28) | As an **employee**, I want to add certifications with issuer, dates, and credential URL so my qualifications are recorded. | POST `/api/profile/certifications`; accepts cert name, provider, dates, URL; in-page reload. | Must Have |
-| ✅ [KAN-29](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-29) | As an **employee**, I want to edit and remove my certifications so I keep them current. | PUT and DELETE `/api/profile/certifications/<id>`; in-page update. | Must Have |
-| ✅ [KAN-30](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-30) | As an **employee**, I want to record my gender on my profile so my vacation eligibility is calculated correctly. | Gender dropdown (Male/Female/Other) with auto-save on change via POST `/api/profile/gender`. | Must Have |
-| ✅ [KAN-31](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-31) | As a **SYSTEM_ADMIN / HR_ADMIN**, I want to validate an employee's skill rating so the profile shows verified competencies. | POST `/api/admin/validate-skill`; status → `VALIDATED`; skill bar turns green. | Should Have |
+| ✅ KAN-25 | As any **employee**, I want to view my complete profile including employment details, org placement, manager, skills, and certifications. | `/profile` loads own profile; `/profile/<id>` loads others; `is_own` flag controls edit UI. | Must Have |
+| ✅ KAN-26 | As an **employee**, I want to add skills to my profile and self-rate each on a 1–10 scale so my competencies are visible. | Skill modal with 🌱💡⚡🏆 level buttons; POST `/api/profile/skills`; list refreshes in-page. | Must Have |
+| ✅ KAN-27 | As an **employee**, I want to remove a skill from my profile so outdated entries do not mislead others. | DELETE `/api/profile/skills/<id>`; list updated in-page. | Must Have |
+| ✅ KAN-28 | As an **employee**, I want to add certifications with issuer, dates, and credential URL so my qualifications are recorded. | POST `/api/profile/certifications`; accepts cert name, provider, dates, URL; in-page reload. | Must Have |
+| ✅ KAN-29 | As an **employee**, I want to edit and remove my certifications so I keep them current. | PUT and DELETE `/api/profile/certifications/<id>`; in-page update. | Must Have |
+| ✅ KAN-30 | As an **employee**, I want to record my gender on my profile so my vacation eligibility is calculated correctly. | Gender dropdown (Male/Female/Other) with auto-save on change via POST `/api/profile/gender`. | Must Have |
+| ✅ KAN-31 | As a **SYSTEM_ADMIN / HR_ADMIN**, I want to validate an employee's skill rating so the profile shows verified competencies. | POST `/api/admin/validate-skill`; status → `VALIDATED`; skill bar turns green. | Should Have |
 
 ---
 
 ## EPIC 5 — Organisational Structure  —  ✅ Done
-**Jira:** [KAN-6](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-6) · **Label:** `org` `hierarchy`
+**ID:** KAN-6 · **Label:** `org` `hierarchy`
 **Description:** Multi-level org model: Companies → Business Units → Functional Units → Cost Centres → Locations.
 
-| Jira Key | User Story | Acceptance Criteria | Priority |
+| ID | User Story | Acceptance Criteria | Priority |
 |----------|-----------|---------------------|----------|
-| ✅ [KAN-32](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-32) | As a **SYSTEM_ADMIN**, I want to register companies so multiple entities can share the portal. | `/admin/companies` CRUD; company has name, industry, website, HQ, description, active flag. | Must Have |
-| ✅ [KAN-33](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-33) | As an **employee**, I want to view my company's overview page showing headcount, locations, and business units. | `/company` shows stats, BU breakdown, location breakdown; accessible to all employees. | Should Have |
-| ✅ [KAN-34](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-34) | As an **HR_ADMIN**, I want to assign employees to business units, functional units, locations, and cost centres during onboarding. | Registration step 3 has cascading BU → FU selectors; `employee_org_assignments` written with `is_current=true`. | Must Have |
-| ✅ [KAN-35](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-35) | As a **manager or admin**, I want to view the org hierarchy as an interactive tree so I can understand reporting lines. | `/org-tree` renders recursive tree via CTE (max 10 levels); nodes clickable; expand/collapse; admin can pick any root or Full Org. | Must Have |
-| ✅ [KAN-36](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-36) | As a **manager**, I want to see pending vacation badges on org tree nodes so I know which reportees need action. | Orange ⏳ badge on nodes with pending requests; links to `/vacation/team`. | Should Have |
+| ✅ KAN-32 | As a **SYSTEM_ADMIN**, I want to register companies so multiple entities can share the portal. | `/admin/companies` CRUD; company has name, industry, website, HQ, description, active flag. | Must Have |
+| ✅ KAN-33 | As an **employee**, I want to view my company's overview page showing headcount, locations, and business units. | `/company` shows stats, BU breakdown, location breakdown; accessible to all employees. | Should Have |
+| ✅ KAN-34 | As an **HR_ADMIN**, I want to assign employees to business units, functional units, locations, and cost centres during onboarding. | Registration step 3 has cascading BU → FU selectors; `employee_org_assignments` written with `is_current=true`. | Must Have |
+| ✅ KAN-35 | As a **manager or admin**, I want to view the org hierarchy as an interactive tree so I can understand reporting lines. | `/org-tree` renders recursive tree via CTE (max 10 levels); nodes clickable; expand/collapse; admin can pick any root or Full Org. | Must Have |
+| ✅ KAN-36 | As a **manager**, I want to see pending vacation badges on org tree nodes so I know which reportees need action. | Orange ⏳ badge on nodes with pending requests; links to `/vacation/team`. | Should Have |
 
 ---
 
 ## EPIC 6 — Manager Self-Service  —  ✅ Done
-**Jira:** [KAN-7](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-7) · **Label:** `manager` `team`
+**ID:** KAN-7 · **Label:** `manager` `team`
 **Description:** Managers have a dedicated team view showing all direct reports with enriched data and can take management actions from a single screen.
 
-| Jira Key | User Story | Acceptance Criteria | Priority |
+| ID | User Story | Acceptance Criteria | Priority |
 |----------|-----------|---------------------|----------|
-| ✅ [KAN-37](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-37) | As a **manager**, I want to see all my direct reports in a card layout with their role, location, skills, and manager links. | `/my-team` shows cards for all SOLID_LINE direct reports; each card has profile link and management quick-actions. | Must Have |
-| ✅ [KAN-38](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-38) | As a **manager**, I want to see a pending vacation count badge on each team member's card so I can act without leaving the team page. | `pendingCounts` fetched on page load; badge shows ⏳ N vacation req with link to `/vacation/team`. | Should Have |
+| ✅ KAN-37 | As a **manager**, I want to see all my direct reports in a card layout with their role, location, skills, and manager links. | `/my-team` shows cards for all SOLID_LINE direct reports; each card has profile link and management quick-actions. | Must Have |
+| ✅ KAN-38 | As a **manager**, I want to see a pending vacation count badge on each team member's card so I can act without leaving the team page. | `pendingCounts` fetched on page load; badge shows ⏳ N vacation req with link to `/vacation/team`. | Should Have |
 
 ---
 
 ## EPIC 7 — Vacation & Leave Management  —  ✅ Done
-**Jira:** [KAN-8](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-8) · **Label:** `vacation` `leave` `hr-process`
+**ID:** KAN-8 · **Label:** `vacation` `leave` `hr-process`
 **Description:** Company-defined leave types with location scoping and eligibility rules. Full request → approval workflow with manager review queue and upcoming schedule view.
 
-| Jira Key | User Story | Acceptance Criteria | Priority |
+| ID | User Story | Acceptance Criteria | Priority |
 |----------|-----------|---------------------|----------|
-| ✅ [KAN-39](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-39) | As a **SYSTEM_ADMIN**, I want to define vacation types per company (e.g. Annual Leave, Sick Leave) with day limits and paid/unpaid flags. | `/admin/vacation-types` CRUD; name, max days/year, is_paid, colour, description stored per company. | Must Have |
-| ✅ [KAN-40](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-40) | As a **SYSTEM_ADMIN**, I want to make a vacation type available only to employees in specific locations. | Multi-select locations; stored in `vacation_type_locations`; company-wide types have no location entries. | Must Have |
-| ✅ [KAN-41](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-41) | As a **SYSTEM_ADMIN**, I want to add eligibility rules (gender, minimum tenure) to vacation types so the right employees see them. | Step 4 Rules builder; supports `GENDER_EQ`, `MIN_TENURE_MONTHS`, `MIN_TENURE_YEARS`; AND logic. | Must Have |
-| ✅ [KAN-42](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-42) | As an **employee**, I want to see only the vacation types I am eligible for so I don't waste time applying for unavailable leave. | Location + ALL rules must pass; rule labels shown as purple badges; ineligible types hidden. | Must Have |
-| ✅ [KAN-43](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-43) | As an **employee**, I want to see my used vs. remaining days for each vacation type so I know my balance. | Type cards show used/max progress bar; remaining shown in request modal; counts PENDING+APPROVED. | Must Have |
-| ✅ [KAN-44](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-44) | As an **employee**, I want to submit a vacation request with start/end dates and a note so my manager is notified. | Request modal; weekday count verified server-side; manager auto-set from solid-line; annual limit enforced. | Must Have |
-| ✅ [KAN-45](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-45) | As an **employee**, I want to cancel a PENDING request if my plans change. | DELETE `/api/vacation/request/<id>`; only PENDING status can be cancelled; status → CANCELLED. | Must Have |
-| ✅ [KAN-46](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-46) | As an **employee**, I cannot submit a vacation request if I have no manager assigned. | Warning banner shown; request button disabled; API returns 400 with reason. | Must Have |
-| ✅ [KAN-48](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-48) | As an **employee**, I want to see all my past and current requests with their status and manager note. | Request history table shows type, dates, days, status badge, manager note, cancel button for PENDING. | Must Have |
-| ✅ [KAN-49](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-49) | As a **manager**, I want to see all pending vacation requests from my reportees and approve or reject them with a note. | Pending tab; review modal with optional note; POST `/api/vacation/review/<id>`; only PENDING reviewable. | Must Have |
-| ✅ [KAN-50](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-50) | As a **manager**, I want to see my team's upcoming approved leave in a calendar-like schedule so I can plan coverage. | Upcoming tab groups by month; "● On leave" indicator for currently active requests. | Should Have |
-| ✅ [KAN-51](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-51) | As a **manager**, I cannot approve a request that has already been reviewed. | API validates status == PENDING before update; returns 400 if already actioned. | Must Have |
+| ✅ KAN-39 | As a **SYSTEM_ADMIN**, I want to define vacation types per company (e.g. Annual Leave, Sick Leave) with day limits and paid/unpaid flags. | `/admin/vacation-types` CRUD; name, max days/year, is_paid, colour, description stored per company. | Must Have |
+| ✅ KAN-40 | As a **SYSTEM_ADMIN**, I want to make a vacation type available only to employees in specific locations. | Multi-select locations; stored in `vacation_type_locations`; company-wide types have no location entries. | Must Have |
+| ✅ KAN-41 | As a **SYSTEM_ADMIN**, I want to add eligibility rules (gender, minimum tenure) to vacation types so the right employees see them. | Step 4 Rules builder; supports `GENDER_EQ`, `MIN_TENURE_MONTHS`, `MIN_TENURE_YEARS`; AND logic. | Must Have |
+| ✅ KAN-42 | As an **employee**, I want to see only the vacation types I am eligible for so I don't waste time applying for unavailable leave. | Location + ALL rules must pass; rule labels shown as purple badges; ineligible types hidden. | Must Have |
+| ✅ KAN-43 | As an **employee**, I want to see my used vs. remaining days for each vacation type so I know my balance. | Type cards show used/max progress bar; remaining shown in request modal; counts PENDING+APPROVED. | Must Have |
+| ✅ KAN-44 | As an **employee**, I want to submit a vacation request with start/end dates and a note so my manager is notified. | Request modal; weekday count verified server-side; manager auto-set from solid-line; annual limit enforced. | Must Have |
+| ✅ KAN-45 | As an **employee**, I want to cancel a PENDING request if my plans change. | DELETE `/api/vacation/request/<id>`; only PENDING status can be cancelled; status → CANCELLED. | Must Have |
+| ✅ KAN-46 | As an **employee**, I cannot submit a vacation request if I have no manager assigned. | Warning banner shown; request button disabled; API returns 400 with reason. | Must Have |
+| ✅ KAN-48 | As an **employee**, I want to see all my past and current requests with their status and manager note. | Request history table shows type, dates, days, status badge, manager note, cancel button for PENDING. | Must Have |
+| ✅ KAN-49 | As a **manager**, I want to see all pending vacation requests from my reportees and approve or reject them with a note. | Pending tab; review modal with optional note; POST `/api/vacation/review/<id>`; only PENDING reviewable. | Must Have |
+| ✅ KAN-50 | As a **manager**, I want to see my team's upcoming approved leave in a calendar-like schedule so I can plan coverage. | Upcoming tab groups by month; "● On leave" indicator for currently active requests. | Should Have |
+| ✅ KAN-51 | As a **manager**, I cannot approve a request that has already been reviewed. | API validates status == PENDING before update; returns 400 if already actioned. | Must Have |
 
 ---
 
 ## EPIC 8 — Company Branding & Theming  —  ✅ Done
-**Jira:** [KAN-9](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-9) · **Label:** `branding` `ui` `personalisation`
+**ID:** KAN-9 · **Label:** `branding` `ui` `personalisation`
 **Description:** Admins configure per-company visual identity. Employees choose their own light/dark preference. All settings persist and apply immediately on next page load.
 
-| Jira Key | User Story | Acceptance Criteria | Priority |
+| ID | User Story | Acceptance Criteria | Priority |
 |----------|-----------|---------------------|----------|
-| ✅ [KAN-52](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-52) | As a **SYSTEM_ADMIN**, I want to upload a company logo so it appears in the sidebar for all employees of that company. | Drag-and-drop upload; saved to `static/uploads/logos/`; old file deleted on replacement; PNG/JPG/SVG/WebP max 2 MB. | Must Have |
-| ✅ [KAN-53](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-53) | As a **SYSTEM_ADMIN**, I want to optionally provide an external logo URL instead of uploading a file. | Tab switcher between Upload File and External URL; live preview; uploaded file takes priority. | Should Have |
-| ✅ [KAN-54](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-54) | As a **SYSTEM_ADMIN**, I want to set a primary theme colour for my company so the portal reflects our brand identity. | Colour picker + hex input + 8 quick presets; saved as `theme_color`; injected as `--primary` CSS variable. | Must Have |
-| ✅ [KAN-55](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-55) | As a **SYSTEM_ADMIN**, I want to add a company-wide header banner (HTML) above all portal pages for announcements. | `header_html` field; rendered above all pages for company employees; inline preview button. | Should Have |
-| ✅ [KAN-56](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-56) | As a **SYSTEM_ADMIN**, I want to add a company-wide footer (HTML) below all pages for legal links and support contacts. | `footer_html` field; rendered at bottom of all pages; clear button available. | Should Have |
-| ✅ [KAN-57](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-57) | As any **employee**, I want to switch between light and dark mode so I can work comfortably in different environments. | Toggle button in topbar; instant CSS variable swap; POST `/api/user/theme` persists to DB; restored on next login. | Must Have |
-| ✅ [KAN-58](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-58) | As an **employee**, my branding is refreshed in my session after the admin updates the company record. | `admin_company_edit` POST re-fetches and updates `session['branding']` immediately. | Should Have |
+| ✅ KAN-52 | As a **SYSTEM_ADMIN**, I want to upload a company logo so it appears in the sidebar for all employees of that company. | Drag-and-drop upload; saved to `static/uploads/logos/`; old file deleted on replacement; PNG/JPG/SVG/WebP max 2 MB. | Must Have |
+| ✅ KAN-53 | As a **SYSTEM_ADMIN**, I want to optionally provide an external logo URL instead of uploading a file. | Tab switcher between Upload File and External URL; live preview; uploaded file takes priority. | Should Have |
+| ✅ KAN-54 | As a **SYSTEM_ADMIN**, I want to set a primary theme colour for my company so the portal reflects our brand identity. | Colour picker + hex input + 8 quick presets; saved as `theme_color`; injected as `--primary` CSS variable. | Must Have |
+| ✅ KAN-55 | As a **SYSTEM_ADMIN**, I want to add a company-wide header banner (HTML) above all portal pages for announcements. | `header_html` field; rendered above all pages for company employees; inline preview button. | Should Have |
+| ✅ KAN-56 | As a **SYSTEM_ADMIN**, I want to add a company-wide footer (HTML) below all pages for legal links and support contacts. | `footer_html` field; rendered at bottom of all pages; clear button available. | Should Have |
+| ✅ KAN-57 | As any **employee**, I want to switch between light and dark mode so I can work comfortably in different environments. | Toggle button in topbar; instant CSS variable swap; POST `/api/user/theme` persists to DB; restored on next login. | Must Have |
+| ✅ KAN-58 | As an **employee**, my branding is refreshed in my session after the admin updates the company record. | `admin_company_edit` POST re-fetches and updates `session['branding']` immediately. | Should Have |
 
 ---
 
 ## EPIC 9 — Dashboard & Real-Time Metrics  —  ✅ Done
-**Jira:** [KAN-10](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-10) · **Label:** `dashboard` `analytics`
+**ID:** KAN-10 · **Label:** `dashboard` `analytics`
 **Description:** Role-aware dashboard with live stat cards, drill-down filtering, and configurable auto-refresh intervals per role.
 
-| Jira Key | User Story | Acceptance Criteria | Priority |
+| ID | User Story | Acceptance Criteria | Priority |
 |----------|-----------|---------------------|----------|
-| ✅ [KAN-59](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-59) | As any **logged-in user**, I want to see a dashboard with the key stats relevant to my role so I get an immediate status overview. | Stats differ by role; SYSTEM_ADMIN sees all-company counts; managers see team counts; employees see personal stats. | Must Have |
-| ✅ [KAN-60](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-60) | As a **dashboard user**, I want stat cards to auto-refresh periodically so I see live data without reloading. | Refresh interval configurable per role; JS polls `/api/dashboard/stats`; changed values animate (flash green). | Should Have |
-| ✅ [KAN-61](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-61) | As a **dashboard user**, I want clickable stat cards that filter the employee directory to the relevant subset. | Clicking a stat card navigates to `/directory?filter=<value>`; directory pre-applies the filter. | Should Have |
-| ✅ [KAN-62](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-62) | As a **SYSTEM_ADMIN**, I want to configure per-role refresh intervals so I can balance data freshness against server load. | POST `/api/admin/refresh-settings`; persisted to `widget_refresh_settings`; applied on next page load. | Nice to Have |
+| ✅ KAN-59 | As any **logged-in user**, I want to see a dashboard with the key stats relevant to my role so I get an immediate status overview. | Stats differ by role; SYSTEM_ADMIN sees all-company counts; managers see team counts; employees see personal stats. | Must Have |
+| ✅ KAN-60 | As a **dashboard user**, I want stat cards to auto-refresh periodically so I see live data without reloading. | Refresh interval configurable per role; JS polls `/api/dashboard/stats`; changed values animate (flash green). | Should Have |
+| ✅ KAN-61 | As a **dashboard user**, I want clickable stat cards that filter the employee directory to the relevant subset. | Clicking a stat card navigates to `/directory?filter=<value>`; directory pre-applies the filter. | Should Have |
+| ✅ KAN-62 | As a **SYSTEM_ADMIN**, I want to configure per-role refresh intervals so I can balance data freshness against server load. | POST `/api/admin/refresh-settings`; persisted to `widget_refresh_settings`; applied on next page load. | Nice to Have |
 
 ---
 
 ## EPIC 10 — Work Anniversary Recognition  —  ✅ Done
-**Jira:** [KAN-11](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-11) · **Label:** `engagement` `hr`
+**ID:** KAN-11 · **Label:** `engagement` `hr`
 **Description:** Automatic work anniversary detection with animated visual indicator on employee names throughout the portal.
 
-| Jira Key | User Story | Acceptance Criteria | Priority |
+| ID | User Story | Acceptance Criteria | Priority |
 |----------|-----------|---------------------|----------|
-| ✅ [KAN-63](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-63) | As a **manager or admin**, I want to see a visual indicator next to employees whose work anniversaries are upcoming so I can acknowledge them. | 🎂 badge computed from `join_date`; urgency levels: normal (>7 days), soon (≤7 days), urgent (today/tomorrow); animated per urgency. | Should Have |
-| ✅ [KAN-64](https://roysamiracc1-1777144763345.atlassian.net/browse/KAN-64) | As a **manager**, I want to hover over the badge to see the exact anniversary date and tenure. | Tooltip shows "N-year anniversary on DD MMM YYYY" on hover with smooth animation. | Should Have |
+| ✅ KAN-63 | As a **manager or admin**, I want to see a visual indicator next to employees whose work anniversaries are upcoming so I can acknowledge them. | 🎂 badge computed from `join_date`; urgency levels: normal (>7 days), soon (≤7 days), urgent (today/tomorrow); animated per urgency. | Should Have |
+| ✅ KAN-64 | As a **manager**, I want to hover over the badge to see the exact anniversary date and tenure. | Tooltip shows "N-year anniversary on DD MMM YYYY" on hover with smooth animation. | Should Have |
 
 ---
 
@@ -265,7 +273,7 @@
 ---
 
 ## EP17 — Family Tree Org Chart & Employee-Centric Navigation  —  ✅ Done
-**Jira:** KAN-81 · **Label:** `org-chart` `ux`
+**ID:** KAN-81 · **Label:** `org-chart` `ux`
 
 **Description:** Redesign the organisation tree from a folder/indent structure into a proper top-down family tree chart that starts from the logged-in employee, with full up/down navigation.
 
@@ -282,7 +290,7 @@
 ---
 
 ## EP18 — Email Notification System  —  ✅ Done
-**Jira:** KAN-88 · **Label:** `notifications` `email`
+**ID:** KAN-88 · **Label:** `notifications` `email`
 
 | Story ID | User Story | Acceptance Criteria | Priority |
 |---|---|---|---|
@@ -294,7 +302,7 @@
 ---
 
 ## EP19 — Full-Text Search  —  ✅ Done
-**Jira:** KAN-92 · **Label:** `search` `ux`
+**ID:** KAN-92 · **Label:** `search` `ux`
 
 | Story ID | User Story | Acceptance Criteria | Priority |
 |---|---|---|---|
@@ -306,7 +314,7 @@
 ---
 
 ## EP20 — Vacation Calendar  —  ✅ Done
-**Jira:** KAN-96 · **Label:** `calendar` `vacation`
+**ID:** KAN-96 · **Label:** `calendar` `vacation`
 
 | Story ID | User Story | Acceptance Criteria | Priority |
 |---|---|---|---|
@@ -317,7 +325,7 @@
 ---
 
 ## EP21 — Bulk Employee Import  —  ✅ Done
-**Jira:** KAN-99 · **Label:** `import` `hr-ops`
+**ID:** KAN-99 · **Label:** `import` `hr-ops`
 
 | Story ID | User Story | Acceptance Criteria | Priority |
 |---|---|---|---|
@@ -329,7 +337,7 @@
 ---
 
 ## EP22 — Mobile Responsive Design  —  ✅ Done
-**Jira:** KAN-103 · **Label:** `mobile` `ux` `frontend`
+**ID:** KAN-103 · **Label:** `mobile` `ux` `frontend`
 
 | Story ID | User Story | Acceptance Criteria | Priority |
 |---|---|---|---|
@@ -341,7 +349,7 @@
 ---
 
 ## EP23 — In-App Notification System  —  ✅ Done
-**Jira:** KAN-107 · **Label:** `notifications` `ux` `bell`
+**ID:** KAN-107 · **Label:** `notifications` `ux` `bell`
 **Description:** Every user gets a bell icon in the topbar. Managers see pending vacation approvals; employees see real-time alerts when their requests are approved, rejected, or when they cancel. Notifications persist in a `user_notifications` table and auto-mark as read.
 
 | Story ID | User Story | Acceptance Criteria | Priority |
@@ -357,7 +365,7 @@
 ---
 
 ## EP24 — Vacation Cancellation & Withdrawal UI  —  ✅ Done
-**Jira:** KAN-114 · **Label:** `vacation` `ux` `cancel`
+**ID:** KAN-114 · **Label:** `vacation` `ux` `cancel`
 **Description:** The cancel button was always present in the vacation history table but was completely invisible (grey text, no border). This epic makes it a visible action, extends it to allow withdrawal of future approved vacations, and ensures managers are notified on every cancellation.
 
 | Story ID | User Story | Acceptance Criteria | Priority |
@@ -371,7 +379,7 @@
 ---
 
 ## EP25 — Analytics & Reporting Dashboard  —  ✅ Done
-**Jira:** KAN-119 · **Label:** `analytics` `admin` `reporting`
+**ID:** KAN-119 · **Label:** `analytics` `admin` `reporting`
 **Description:** A full analytics dashboard under `/admin/analytics` giving Company Admins, Portal Admins, and HR Admins actionable insight into feature adoption, vacation behaviour, skills coverage, org structure health, and search patterns. Every page visit and search query is logged non-blocking in Postgres, giving a rolling 1-year behavioural dataset.
 
 | Story ID | User Story | Acceptance Criteria | Priority |
@@ -394,7 +402,7 @@
 ---
 
 ## EP26 — Vacation Balance Visibility  —  ✅ Done
-**Jira:** KAN-133 · **Label:** `vacation` `ux` `balance`
+**ID:** KAN-133 · **Label:** `vacation` `ux` `balance`
 **Description:** Surface the remaining balance for each vacation type wherever a leave decision is made — the type cards, the employee's request modal (live, as dates change), the manager's pending list, and the manager's review modal — so employees never over-request and managers can see entitlement impact before approving.
 
 | Story ID | User Story | Acceptance Criteria | Priority |
@@ -407,7 +415,7 @@
 ---
 
 ## EP27 — Employee Position Change Workflow  —  ✅ Done
-**Jira:** KAN-137 · **Label:** `org` `workflow` `approval` `drag-drop`
+**ID:** KAN-137 · **Label:** `org` `workflow` `approval` `drag-drop`
 **Description:** Managers, HR, and Portal Admins move an employee to a new business unit, functional unit (department), location, and/or reporting manager by **dragging a card in the Organisation Tree**. The move is a request that flows through a **company-configurable, multi-level, sequential approval chain** (each level a role or a named person) and is only applied after the final approval. Individual employees can never initiate their own move. Backed by four tables (`org_change_workflows`, `org_change_workflow_steps`, `org_change_requests`, `org_change_approvals`) and a new `org_change` portal feature.
 
 | Story ID | User Story | Acceptance Criteria | Priority |
@@ -438,7 +446,7 @@
 > **KAN-169** GitHub Actions CI. Status shown in the Priority column below (✅ Done · 🟡 Partial).
 
 ## EP28 — Security Hardening  —  🟡 In progress
-**Jira:** KAN-148 · **Label:** `security` `hardening` `pre-prod`
+**ID:** KAN-148 · **Label:** `security` `hardening` `pre-prod`
 **Description:** Close the authentication, CSRF, and output-escaping gaps and harden session, config, and
 upload handling before the portal is exposed beyond local/demo use. Sourced from review findings F1–F5, F31.
 
@@ -454,7 +462,7 @@ upload handling before the portal is exposed beyond local/demo use. Sourced from
 ---
 
 ## EP29 — Data Layer & Query Performance  —  🟡 In progress
-**Jira:** KAN-154 · **Label:** `database` `performance` `sql`
+**ID:** KAN-154 · **Label:** `database` `performance` `sql`
 **Description:** Remove the seq-scans and N+1s on hot paths, make multi-statement writes atomic, and stop
 over-fetching the directory. Sourced from F6, F8, F22, F23, F24.
 
@@ -469,7 +477,7 @@ over-fetching the directory. Sourced from F6, F8, F22, F23, F24.
 ---
 
 ## EP30 — Scalability & Runtime  —  ⬜ Planned
-**Jira:** KAN-159 · **Label:** `scalability` `runtime` `ops`
+**ID:** KAN-159 · **Label:** `scalability` `runtime` `ops`
 **Description:** Make the app ready to run multi-worker / multi-instance: pool DB connections, bound
 background work, share upload storage, push instead of poll, and slim the session. Sourced from F7, F16, F17, F18, F19, F25.
 
@@ -485,7 +493,7 @@ background work, share upload storage, push instead of poll, and slim the sessio
 ---
 
 ## EP31 — Schema Source of Truth & Migrations  —  🟡 In progress
-**Jira:** KAN-165 · **Label:** `database` `migrations` `devex`
+**ID:** KAN-165 · **Label:** `database` `migrations` `devex`
 **Description:** Make the database reproducible from the repo and adopt a real migration tool so schema drift
 can't happen silently (the `org_change` tables currently exist only in migration 06). Sourced from F9.
 
@@ -498,7 +506,7 @@ can't happen silently (the `org_change` tables currently exist only in migration
 ---
 
 ## EP32 — Testing & CI Hardening  —  🟡 In progress
-**Jira:** KAN-168 · **Label:** `testing` `ci` `quality`
+**ID:** KAN-168 · **Label:** `testing` `ci` `quality`
 **Description:** Add coverage the mocked suite can't provide — real-DB integration tests and a shared CI
 pipeline — so SQL and schema are verified, not just string-matched. Sourced from F10, F11, F12.
 
@@ -512,7 +520,7 @@ pipeline — so SQL and schema are verified, not just string-matched. Sourced fr
 ---
 
 ## EP33 — Frontend Modernization  —  ⬜ Planned
-**Jira:** KAN-172 · **Label:** `frontend` `refactor` `accessibility`
+**ID:** KAN-172 · **Label:** `frontend` `refactor` `accessibility`
 **Description:** Evolve the Jinja + vanilla-JS frontend without a rewrite: extract shared JS modules (making
 output-escaping the default), fix accessibility, and add JS tests + asset versioning. Sourced from F3, F20, F21, F26, F27, F28. (Framework migration is explicitly deferred — see `ARCHITECTURE_REVIEW.md` Stage 3.)
 
@@ -528,7 +536,7 @@ output-escaping the default), fix accessibility, and add JS tests + asset versio
 ---
 
 ## EP34 — Architecture & Structure  —  ⬜ Planned
-**Jira:** KAN-178 · **Label:** `architecture` `refactor` `maintainability`
+**ID:** KAN-178 · **Label:** `architecture` `refactor` `maintainability`
 **Description:** Make the structure hold as the app grows: an application factory + Blueprints, a real service
 layer, pinned dependencies, and a guard-decorator audit. Sourced from F13, F14, F15, F29, F30.
 
