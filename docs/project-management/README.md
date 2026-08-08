@@ -28,6 +28,43 @@ They are records, not documentation — never edit them and never cite them as c
 
 ---
 
+## Who maintains what
+
+Every persona in [`../product-team/`](../product-team/) is responsible for keeping its own documents
+current — documentation is part of each role's job, not a separate workstream handed to someone else.
+The authoritative map is **Team Charter §5b**
+([`../product-team/01_TEAM_CHARTER.md`](../product-team/01_TEAM_CHARTER.md)); Engineering Charter §9
+([`../product-team/08_ENGINEERING_CHARTER.md`](../product-team/08_ENGINEERING_CHARTER.md)) adds
+engineering's share. Summary:
+
+| Document | Owner | Contributors |
+|---|---|---|
+| [`../BUSINESS_DOCUMENTATION.md`](../BUSINESS_DOCUMENTATION.md) | Business Analyst | Strategist (§6), UX (journeys), SPM approves |
+| [`../BUSINESS_OVERVIEW_FEATURES_AND_ACCESS.md`](../BUSINESS_OVERVIEW_FEATURES_AND_ACCESS.md) | Business Analyst | Senior Architect, SPM |
+| [`../TECHNICAL_DOCUMENTATION.md`](../TECHNICAL_DOCUMENTATION.md) | Senior Architect | Senior SWE & Mid-Level (code they change), DevOps (deploy/CI/testing) |
+| [`../ARCHITECTURE_REVIEW.md`](../ARCHITECTURE_REVIEW.md) | Senior Architect | all engineers |
+| [`BACKLOG.md`](BACKLOG.md) | Senior Product Manager | BA (acceptance criteria), Delivery Mgr (status), UAT (defects), engineers (own stories) |
+| `README.md` (this file) | Delivery / Release Manager | SPM |
+| [`../product-team/deliverables/PRODUCT_ROADMAP_GOALS_EPICS_STORIES.md`](../product-team/deliverables/PRODUCT_ROADMAP_GOALS_EPICS_STORIES.md) | Senior Product Manager | Delivery Mgr, Strategist |
+| [`../product-team/deliverables/ARCHITECT_KICKOFF_AND_TASK_BREAKDOWN.md`](../product-team/deliverables/ARCHITECT_KICKOFF_AND_TASK_BREAKDOWN.md) | Senior Architect | Senior SWE, Mid-Level, DevOps |
+| [`../../README.md`](../../README.md) | Delivery / Release Manager | Architect, DevOps |
+| [`../../CLAUDE.md`](../../CLAUDE.md) | Senior Architect | SPM (product rules) |
+| `../../tests/ui/` regression suites | UAT Lead | implementing engineer |
+| [`../archive/confluence-export/`](../archive/confluence-export/) | **frozen — nobody** | — |
+
+**The rules that make this work:**
+
+1. **Same commit.** The change and the documentation describing it land together.
+2. **Own it or flag it.** If your work makes a document you don't own false, tell the owner. Never
+   silently rewrite another role's document; never walk past a known-false statement.
+3. **Don't restate volatile numbers.** Test counts, row counts, and timings go stale between commits —
+   reference the command that produces them instead.
+4. **It's a gate, not a chore.** "Documentation updated" is in the Definition of Done, in the
+   Production and Customer Readiness checklists, and in the Release Gate table. Stale documentation is
+   a gate finding with a severity.
+
+---
+
 ## Identifiers
 
 * **Epics** are `EP1` … `EP34`.

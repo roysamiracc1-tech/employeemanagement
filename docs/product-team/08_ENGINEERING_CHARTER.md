@@ -41,7 +41,7 @@ Match the product's real stack (from Samir's context this is commonly Python/Fla
 
 ## 4. Engineering Definition of Done (code-level — extends the product DoD)
 
-A change is done only when: it meets the acceptance criteria; code is **peer-reviewed and approved**; **unit and integration tests** are added and passing; linting and **security/dependency scans** show no critical findings; **API specs and docs updated**; **migrations reversible**; **observability** (logs/metrics/traces) added for new paths; performance within the agreed budget; **frontend meets WCAG 2.2 AA** for changed UI; secrets handled correctly; change is **backward compatible** (or a migration/deprecation path is documented); and it is **feature-flagged** where rollout risk warrants.
+A change is done only when: it meets the acceptance criteria; code is **peer-reviewed and approved**; **unit and integration tests** are added and passing; linting and **security/dependency scans** show no critical findings; **API specs and the affected sections of `../TECHNICAL_DOCUMENTATION.md` are updated in the same commit, and the story's status marker in `../project-management/BACKLOG.md` is corrected** (§9, product Charter §5b); **migrations reversible**; **observability** (logs/metrics/traces) added for new paths; performance within the agreed budget; **frontend meets WCAG 2.2 AA** for changed UI; secrets handled correctly; change is **backward compatible** (or a migration/deprecation path is documented); and it is **feature-flagged** where rollout risk warrants.
 
 ---
 
@@ -88,6 +88,22 @@ Default to a simple, CI-gated flow (trunk-based or short-lived feature branches;
 | Observability dashboards & alerts | Senior DevOps | all |
 | Runbooks & DR plan | Senior DevOps | Delivery Mgr |
 | Deployment & rollback procedures | Senior DevOps | Delivery Mgr |
+
+**Repository documentation is an engineering artifact too.** You inherit product Charter **§5b** in full —
+documentation lives in git, and maintaining it is part of building, not a follow-up chore. Engineering's
+share of that map:
+
+| Repository document | Owner | Contributors |
+|---|---|---|
+| `../TECHNICAL_DOCUMENTATION.md` | Senior Architect | **Senior SWE / Mid-Level: the sections covering code you change** — schema, API reference, helpers, feature sections |
+| `../ARCHITECTURE_REVIEW.md` (findings `F1`–`F31`) | Senior Architect | all engineers — close a finding by updating it, don't just fix the code |
+| `../../CLAUDE.md` (engineering invariants) | Senior Architect | anyone who changes an invariant it documents |
+| `deliverables/ARCHITECT_KICKOFF_AND_TASK_BREAKDOWN.md` | Senior Architect | Senior SWE, Mid-Level, DevOps (task status) |
+| `../TECHNICAL_DOCUMENTATION.md` deployment / CI / testing sections | Senior DevOps | Architect |
+| `../project-management/BACKLOG.md` — status markers on your own stories | (see product Charter §5b) | implementing engineer |
+
+**Never** call the Atlassian/Jira/Confluence tooling for project documentation, and never link to
+`*.atlassian.net` — retired 8 Aug 2026, all such URLs are dead. `../archive/confluence-export/` is frozen.
 
 ---
 

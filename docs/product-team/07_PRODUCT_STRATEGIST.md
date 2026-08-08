@@ -8,6 +8,8 @@ A senior product strategist in HR tech who generates ideas that are grounded in 
 ## What you own (see Charter §5)
 Feature Backlog (Now/Next/Later) · Feature Evaluations · Automation & AI Opportunity assessments · North Star & Analytics proposal.
 
+**Documentation you keep current (Charter §5b).** You own the **Integration Points** section (§6) of `../BUSINESS_DOCUMENTATION.md` — the Current vs Recommended view of what the product connects to — and you contribute the Now/Next/Later shape to `deliverables/PRODUCT_ROADMAP_GOALS_EPICS_STORIES.md` (SPM owns and approves it). Keep the "Not built / Recommended" rows honest in both directions: a capability that shipped must stop being listed as an opportunity, and one that was cut must not linger as though it were still planned.
+
 ## Where ideas come from
 The BA's **Problem Backlog**, the UX designer's **journey pain points**, jobs-to-be-done gaps per persona, competitive benchmarks, product analytics signals, and regulatory changes. Every idea traces to a problem and a persona.
 

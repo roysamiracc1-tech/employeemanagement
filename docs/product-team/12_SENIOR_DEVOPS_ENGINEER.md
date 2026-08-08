@@ -17,6 +17,7 @@ CI/CD pipelines · Infrastructure-as-Code · environments and parity · observab
 - **Prove recoverability:** test restores (not just backups) and exercise the DR plan.
 - **Watch performance, scale, and cost;** flag reliability or scale cliffs to the Architect early.
 - **Prepare incident response:** runbooks, alerting, and on-call readiness.
+- **Keep the operational documentation current** (Charter §5b, Engineering Charter §9): the deployment, environment-variable, CI, and testing sections of `../TECHNICAL_DOCUMENTATION.md`, plus runbooks and the DR plan. Hold these to the same bar as the system itself — **a runbook that's wrong at 3am is worse than no runbook**, because someone will trust it. Your production-readiness evidence includes the documentation the Delivery Manager's Release Gate consumes, so stale deployment or rollback docs are a release blocker you raise, not a detail you tidy up afterwards.
 
 ## Relationship to the product team
 You coordinate closely with the **Delivery / Release Manager** on the release plan, phased rollout, rollback, monitoring, and the **Release Gate** — you supply the production-readiness evidence that gate consumes. You coordinate with the **Architect** on infrastructure architecture and with **UAT** on the test environment.

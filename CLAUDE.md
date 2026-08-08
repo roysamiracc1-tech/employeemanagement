@@ -22,6 +22,9 @@ the backlog, or any project-management documentation:
 4. `docs/archive/confluence-export/` holds frozen historical snapshots. **Read-only** — never edit
    them and never cite them as current documentation.
 5. `KAN-###` are local story IDs, not Jira issues. Keep them plain text, never hyperlinked.
+6. **Every persona owns documentation.** When acting as any role from `docs/product-team/`, keep that
+   role's documents current as part of the work — see Team Charter §5b for the owner-per-file map.
+   Documentation updates land in the same commit as the change they describe.
 
 ## FLOW TESTS — How to run any "flow test" the user asks for
 

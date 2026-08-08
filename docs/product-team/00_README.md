@@ -48,23 +48,30 @@ share one language and hand off through a defined interface.
 | File | Produced by | Contents |
 |---|---|---|
 | `deliverables/SPM_KICKOFF.md` | Senior Product Manager | Intake against the existing docs, maturity read, phased roadmap, task assignments to each product specialist |
-| `deliverables/PRODUCT_ROADMAP_GOALS_EPICS_STORIES.md` | Senior Product Manager | Written after driving the running app; Business Goals → Epics → User Stories, Jira-ready |
+| `deliverables/PRODUCT_ROADMAP_GOALS_EPICS_STORIES.md` | Senior Product Manager | Written after driving the running app; Business Goals → Epics → User Stories, ready to fold into `../project-management/BACKLOG.md` |
 | `deliverables/ARCHITECT_KICKOFF_AND_TASK_BREAKDOWN.md` | Senior Architect | Knowledge transfer to the engineering team + user stories subdivided into technical tasks assigned to Senior SWE / Mid-level / DevOps |
 
 ## How this maps to THIS project (reads-first / chain of responsibility)
 Neither org starts from a blank page — this repo already contains the source material. Read your set before acting:
 
-| Role | Reads first (in this repo) | Produces / maintains |
-|---|---|---|
-| **All** | `../BUSINESS_DOCUMENTATION.md`, `../TECHNICAL_DOCUMENTATION.md`, `../../CLAUDE.md`, `../../README.md` | — |
-| Business Analyst | `../BUSINESS_DOCUMENTATION.md`, `../project-management/BACKLOG.md` | Gap Register, Traceability, Conflict Log, Problem Backlog |
-| UX / Product Designer | `../TECHNICAL_DOCUMENTATION.md` (§7, §20–22), `../ARCHITECTURE_REVIEW.md` (F20/F21) | Journeys, design specs, accessibility audit |
-| UAT Lead | `../project-management/BACKLOG.md`, `../../tests/ui/` | UAT plan, test cases, defect log, sign-off |
-| Delivery / Release Mgr | `../ARCHITECTURE_REVIEW.md`, `../project-management/BACKLOG.md` (EP28–34) | Phased roadmap, readiness checklists, release gate, registers |
-| Product Strategist | `../BUSINESS_DOCUMENTATION.md` (§6), `../project-management/BACKLOG.md` | Feature backlog, AI/automation assessments, North Star |
-| **Senior Architect** | `../ARCHITECTURE_REVIEW.md` (F1–F31), `../TECHNICAL_DOCUMENTATION.md`, `../../CLAUDE.md`, `../../app/`, `../../database/` | ADRs, tech-debt & risk registers, technical-readiness verdict, task breakdown |
-| Senior / Mid Engineer | `../TECHNICAL_DOCUMENTATION.md`, the relevant `app/` module, `../../tests/` | Reviewed, tested code (PRs); traceability Test/Impl links |
-| Senior DevOps | `../../.github/workflows/`, `../TECHNICAL_DOCUMENTATION.md` §10–§11, `../../database/schema.sql` | CI/CD, IaC, observability, release/rollback, prod-readiness evidence |
+| Role | Reads first (in this repo) | Produces / maintains | **Repo documents it keeps current** (Charter §5b) |
+|---|---|---|---|
+| **All** | `../BUSINESS_DOCUMENTATION.md`, `../TECHNICAL_DOCUMENTATION.md`, `../../CLAUDE.md`, `../../README.md` | — | Status markers on stories it touches; flag any document its work makes false |
+| Business Analyst | `../BUSINESS_DOCUMENTATION.md`, `../project-management/BACKLOG.md` | Gap Register, Traceability, Conflict Log, Problem Backlog | `../BUSINESS_DOCUMENTATION.md`, `../BUSINESS_OVERVIEW_FEATURES_AND_ACCESS.md`, acceptance criteria in `../project-management/BACKLOG.md` |
+| UX / Product Designer | `../TECHNICAL_DOCUMENTATION.md` (§7, §20–22), `../ARCHITECTURE_REVIEW.md` (F20/F21) | Journeys, design specs, accessibility audit | Journey/UX sections of `../BUSINESS_DOCUMENTATION.md`; design-system & UI behaviour in `../TECHNICAL_DOCUMENTATION.md` |
+| UAT Lead | `../project-management/BACKLOG.md`, `../../tests/ui/` | UAT plan, test cases, defect log, sign-off | `../../tests/ui/` regression suites; defect & story status in `../project-management/BACKLOG.md` |
+| Delivery / Release Mgr | `../ARCHITECTURE_REVIEW.md`, `../project-management/BACKLOG.md` (EP28–34) | Phased roadmap, readiness checklists, release gate, registers | `../project-management/README.md`, `../../README.md`, status markers across `../project-management/BACKLOG.md` |
+| Product Strategist | `../BUSINESS_DOCUMENTATION.md` (§6), `../project-management/BACKLOG.md` | Feature backlog, AI/automation assessments, North Star | `../BUSINESS_DOCUMENTATION.md` §6 Integration Points; Now/Next/Later in the roadmap |
+| **Senior Product Manager** | all of the above + specialist reports | Scorecard, Maturity, Decision Log, phase gate | `../project-management/BACKLOG.md`, `deliverables/PRODUCT_ROADMAP_GOALS_EPICS_STORIES.md`, `deliverables/SPM_KICKOFF.md`, product role files |
+| **Senior Architect** | `../ARCHITECTURE_REVIEW.md` (F1–F31), `../TECHNICAL_DOCUMENTATION.md`, `../../CLAUDE.md`, `../../app/`, `../../database/` | ADRs, tech-debt & risk registers, technical-readiness verdict, task breakdown | `../TECHNICAL_DOCUMENTATION.md`, `../ARCHITECTURE_REVIEW.md`, `../../CLAUDE.md`, `deliverables/ARCHITECT_KICKOFF_AND_TASK_BREAKDOWN.md`, engineering role files |
+| Senior / Mid Engineer | `../TECHNICAL_DOCUMENTATION.md`, the relevant `app/` module, `../../tests/` | Reviewed, tested code (PRs); traceability Test/Impl links | The sections of `../TECHNICAL_DOCUMENTATION.md` covering code they changed; own story status |
+| Senior DevOps | `../../.github/workflows/`, `../TECHNICAL_DOCUMENTATION.md` §10–§11, `../../database/schema.sql` | CI/CD, IaC, observability, release/rollback, prod-readiness evidence | Deployment / env-var / CI / testing sections of `../TECHNICAL_DOCUMENTATION.md`; runbooks & DR plan |
+
+> **Documentation is not a separate workstream.** It lives in git (Jira and Confluence were retired
+> 8 Aug 2026 — see `../project-management/README.md`), every role maintains its own share of it, and the
+> update lands **in the same commit** as the change it describes. The authoritative map is
+> **Team Charter §5b**; Engineering Charter §9 adds engineering's share. `../archive/confluence-export/`
+> is frozen — never edited, never cited as current.
 
 ## How the two orgs connect
 - **SPM and Senior Architect are peer leads.** Product owns *what / why / priority*; engineering owns *how / feasibility*. Scope-vs-feasibility trade-offs are negotiated between them and recorded in the SPM's Decision Log.

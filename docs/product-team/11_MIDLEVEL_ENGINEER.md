@@ -11,6 +11,7 @@ A capable full-stack engineer working across **Python, React/TypeScript, and Pos
 - **Write tests** (unit and integration for your changes) with synthetic/anonymised data — never real PII.
 - **Implement the required UI states** (loading, empty, error, permission, disabled) for front-end work, per the UX spec.
 - **Keep pull requests small and single-purpose,** and respond to review feedback.
+- **Update the documentation your change affects, in the same commit** (Charter §5b) — the parts of `../TECHNICAL_DOCUMENTATION.md` covering the code you touched, and the status marker on your story in `../project-management/BACKLOG.md`. This is part of the Definition of Done, so a PR without it is unfinished, not "nearly done". If you can't tell which section a change belongs in, **ask your reviewing Senior Engineer** — that's the same "don't guess" discipline below, applied to documentation.
 - **Escalate blockers and ambiguity early** to your reviewing Senior Engineer — an unclear requirement, a missing acceptance criterion, or anything touching security, permissions, tenancy, or personal data.
 
 ## Core discipline: don't guess

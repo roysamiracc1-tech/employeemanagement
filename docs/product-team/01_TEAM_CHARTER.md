@@ -79,7 +79,7 @@ Place the product on this ladder with evidence; never equate "development comple
 
 **Definition of Ready (DoR)** — a feature may enter development only when: problem understood · persona identified · business value defined · requirements & acceptance criteria documented · UX understood · dependencies identified · data requirements known · security/privacy considered · technical feasibility assessed · test approach understood. Otherwise mark it **NOT READY**.
 
-**Definition of Done (DoD)** — a feature is done (for its phase) only when: development, code review, unit/integration/functional testing complete · UX validated · acceptance criteria passed · security checks complete · performance acceptable · documentation updated · analytics implemented where required · UAT passed where applicable · deployment-ready.
+**Definition of Done (DoD)** — a feature is done (for its phase) only when: development, code review, unit/integration/functional testing complete · UX validated · acceptance criteria passed · security checks complete · performance acceptable · **the repository documents affected by the change are updated in the same commit, and the story's status marker in `../project-management/BACKLOG.md` reflects reality (see §5b)** · analytics implemented where required · UAT passed where applicable · deployment-ready.
 
 **Production-Ready ≠ Customer-Ready — keep these two gates distinct:**
 - **Production-Ready:** technical, security, privacy, performance, reliability, data, integrations, monitoring, logging, alerting, backup/recovery, rollback, and support processes satisfied.
@@ -117,6 +117,41 @@ Living documents shared across the team. The **owner** drafts and maintains; the
 | Decision Log | Senior Product Manager | — |
 | North Star & Analytics | Product Strategist | SPM (approves) |
 | Master Status & Phase-Gate decision | Senior Product Manager | — |
+
+### 5b. Repository documentation — every role maintains it
+
+**Documentation lives in this git repository, not in Jira or Confluence** (retired 8 Aug 2026 — see
+`../project-management/README.md`). The registers above are analysis artifacts; the files below are the
+product's durable record. **Keeping them current is part of every role's job, not a separate documentation
+task and not someone else's problem.**
+
+| Repository document | Owner (drafts & maintains) | Contributors |
+|---|---|---|
+| `../BUSINESS_DOCUMENTATION.md` | Business Analyst | Strategist (§6 integrations), UX (journeys), SPM approves |
+| `../BUSINESS_OVERVIEW_FEATURES_AND_ACCESS.md` | Business Analyst | Senior Architect (access-control accuracy), SPM |
+| `../TECHNICAL_DOCUMENTATION.md` | Senior Architect | Senior SWE & Mid-Level (sections covering code they change), DevOps (deployment, CI, testing) |
+| `../ARCHITECTURE_REVIEW.md` | Senior Architect | all engineers |
+| `../project-management/BACKLOG.md` | Senior Product Manager | BA (acceptance criteria), Delivery Mgr (status), UAT (defects), engineers (status on their own stories) |
+| `../project-management/README.md` | Delivery / Release Manager | SPM |
+| `deliverables/PRODUCT_ROADMAP_GOALS_EPICS_STORIES.md` | Senior Product Manager | Delivery Mgr, Strategist |
+| `deliverables/SPM_KICKOFF.md` | Senior Product Manager | — |
+| `deliverables/ARCHITECT_KICKOFF_AND_TASK_BREAKDOWN.md` | Senior Architect | Senior SWE, Mid-Level, DevOps |
+| `../../README.md` | Delivery / Release Manager | Architect, DevOps |
+| `../../CLAUDE.md` | Senior Architect | SPM (product rules) |
+| `../../tests/ui/` regression suites | UAT Lead | implementing engineer |
+| `01_TEAM_CHARTER.md` + product role files | Senior Product Manager | — |
+| `08_ENGINEERING_CHARTER.md` + engineering role files | Senior Architect | — |
+| `../archive/confluence-export/` | **frozen — nobody edits** | — |
+
+**UX / Product Designer** has no standalone file yet: journeys and UX rules go in the relevant sections of
+`../BUSINESS_DOCUMENTATION.md`, and design-system/UI behaviour in `../TECHNICAL_DOCUMENTATION.md`. If those
+artifacts outgrow their host, propose a dedicated `../UX_DESIGN_SPECS.md` to the SPM rather than sprawling.
+
+**The rules:**
+1. **Same commit.** A change and the documentation describing it land together. Documentation updated "later" is documentation that never happens.
+2. **Own it or flag it.** If your work invalidates a document you don't own, tell the owner — never leave a known-false statement standing, and never silently rewrite another role's document.
+3. **Don't restate volatile numbers.** Test counts, row counts, and timings go stale between commits. Reference the command that produces them instead.
+4. **Frozen means frozen.** `../archive/confluence-export/` is a historical record. Never edit it, never cite it as current.
 
 ---
 
@@ -176,3 +211,4 @@ When the SPM receives a specialist report it will: verify every material claim i
 8. **No dark patterns, ever** — no coercive nudges, hidden privacy controls, or manipulation of employees or candidates.
 9. **Never claim readiness without evidence.** If evidence is insufficient, say *"Insufficient evidence to determine this confidently,"* and specify exactly what is required.
 10. **Report in the standard format** and keep registers current.
+11. **Leave the documentation true.** Every role maintains the repository documents it owns (§5b), in the same commit as the change. If you learn something that makes a document wrong — including one you don't own — you either fix it or tell its owner. Discovering a false statement and walking past it is a defect, not an oversight.

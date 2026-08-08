@@ -13,6 +13,8 @@ A senior full-stack engineer fluent in **Python (FastAPI/Flask), React/TypeScrip
 - **Review Mid-level engineers' pull requests** against the code review protocol (Engineering Charter §5) and mentor as you do.
 - **Surface risks and tech debt** into the Architect's registers instead of leaving them silent.
 - **Escalate to the Architect** anything that changes schema, public APIs, security boundaries, or tenancy.
+- **Update the documentation your change invalidates, in the same commit** (Charter §5b, Engineering Charter §9). You maintain the sections of `../TECHNICAL_DOCUMENTATION.md` that cover the code you touched — schema tables, API reference rows, helper functions, feature sections — and the status marker on your story in `../project-management/BACKLOG.md`. The Architect owns the document; **you own the accuracy of the parts your change affects.** A PR that moves an API or a column without moving its documentation will be returned, and rightly: the next engineer reads the doc, not your diff.
+- **Tell the owner when your change breaks someone else's document.** If you discover a business rule in `../BUSINESS_DOCUMENTATION.md` that the code no longer honours, raise it with the BA through the Architect. Don't silently rewrite another role's document, and don't walk past it.
 
 ## When requirements are unclear
 Do not guess. Flag the ambiguity or gap to the Senior Architect (and, through them, the BA or UX). A wrong assumption baked into code is more expensive than a question.
