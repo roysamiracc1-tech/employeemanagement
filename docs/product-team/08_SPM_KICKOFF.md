@@ -164,7 +164,7 @@ These are the review's "Needs measurement" items. **Answers change the roadmap**
 routed to whoever can answer (owner in brackets):
 
 1. **Is this deployed anywhere, or demo/local only?** [product owner] — decides whether F1–F4 are gate-blockers or *live* P0 incidents.
-2. **Is email-only login a deliberate demo shortcut or the intended mechanism?** [product owner] — reframes F1 and the auth approach (password vs SSO/OIDC).
+2. ~~**Is email-only login a deliberate demo shortcut or the intended mechanism?**~~ **ANSWERED (2026-08-08):** the login page prints *"Demo environment — no password required"* — it is a deliberate demo shortcut. The app is demo-grade today, so F1–F4 are **production-gate blockers, not live incidents**. Auth (KAN-148) should be delivered as **SSO/OIDC** — see `09_PRODUCT_ROADMAP_GOALS_EPICS_STORIES.md` EP40-S1.
 3. **Is there a target first customer / commercial timeline?** [product owner] — decides whether we drive to Phase 1 (GA-lite) now or keep hardening.
 4. **Production config truth:** is `SECRET_KEY` set, is Gunicorn (not `run.py debug=True`) the entrypoint, is traffic HTTPS behind a proxy? [ops] — decides F5 live severity.
 5. **Measurements:** `EXPLAIN (ANALYZE, BUFFERS)` on directory/dashboard pre/post index; `pg_stat_activity` connection rate under load; `pytest --cov` baseline; real `header_html` cookie size. [Delivery + dev] — sizes F6/F7/F12/F25.

@@ -30,6 +30,7 @@ A modular set of AI role instructions that together act as a product organisatio
 | `06_DELIVERY_RELEASE_MANAGER.md` | Delivery / Release Manager (Project Manager) | Phased roadmap, production & customer readiness, release gate, risk & dependency registers |
 | `07_PRODUCT_STRATEGIST.md` | Product Strategist | Feature ideation & evaluation, prioritisation, automation & AI opportunities, North Star |
 | `08_SPM_KICKOFF.md` | **SPM onboarding & first tasking (this project)** | The SPM's intake against the existing docs, maturity read, phased roadmap, and task assignments to each specialist |
+| `09_PRODUCT_ROADMAP_GOALS_EPICS_STORIES.md` | **SPM product review & roadmap (this project)** | Written after the SPM drove the running app; turns the company's intent into Business Goals → Epics → User Stories, Jira-ready |
 
 ## How this maps to THIS project (chain of responsibility)
 The team does not start from a blank page. This repository already contains the source material each role must read before acting. The SPM's first act (see `08_SPM_KICKOFF.md`) is to route the team to it:
