@@ -131,11 +131,29 @@ directly. Keep them current: when a change alters a flow they cover, update the 
 4. SYSTEM_ADMIN always has full access — handled automatically in `_load_feature_access()`.
 5. If a role has access in `role_feature_access` and is not overridden by `company_role_feature_access`, they get access. Period.
 
-**Adding a new feature:**
-- Add it to `portal_features` in `setup_db.py` and a migration SQL under `database/migrations/`
-- Seed default `role_feature_access` rows for the roles that should have it by default
+**Adding a new feature — all FOUR places, or it does not exist outside your machine:**
+- Add it to `portal_features` in `setup_db.py` **and** a migration SQL under `database/migrations/`
+- **Add the same row to `database/seed_rbac.sql`.** ⚠️ Non-obvious and the one that gets missed:
+  a fresh database is built from `schema.sql` (structure only) + `seed_rbac.sql`, and **migrations
+  are never replayed** (TECHNICAL_DOCUMENTATION §10). A feature row is DATA, so a schema-only dump
+  cannot carry it — put it only in the migration and CI gets the table but not the feature, while
+  every developer machine passes because the migration was run there by hand. This broke CI on
+  9 Aug 2026 (`audit_log`). `TestFeatureRegistryHasNoDrift` in `tests/test_regression.py` now
+  fails when a migration registers a feature the seed does not.
+- Seed default `role_feature_access` rows for the roles that should have it by default —
+  again in **both** the migration and `seed_rbac.sql`
 - Use `@require_feature_access('your_feature_code')` on routes
 - Use `{% if has_feature_access('your_feature_code') %}` in nav
+
+**Verifying a DB change the way CI does** — the dev DB has migrations applied by hand and will hide
+seed drift. Build a throwaway database the way CI builds one and run against that:
+```bash
+dropdb --if-exists employee_ci_local && createdb employee_ci_local
+psql -q -d employee_ci_local -c 'CREATE EXTENSION IF NOT EXISTS "uuid-ossp";'
+psql -q -d employee_ci_local -v ON_ERROR_STOP=1 -f database/schema.sql
+psql -q -d employee_ci_local -v ON_ERROR_STOP=1 -f database/seed_rbac.sql
+PGDATABASE=employee_ci_local python -m pytest -q --ignore=tests/ui
+```
 
 **Company roles are ONLY roles with `company_id = that company's UUID`.** Never query `OR company_id IS NULL` when showing a company's roles — that pulls in global template roles (EMPLOYEE, DEPARTMENT_HEAD, etc.) which the company has NOT created. Every query that lists or shows roles for a specific company must filter `WHERE company_id = %s::uuid` only.
 

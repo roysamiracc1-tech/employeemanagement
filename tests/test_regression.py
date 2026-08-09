@@ -1303,3 +1303,84 @@ class TestSessionAndCompanyIsolation:
             assert len(captured_execute_params) == 1
             assert FAKE_ROLE_ID in captured_execute_params[0], \
                 "_assign_role must insert the company-specific role id."
+
+
+# ── Feature-registry drift (CI failure, 9 Aug 2026) ───────────────────────────
+
+class TestFeatureRegistryHasNoDrift:
+    """Every feature the code gates on must exist in `portal_features`.
+
+    THE BUG THIS GUARDS: `database/migrations/08_audit_log.sql` registered the
+    `audit_log` feature with an INSERT. A fresh database is built from
+    `schema.sql` (structure only) plus `seed_rbac.sql` — migrations are NOT
+    replayed — and the feature row is DATA, so a schema-only dump cannot carry
+    it. The row was never added to `seed_rbac.sql`, so CI's database had the
+    audit_log TABLE but no audit_log FEATURE, and every developer machine passed
+    because the migration had been applied there by hand.
+
+    A feature code that no `portal_features` row backs is not a cosmetic gap:
+    `@require_feature_access` on it denies everyone except SYSTEM_ADMIN, so the
+    feature silently disappears for the roles that should have it.
+
+    Runs against whatever database is configured, so it fails on a CI-style
+    fresh build exactly as it would in production.
+    """
+
+    def _registered_codes(self):
+        from app.db import query, close_db
+        with flask_app.test_request_context():
+            try:
+                rows = query('SELECT code FROM portal_features')
+            except Exception as e:                      # pragma: no cover - no DB configured
+                pytest.skip(f'no live database available: {e}')
+            finally:
+                close_db(None)
+        return {r['code'] for r in rows}
+
+    def test_every_migration_seeded_feature_survives_a_fresh_build(self):
+        """The exact invariant that broke: migration-seeded rows must be in the seed.
+
+        A fresh database replays no migrations, so any feature a migration
+        registers has to be repeated in `seed_rbac.sql` or it simply does not
+        exist outside the machines where that migration was run by hand.
+        """
+        import re, pathlib
+        root = pathlib.Path(__file__).resolve().parent.parent
+        block = re.compile(r"INSERT\s+INTO\s+(?:public\.)?portal_features\b(.*?);", re.S | re.I)
+        declared = {}
+        for path in sorted((root / 'database' / 'migrations').glob('*.sql')):
+            if path.name.endswith('_down.sql'):
+                continue
+            for body in block.findall(path.read_text(encoding='utf-8', errors='ignore')):
+                _, _, values = body.partition('VALUES')
+                for code in re.findall(r"\(\s*'([a-z0-9_]+)'", values):
+                    declared.setdefault(code, set()).add(path.name)
+        assert declared, 'found no feature inserts in any migration — the scanner is broken'
+
+        missing = {c: sorted(f) for c, f in declared.items() if c not in self._registered_codes()}
+        assert not missing, (
+            f'these features are registered by a migration but are absent from a fresh '
+            f'schema.sql + seed_rbac.sql build: {missing}. Add the row to '
+            f'database/seed_rbac.sql — CI and every new environment never replay migrations.')
+
+    def test_every_gated_feature_is_registered(self):
+        """A second, narrower drift: gating on a code no row backs.
+
+        `@require_feature_access('x')` where no `portal_features` row has code
+        `x` denies everyone except SYSTEM_ADMIN, so the feature vanishes for the
+        roles that should have it — silently, with no error anywhere.
+        """
+        import re, pathlib
+        root = pathlib.Path(__file__).resolve().parent.parent
+        pattern = re.compile(r"""(?:require_feature_access|has_feature_access)\(\s*['"]([a-z0-9_]+)['"]""")
+        declared = set()
+        for sub in ('app', 'templates'):
+            for path in (root / sub).rglob('*'):
+                if path.suffix in ('.py', '.html') and path.is_file():
+                    declared |= set(pattern.findall(path.read_text(encoding='utf-8', errors='ignore')))
+        assert declared, 'found no feature gates at all — the scanner is broken, not the code'
+        missing = sorted(declared - self._registered_codes())
+        assert not missing, (
+            f'these feature codes are gated on in the app but have no portal_features row: '
+            f'{missing}. If a migration seeds the row, it must also be added to '
+            f'database/seed_rbac.sql — a fresh database never replays migrations.')

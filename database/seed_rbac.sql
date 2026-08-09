@@ -182,3 +182,44 @@ INSERT INTO public.role_feature_access (role_id, feature_id, can_read, can_write
 
 \unrestrict m6c4MySsm4OeC913SCQBJ7xJ5Q1fIkko3PrqwvSWxhKxjgy62klQ7uqcZqFe5pB
 
+
+--
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Appended by hand (NOT part of the pg_dump above).
+--
+-- The `audit_log` portal feature and its grants (EP38 / KAN-187, ADR-009).
+--
+-- WHY THIS IS HERE AND NOT ONLY IN THE MIGRATION: `database/migrations/08_audit_log.sql`
+-- §3 registers this feature, but a fresh database is built from `schema.sql`
+-- (structure only) plus this file — migrations are NOT replayed (see
+-- TECHNICAL_DOCUMENTATION §10). The feature row is DATA, so a schema-only dump
+-- cannot carry it, and CI's fresh database had the audit_log TABLE but no
+-- audit_log FEATURE. Any migration that seeds a row must add it here too.
+--
+-- Kept as INSERT…SELECT keyed on role NAME rather than hardcoded role ids so it
+-- stays correct for the per-company roles as well, and cannot drift from the
+-- role list above. Idempotent — safe if the migration has already run.
+-- ─────────────────────────────────────────────────────────────────────────────
+
+INSERT INTO public.portal_features (id, code, label, description, sort_order) VALUES
+    ('3f7c1d92-8a41-4e3b-9c6d-5b2e7a0f4c18', 'audit_log', 'Audit Log',
+     'View the immutable audit trail of changes within the company', 13)
+ON CONFLICT (code) DO NOTHING;
+
+-- Read-only for PORTAL_ADMIN and HR_ADMIN. The table is append-only and there is
+-- no legitimate audit write or delete outside audit_service, so write/delete are
+-- FALSE for every tenant role. EMPLOYEE must never read the trail.
+INSERT INTO public.role_feature_access (role_id, feature_id, can_read, can_write, can_delete)
+SELECT ro.id, f.id, TRUE, FALSE, FALSE
+FROM public.roles ro, public.portal_features f
+WHERE f.code = 'audit_log'
+  AND ro.name IN ('PORTAL_ADMIN', 'HR_ADMIN')
+ON CONFLICT (role_id, feature_id) DO NOTHING;
+
+-- SYSTEM_ADMIN mirrors the blanket grant elsewhere; the bypass in
+-- _load_feature_access() makes this belt-and-braces rather than load-bearing.
+INSERT INTO public.role_feature_access (role_id, feature_id, can_read, can_write, can_delete)
+SELECT ro.id, f.id, TRUE, TRUE, TRUE
+FROM public.roles ro, public.portal_features f
+WHERE f.code = 'audit_log' AND ro.name = 'SYSTEM_ADMIN'
+ON CONFLICT (role_id, feature_id) DO NOTHING;
