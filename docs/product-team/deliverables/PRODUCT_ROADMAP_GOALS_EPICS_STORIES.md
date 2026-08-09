@@ -1,13 +1,16 @@
 # SPM Product Review & Roadmap — Business Goals → Epics → User Stories — 2026-08-08
 
 > Produced by the **Senior Product Manager** (`02_SENIOR_PRODUCT_MANAGER.md`) after (a) reading the existing
-> business, technical, Jira, and architecture docs and (b) **driving the running application myself in a
+> business, technical, project-management and architecture docs and (b) **driving the running application myself in a
 > browser** across four roles and two tenants. This turns the company's intent into a prioritised roadmap of
-> **Business Goals → Epics → User Stories with acceptance criteria** — ready to be created in Jira.
+> **Business Goals → Epics → User Stories with acceptance criteria**, promoted into
+> [`../../project-management/BACKLOG.md`](../../project-management/BACKLOG.md) as each epic is scheduled.
+> *(Corrected 2026-08-09: this file predates the Atlassian retirement of 8 Aug 2026. **Documentation lives in
+> git**; `KAN-###` are local story IDs, not Jira issues — `CLAUDE.md` and `docs/project-management/README.md`.)*
 >
 > **Numbering:** existing delivered/in-flight work keeps its real keys (`EP1`–`EP34`, `KAN-*`). New work I am
-> proposing is numbered `EP35+` with story IDs like `EP35-S1` and marked **(proposed — create in Jira)**. No
-> real Jira key is invented for new work.
+> proposing is numbered `EP35+` with story IDs like `EP35-S1` and marked **(proposed — not yet in the backlog)**.
+> An epic gets `KAN-###` story IDs when it is promoted into `BACKLOG.md`; the next free ID is **KAN-241**.
 >
 > **Discipline:** every goal traces to evidence (product copy, a screen I saw, or a cited doc/finding). I guard
 > the MVP — growth items are explicitly **Next/Later**, not **Now**. Engineering obeys `CLAUDE.md`.
@@ -129,7 +132,7 @@ platform") and rewards adoption + trust, not feature count.
 | **BG4** | **Complete the people-ops lifecycle.** | Org structure + leave | Onboarding/offboarding workflows, transfers, rehire, vacation balances/accruals. | **Now/Next** |
 | **BG5** | **Be enterprise-ready & connected.** | Multi-company + RBAC | SSO/OIDC, SCIM, HRIS import/export, calendar; multi-tenant scale (EP30). | SSO **Final phase** (it *is* the login work) · SCIM/HRIS/scale **Later** |
 | **BG6** | **Be usable by the whole workforce** (a11y + mobile). | All (deskless employees) | WCAG 2.2 AA on core flows; mobile self-service. | a11y **standard now, retro-fit sweep at the end** (pending Q5) / mobile **Next** |
-| **BG7** | **Pay decisions this company can defend.** *(new — 2026-08-09; a **multi-epic programme**: **EP42** → **EP43** → **EP44** if chosen)* | Core HR + org structure + RBAC | Every employee on a company-defined job ladder with a current, effective-dated, auditable pay record; pay moves with position and promotion through **one** governed approval; **the ladder is re-based as the market moves, so the fairness check keeps meaning something year after year**; unjustified gaps surface to a named owner before somebody else finds them. | **Now** (requirements, S1) · **Next** (build — EP42 W0 in **S2**, W1–W4 in **S3**; **EP43 in S3 after EP42**) |
+| **BG7** | **Pay decisions this company can defend.** *(new — 2026-08-09; a **three-epic programme**, ordered **EP42 → EP44 → EP43**, ~**50 stories**, ~**8–9 months**)* | Core HR + org structure + RBAC + performance | **The job decides the step, the step decides base pay, and pay never decides the step** (amendment A6). Every employee on a company-defined job ladder with a current, effective-dated, auditable base pay record, plus **additional pay** as a separately-governed, attributed amount for the exceptions; pay moves with position and level through **one** governed approval; **Global HR re-authors the ladder's economics each year, which under A6 *is* the act of granting a rise**; a real performance review produces the judgement that moves people up it; and unexplained differences surface to a named owner before somebody else finds them. | **Now** (requirements, S1) · **Next** (build — EP42 W0 in **S2**, W1–W4 in **S3**; **EP44 in S3 after EP42**; **EP43 last**) |
 
 **Why BG7 is a new goal rather than an extension of BG4** (SPM, 2026-08-09 — argued in full in
 `EP42_SPM_SCOPE_AND_DECISIONS.md` §1.2). BG4 is about lifecycle **events**; compensation is a **data class and a
@@ -187,7 +190,7 @@ builders queued. That freeze is what makes a single hardening sweep complete ins
 
 ---
 
-### BG2 — Customer-Ready — **EP35 (proposed — create in Jira)**
+### BG2 — Customer-Ready — **EP35 (proposed — not yet promoted into the backlog)**
 
 **EP35 — Customer Onboarding & Data Migration**
 *Goal:* a new tenant can go from zero to running core HR without engineering help. *Why:* Customer-Readiness is
@@ -247,7 +250,7 @@ no first-class **onboarding/offboarding** workflow or **transfer/rehire** handli
 
 **EP39 — Vacation Balances, Accruals & Policy Depth**
 *Why:* I saw request/approve/calendar and eligibility rules, but no visible **balance/accrual** engine —
-kickoff/Jira note KAN-158/EP26 touch balance visibility; deepen it into real policy.
+the kickoff note and KAN-158/EP26 touch balance visibility; deepen it into real policy.
 
 | Story | User story | Acceptance criteria | MoSCoW · P |
 |---|---|---|---|
@@ -433,6 +436,120 @@ discloses the level (*Junior Software Fullstack Engineer* **is** level 2), so th
 hidden nothing while claiming to · and **`/ladder` as a main-nav surface is confirmed**, with **job family** now
 an explicit part of what it shows. **The ladder is public; the pin on the ladder is not.**
 
+### Amendments A4, A5 and A6 — 2026-08-09 — **the owner overturned the pay/step model, and BG7 becomes a three-epic programme**
+
+**Full re-ruling in `EP42_SPM_SCOPE_AND_DECISIONS.md` §22. Five things belong at roadmap level.**
+
+**1. The corrected model, and it only runs one way.** He rejected the model the team built in the strongest
+terms he has used — *"No you have not got correct!!"*:
+
+> **job content & responsibility → STEP → BASE PAY.** Never base pay → step.
+
+A step is an assignment about **what work someone does**, made by a human at a review; base pay **is** that
+step's defined value × FTE. **The system must never propose, infer, imply, suggest, pre-select or "fit" a step
+from a salary figure.** The **nearest-step rule is withdrawn in full** — as a mechanism *and* as a description,
+because *"paid closer to step 2.2"* is a claim about somebody's step. **KAN-191's step-fitting backfill is
+forbidden**: the step now comes from the **manager's assessment against the written step expectations**, in W1,
+with no money involved, and **KAN-209 is repurposed into a human pay reconciliation** at the end of W2 that
+opens with the totals (*"31 below their step value by €214,000"*) and requires one recorded disposition per
+person — **align · attribute the surplus as additional pay · accept a residual deviation with a reason**.
+Day-one findings are still zero, but now **because a human decided each case** rather than because the system
+quietly re-labelled everyone's step to match their salary. *(This also closes CFL-42-41, the SPM's own Wave-4
+build-order defect, rather than working around it.)*
+
+**2. `additional pay` — the owner's own mechanism, and it makes the rest work.** Base and additional are two
+distinct, separately-governed amounts. Tom is at step 2.1 on €51,000 and about to resign; local HR grants 5%.
+**Tom stays a 2.1**, his base stays €51,000, and €2,550 is recorded as additional pay with a reason. The
+retention save no longer corrupts the ladder, the fairness check becomes a clean equality, and the "dead zone"
+disappears — it existed only because pay was being mapped back onto steps. New story **KAN-218**, W2.
+
+**3. The hike rate is per step-transition, per year, set by Global HR** — *"from 2.0 to 2.1 the hike will be 2%
+this year while from 2.1 to 2.2 it will be 2.4"*. So the rate belongs on the **transition**, year-scoped with
+history, not on the level. Compounding survives and generalises: €50,000 → €51,000 → **€52,224**. **And the
+re-basing question, asked three times and never answered, is dead rather than deferred** — it assumed an
+across-the-board hike drifting away from a static ladder, and under A6 **moving the ladder and paying people
+are the same act**, which promotes KAN-210 from a maintenance action to the mechanism by which a company grants
+a rise. One narrower, genuinely new question replaces it (*what does an employee who stays on the same step all
+year earn next year?*), put to him with numbers. A fifth feature code, **`pay_policy`**, separates **Global HR**
+(the ladder's economics) from **local HR** (one person's pay) using the mechanism `CLAUDE.md` already mandates.
+
+**4. Advise, do not block — his principle, with a boundary the roadmap should carry.** *"Local HR managers can
+always override the system recommendation because otherwise there might be a situation that employee may
+leave."* Adopted as a standing rule for BG7 — **and explicitly bounded**: judgements about an **amount** are
+advisory and overridable with a recorded actor, a mandatory reason **code**, an audit row carrying no figure,
+and **visibility to the approval chain at decision time**. **Integrity controls are not overridable**, and that
+list — subject≠initiator, subject≠decider, initiator≠approver on money, approver≠approver, ≥2 satisfiable
+levels, no SYSTEM_ADMIN bypass — **is closed and may not be eroded by citing this principle, because the
+principle is about amounts and says nothing about actors.** Override rates become data a company should see,
+with a 40% configuration-review tripwire: a company overriding most flags has a mis-set ladder, not an
+exceptional workforce.
+
+**5. The programme, stated once and honestly.** His original request was *hold salary, put people on job
+levels, flag a 5% difference*. It is now:
+
+| | Stories | What it is |
+|---|---|---|
+| **EP42** — Compensation, Job Architecture & Pay Equity | **23** | The pay record, the ladder, the fairness check *(unchanged in count: KAN-218 added, KAN-205 moved to Later, KAN-209 repurposed, KAN-208 made conditional)* |
+| **EP44** — Performance Management | **22** | The review that produces the judgement — **entered, not named** |
+| **EP43** — Annual Compensation Review Cycle | **5** *(was 7)* | The annual round — **reduced by A6**, which collapsed the per-employee hike percentage |
+| **BG7 total** | **~50 stories, ~8–9 months** | **Ordered EP42 → EP44 → EP43** |
+
+**He has chosen every increment with the cost shown, which is his right. The cumulative shape is stated here
+once, as a fact, rather than as a per-amendment reminder.**
+
+### Amendment A4/A5 — **EP44 — Performance Management** *(entered; the owner chose (b) and accepted the delay)*
+
+*Goal:* build the review that EP42 records the context of and EP43 consumes the output of. **Decision D-006:**
+the SPM sized a 2-story performance *input* against full performance *management* and **recommended (a) with
+Confidence High**; the owner chose **(b)** — *"I want a full performance-management capability (cycles, goals,
+calibration)"* — and confirmed it with the cost accepted in his own words: *"go ahead with full implemenation
+cycle as Product owneer accepting the delay."* **Recorded as "recommended (a), owner chose (b)" and not
+re-litigated.** **§14.5 is superseded by owner decision** — it stopped performance management arriving *by
+accident* and did not stop him choosing it *on purpose*; that is the boundary working, not the ruling failing.
+
+| Wave | Stories | Delivers |
+|---|---|---|
+| **P0** | KAN-219 · KAN-220 | The review cycle and who is in it |
+| **P1** | KAN-221 · KAN-222 · KAN-223 | Goals, narrative check-ins (**never a completion percentage — that is a rating with a friendlier name**), company templates |
+| **P2** | KAN-224 · KAN-225 · KAN-226 · KAN-227 · KAN-228 | Self- and manager assessment, the company-defined **versioned** rating scale, the form configurator, and the conversation record — **`Confirm we discussed this`, never `Accept`** |
+| **P3** | KAN-229 · KAN-230 · KAN-231 · **KAN-232** | Calibration as a **human forum**; distribution **shown, never enforced**; every calibration change attributed; and **the EU AI Act / Art. 22 gate as a story in the build, not a note after it** |
+| **P4** | KAN-233 · KAN-234 · KAN-235 · KAN-236 · KAN-237 | Ratings history with its own negative-visibility suite, the employee's own view and right of reply, **the pay seam** (gated by KAN-232), **the step seam** into EP42's `review_context`, and completion reporting only |
+| **P5** | KAN-238 · KAN-239 · KAN-240 | Works-council inspectability, retention and erasure, and bias testing that **measures and reports but never auto-corrects** |
+
+**Two compliance items are carried as design inputs rather than notes, and this is the difference between EP44
+being buildable in Germany and not.** **(1)** A full performance capability **with calibration**, feeding
+**pay**, is the doorstep of *"a decision with legal or similarly significant effect"* — so human-in-the-loop
+attestation, an explainability record, no automated ranking and bias testing are **stories** (KAN-232,
+KAN-240), and **a configurable forced curve is refused at product level, not left to a tenant**. **(2)
+Works councils (OQ-8) escalate a third time and are now plausibly market-gating** for Germany and the Nordics,
+where the seed data lives: the **policy** — scale, forms, calibration rules, and the rating-to-pay mapping —
+must be versioned and inspectable **without exposing any individual's data** (KAN-238), because a council may
+need to agree it before the first cycle runs. **A launch blocker, not a build blocker.** Flagged for DPO/legal
+validation; nothing here is legal advice.
+
+**EP43 shrinks to five stories, and A6 is why.** The per-employee annual hike percentage was an artefact of the
+same wrong model. Under A6 pay moves for exactly three reasons — the step moved, the ladder moved, or an
+exception was **attributed** — so KAN-212 is withdrawn (merged into EP42's rate schedule and KAN-216) and
+KAN-217 is withdrawn (superseded by EP44). **EP43 becomes a round-management epic, not a differentiation one**,
+it is sequenced last, and it remains the designated descope if S3 runs long. **Nothing is blocked while EP44
+runs:** EP42's KAN-210 lets a company move the whole ladder today, and under A6 that **is** an across-the-board
+rise.
+
+**⚠ One process finding at roadmap level (`CFL-42-60`).** *"Pay position implies step position"* was **never in
+the owner's request** — it was a team inference, correctly labelled as one when it was made, that then acquired
+a decision number and was reinforced by four specialist reviews and two SPM reconciliations because every
+tasking brief said **apply** rather than **test**. Three changes now bind every epic: a **Load-Bearing Premise
+Register** with each premise tagged **OWNER / EVIDENCE / TEAM** and a falsifying question named for every TEAM
+row · **origin tagging on every requirement** · and **"Premises I challenged" as a required section in every
+specialist report**. Plus one line for the SPM's own checklist: **agreement between specialists tasked from the
+same brief is not evidence.**
+
+**The same pass found a second unexamined premise.** The **gender pay-gap check** has no owner requirement
+behind it either — it came from the SPM's reading of the EU Pay Transparency Directive, and it carries a change
+to live vacation-eligibility behaviour and an Art. 9 data-protection clearance. It is **kept, re-labelled a
+team requirement, descoped to a separable conditional slice, and put to him.** His original ask is satisfied
+without it: under A6 two people at the same step in the same market earn the same base **by construction**.
+
 **This epic closes three long-standing open items** — backlog #3 ("promote" has no story → KAN-197, and the type
 is named `LEVEL_CHANGE` because downward moves are permitted), #4 (transfer vs the EP27 drag-and-drop boundary →
 one modal, one endpoint, one engine, three entry points), and #5 (segregation of duties → KAN-203 + KAN-198) —
@@ -447,12 +564,12 @@ scope; the security/login block moves from first to last.
 
 | Stage | Goals / Epics | Exit criteria | Ties to Delivery phase (`06_*`) |
 |---|---|---|---|
-| **S1 — Requirements finalisation** *(Now)* | BA + UX + Strategist close the functional scope: EP35, EP36, EP37, EP38, EP39, EP41 written to full acceptance criteria; **EP42 — done, three waves, 2026-08-09**; product owner answers Q1/Q3 (§F) and EP42's OQ-1/3/5/9 | Functional scope signed off; no open "we might also…" items. **For EP42 specifically, S1 closes when the four gates in `EP42_SPM_SCOPE_AND_DECISIONS.md` §13.1 clear** | Phase 1 intake |
+| **S1 — Requirements finalisation** *(Now)* | BA + UX + Strategist close the functional scope: EP35, EP36, EP37, EP38, EP39, EP41 written to full acceptance criteria; **EP42 — six amendment rounds, A1…A6, 2026-08-09**; **EP44 outline entered, full requirements exercise to follow**; product owner answers Q1/Q3 (§F) and EP42's four remaining questions | Functional scope signed off; no open "we might also…" items. **For EP42 specifically, S1 closes when the four gates in `EP42_SPM_SCOPE_AND_DECISIONS.md` §13.1 clear, and the Wave-7 amendment round for A4–A6 (§22.14) has landed in all four specialist documents.** **EP44 does not enter its requirements exercise until the owner confirms the 22-story shape** — the last three amendments cost what they cost because specification ran ahead of agreement | Phase 1 intake |
 | **S2 — Foundation enablers** *(Now, parallel to S1)* | EP31 (KAN-166/167) · EP32 (KAN-168/170/171) · EP29 (KAN-155 ✅/156/158) · EP34 (KAN-178) · EP28 **KAN-153 only** · **EP42 W0 (KAN-203 · KAN-204 · KAN-208 · KAN-188 · KAN-189)** | Schema rebuildable + versioned; real-DB test tier green; atomic writes in place (**KAN-155 ✅ done**); **the tenant feature switch resolved centrally; the P0 self-approval defect closed; the shared-shell a11y landed; KAN-185 unblocked**. **KAN-168 is now P0 here — it hard-blocks EP42 W4** | **Phase 0 (non-security half)** |
-| **S3 — Build the functional product** *(Now/Next)* | BG2 EP35 + EP36 · BG4 EP38 (S2/S3 first) + EP39 · BG3 EP37 (S1/S2) · BG6 EP41 · **BG7 EP42 W1–W4, then EP43** | All finalised requirements implemented; pytest + regression flow test green per `CLAUDE.md`; **a11y applied as a standard to new screens**. **EP42 W2 is its minimum shippable slice; W4 does not open until KAN-168 has landed. EP43 (the annual hike cycle) starts only after EP42 W4 and is the designated descope if this stage runs long** | Phase 1 — MVP/GA-lite |
+| **S3 — Build the functional product** *(Now/Next)* | BG2 EP35 + EP36 · BG4 EP38 (S2/S3 first) + EP39 · BG3 EP37 (S1/S2) · BG6 EP41 · **BG7: EP42 W1–W4 → EP44 → EP43** | All finalised requirements implemented; pytest + regression flow test green per `CLAUDE.md`; **a11y applied as a standard to new screens**. **EP42 W2 is its minimum shippable slice; W4 does not open until KAN-168 has landed.** **EP44 follows EP42 and precedes EP43** — the owner's own re-sequencing, and nothing in EP42 needs a performance rating. **EP43 starts after EP44** (except KAN-211/215, which may parallelise if capacity allows — a Delivery call, not a dependency) **and is the designated descope if this stage runs long**; EP42's KAN-210 is the manual fallback and under amendment A6 moving the ladder **is** granting a rise | Phase 1 — MVP/GA-lite |
 | **S4 — Feature freeze** | No new endpoints or DOM builders queued | Written freeze declared by SPM | Gate into S5 |
 | **S5 — Security, login & hardening sweep** *(FINAL — D-004)* | **EP28 in full** (KAN-148 auth via **EP40-S1 SSO**, KAN-149 CSRF, KAN-150+173 escaping, KAN-151 sanitisation) · EP33 a11y retro-fit sweep (pending Q5) | Production Readiness checklist green; UAT signs off flagship flows; **only now can the Production gate go GO** | **Phase 2 — Production Readiness → Phase 3 — Customer Launch** |
-| **Later (grow & scale)** | BG3 depth (EP37-S3/S4) · BG4 rehire (EP38-S4) · BG5 SCIM/HRIS (EP40-S2/S3) · EP30 scale · **BG7 depth: total compensation, comp-review cycles, pay-transparency statements, statutory gap reporting** · **a candidate epic — Performance, Goals & Reviews** (unnumbered, unscoped; EP42 records a step change's review context but builds no review) · any **compliance-gated AI** | — | Phase 4 → Phase 5 |
+| **Later (grow & scale)** | BG3 depth (EP37-S3/S4) · BG4 rehire (EP38-S4) · BG5 SCIM/HRIS (EP40-S2/S3) · EP30 scale · **BG7 depth: total compensation, pay-transparency statements, statutory gap reporting, and KAN-205 salary bands** (descoped from EP42 by A6 — with base pay *being* the step's defined value, a min/max envelope answers approximately what the step value answers exactly) · **the gender pay-gap check (Check B) is parked as a conditional slice, not Later** — it is specified and separable, and it is with the owner because it was never his requirement · any **compliance-gated AI** | — | Phase 4 → Phase 5 |
 
 **S5 is not optional and not reducible.** Deferring it is a sequencing choice justified by the demo-grade,
 synthetic-data status quo (D-001). Any trigger T1–T4 in the amendment above pulls S5 forward immediately,
@@ -470,7 +587,7 @@ regardless of where S3 has got to.
 | Q4 | Any AI ambitions? | **Defer** behind EU AI Act / GDPR Art. 22 gate (D-003). Do not enter this cycle. | Compliance/DPO validation when raised. |
 | **Q5** | **New (D-004):** does accessibility (EP33 KAN-174/175) move to the final sweep with security, or stay a per-screen "Now" requirement? | **Move the retro-fit sweep to S5** (it shares code with the escaping work — KAN-172/173), **but apply WCAG 2.2 AA as a design standard to every new screen built in S3** so the sweep stays small. The gate is unchanged either way. | **Product owner decision** — I have not moved it unilaterally. |
 | **Q6** | **New (D-004):** who confirms the environment stays demo-grade (localhost/private network, synthetic data only) for the duration of S1–S4? | Assign an owner. The whole deferral rests on triggers T1–T4 **and now T5** staying false; unowned, that assumption rots silently. | **Delivery/Release Manager** to own as a standing risk-register entry. **T5 extends this ownership to "no real pay figure, ever, including one".** |
-| **Q7** | **New (EP42, 2026-08-09):** questions on compensation, job levels and pay equity. **OQ-1 (the level roll-up) and OQ-3 (what "5%" means) were ANSWERED on 2026-08-09 — see Amendment A1 below.** Still open: the visibility matrix (**OQ-2**), the example ladder (**OQ-4**), **total compensation (OQ-5)**, multi-currency (**OQ-6**), default exposure (**OQ-7**), works councils (**OQ-8**), segregation of duties (**OQ-9**), plus three confirmations A1 created (**OQ-A1-1/2/3**). | **All nine carry a recommended default the team builds against today, so none of them blocks.** Full text in `EP42_SPM_SCOPE_AND_DECISIONS.md` §6 and §12.8. **Ask OQ-5 first** — after A1 it is the **only** one whose late answer forces a rewrite, and it got slightly worse: the step pay point is a *base* pay point, so a "total compensation" answer changes what the step increment applies to as well as the record's shape. Put **OQ-3 with DPO-1** in one conversation, and note that `employees.gender` is NULL for 100% of the seeded population, so the gender-gap check currently has no data to run on. | **Product owner** (OQ-1…9) · **DPO/legal** (DPO-1, DPO-2 and five launch items). |
+| **Q7** | **EP42 / EP44 / EP43 (BG7), 2026-08-09.** Six rounds of answers — **A1…A6** — have closed OQ-1, OQ-3, OQ-5, the step-disclosure switch and the performance sizing. **A6 overturned the epic's central mechanism** (*"No you have not got correct!!"*): **the job decides the step, the step decides base pay, and pay never decides the step.** **Four questions remain, and they are on one page written as worked examples with his own numbers, per his standing instruction** (`EP42_SPM_SCOPE_AND_DECISIONS.md` §22.13): **Q1** does the entry value of a level move each year — *what does Anna, who stays at step 2.1 all year, earn next year?* · **Q2** Global vs local HR — *can Lars in Oslo grant additional pay to a Hamburg employee?* · **Q3** is a discretionary per-employee percentage still wanted · **Q4** did he ever ask for a **gender pay-gap check**. Carried from earlier rounds: OQ-2, OQ-4, OQ-6, OQ-7, OQ-9 and **OQ-8 (works councils)**. | **All four carry a recommended default the team is building against, so none of them blocks.** **Q1 — C** (employer-authored each year, no automatic rise, staleness warning at 18 months; B silently freezes everyone who does not move a step and nothing would notice) · **Q2 — A** (two permissions, one HR role, via the new `pay_policy` feature code; organisational scoping is a separate epic and is **not** being built on this evidence) · **Q3 — A** (no — step moves and additional pay cover both cases, **which is why EP43 drops from 7 stories to 5**) · **Q4 — park it** (it was the SPM's inference from the EU Pay Transparency Directive, never his requirement, and his original ask is satisfied without it because two people at the same step now earn the same base **by construction**). **OQ-8 is now the highest-value unanswered question in the programme** — performance-related pay with calibration across Germany and the Nordics is plausibly **market-gating**; a launch blocker, not a build blocker. **OQ-5 is closed** and no open question now forces a rewrite. | **Product owner** (Q1–Q4, OQ-2/4/6/7/8/9) · **DPO/legal** (DPO-2 blocks the retention class; DPO-1 travels with Q4). |
 
 ---
 
@@ -509,6 +626,27 @@ regardless of where S3 has got to.
 11. **Standing gate:** **a compensation demo without the "the visibility model is unenforceable under demo auth"
     disclosure in its written script is NO-GO.** The visibility model is a *correctness* control, not a security
     control, until KAN-148 lands.
+
+**Added 2026-08-09 — amendments A4, A5 and A6.** Full tasking in `EP42_SPM_SCOPE_AND_DECISIONS.md` §22.14. Five
+items belong on *this* plan:
+
+12. **SPM (me):** put the **four-question one-pager (§22.13)** in front of the product owner — worked examples,
+    real names, real numbers, a distinguishing outcome and a recommendation each, per his standing instruction.
+    Abstract framing has now failed three times on the same question and it is not going to be tried a fourth.
+13. **BA · Architect · UX · UAT:** run the **Wave-7 amendment round (§22.14)**. Each brief names the sections
+    A4–A6 invalidate in your own document and what to write instead. **Every one of you returns a "Premises I
+    challenged" section — it is a required deliverable, not an optional extra**, and it must contain at least
+    one premise you checked **at source** (his words, the code, the database) with the result stated either way.
+14. **Delivery/Release Mgr:** re-cut the phase plan for **50 stories across three epics, ordered EP42 → EP44 →
+    EP43**. **R-15 comes off the critical path** (the gender-gap check is now a conditional slice and KAN-208
+    leaves W0, taking R-19's vacation side effect with it). **Add R-20** (a step assessment done badly at
+    speed), **R-21** (additional pay becomes the dumping ground) and **R-22** (EP44 crosses the Art. 22 line by
+    increment) to the Risk Register with named owners, and **escalate R-18** — an undescribed ladder now blocks
+    the backfill rather than merely reading poorly.
+15. **Everyone, standing:** the **Load-Bearing Premise Register** applies from now on — max ten rows per epic,
+    each premise tagged **OWNER / EVIDENCE / TEAM**, a falsifying question named for every TEAM row, and **no
+    TEAM premise load-bearing across more than one wave without a validating answer.** Requirements carry their
+    origin as a column. **Agreement between specialists tasked from the same brief is not evidence.**
 
 *All engineering obeys `CLAUDE.md` — feature-access model, company scoping, org-change invariants, and the
 regression flow-test discipline. Nothing is "done" until pytest + the regression flow test pass.*

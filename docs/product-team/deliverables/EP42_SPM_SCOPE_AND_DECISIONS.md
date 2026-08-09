@@ -3329,3 +3329,1390 @@ code and **unenforceable in practice**, which every compensation demo will say a
   **step** and **not** the role or family, and that **My Pay drops pay-point references** when it is off.
 
 *A3 folded in. EP42 unchanged at 23 stories; EP43 at 7; EP44 named and not entered.*
+
+---
+
+> **§21.7 above is SUPERSEDED by §22.13 below.** Amendments A4, A5 and A6 close four questions, overturn the
+> epic's central mechanism, and replace the owner's page entirely.
+
+---
+
+# 📌 AMENDMENTS A4, A5 and A6 — 2026-08-09 — the owner overturns the pay/step model
+
+> **Authoritative. A6 outranks A5, which outranks A4, which outranks A3, A2, A1, §12, §14, §16, §18, §21 and
+> every specialist document.** Sources: `EP42_OWNER_ANSWERS_A4.md`, `A5.md`, `A6.md`.
+>
+> **A4 and A5 were never written into this document** — the session that received them was stopped. They are
+> applied here for the first time, together with A6.
+>
+> **The headline: "pay position implies step position" was never the owner's model. It was ours.** He has
+> rejected it in the strongest terms he has used — *"No you have not got correct!!"* — and with it goes the
+> compa-ratio basis, the nearest-step rule, and KAN-191/KAN-209's step-fitting backfill. **§22.0 states the
+> corrected model. Read it before anything else in this file, including everything above this line.**
+>
+> **Nothing above is edited.** Superseded rulings stay standing and marked, as this document has done
+> throughout. A decision log that quietly rewrites itself teaches nobody anything — and this amendment is the
+> clearest evidence yet of why the trail matters.
+
+## 22. Amendments A4–A6
+
+### 22.0 THE CORRECTED PAY/STEP MODEL — stated once, unambiguously
+
+**One direction. It only runs one way.**
+
+```
+        job content & responsibility  →  STEP  →  BASE PAY
+```
+
+**and never**
+
+```
+        BASE PAY  →  STEP                        ⛔ FORBIDDEN
+```
+
+Four sentences, and every one of them is a rule:
+
+1. **A step is an assignment about what work someone does.** It is decided by a human, at a review, from job
+   content and responsibility (A1). Nothing else may set it.
+2. **The step determines base pay.** A step has a defined value; an employee's base pay **is** that value,
+   scaled by FTE. Base is derived, not observed.
+3. **Pay never determines the step.** The system must never propose, infer, imply, suggest, pre-select or
+   "fit" a step from a salary figure — not in the backfill, not in an import, not as a helper, not as a
+   default, not in a tooltip. **This is a prohibition, not a preference.**
+4. **Money that is not the step's value is `additional pay`** — a separately-governed, attributed amount that
+   sits beside base and never moves the step (§22.3).
+
+**The worked example, in his numbers** (A6 §6). Level 2, Full Stack Software Engineering. Global HR sets for
+2027: **2.0→2.1 = 2%**, **2.1→2.2 = 2.4%**. Step 2.0 = €50,000, so 2.1 = €51,000 and 2.2 = €52,224.
+
+| Person | Step | Base | Additional | Total cash | Correspondence check |
+|---|---|---|---|---|---|
+| **Maria** — assessed at her review as meeting 2.1's expectations | moves 2.0 → **2.1** | €50,000 → **€51,000** | — | €51,000 | base = step value → **no finding** |
+| **Tom** — about to resign; local HR grants 5% to keep him | **stays 2.1** | **€51,000** *(unchanged)* | **€2,550** *(retention)* | €53,550 | base = step value → **no finding**; the €2,550 is visible, attributed and explainable on its own terms |
+
+**Tom is not "a 2.2 now."** His job has not changed, so his step has not changed. The retention money does not
+touch the ladder. That single sentence is the whole amendment.
+
+**What this buys us, and it is a lot:**
+- **The correspondence check becomes an equality, not an estimate.** Base either equals the step's value or it
+  does not, and any difference is a real deviation rather than an artefact of somebody's counter-offer.
+- **The "dead zone" problem disappears.** It existed only because pay was being mapped back onto steps.
+- **The day-one alert storm largely dissolves** — see §22.4 for the part that does not, and how it is handled.
+- **Two people at the same step in the same market are paid the same base, by construction.** R5's original
+  ask — *"flag if there is a difference of let say 5% for the same position"* — is satisfied more strongly than
+  any check we designed: the difference cannot arise from base at all, and if it arises from additional pay it
+  is attributed to a named reason. **We are not quietly dropping his first request. We are making it
+  structurally impossible to violate silently.**
+
+**The cost, named honestly and paid in §22.4:** the step can no longer be derived from anything the system
+already holds. Every one of the 146 seeded employees needs a **human** step assessment. That work is real, it
+belongs to the tenant, and it is the price of the correction. It is the right price.
+
+---
+
+### 22.1 ⚠️ THE CHALLENGE PASS — which premises are the owner's, and which are ours
+
+**This section exists because the epic's central mechanism was a team inference that nobody re-examined for
+five rounds.** Before applying A6 I went back through the epic and asked one question of every load-bearing
+premise: *whose is this?* I am reporting everything I found, including what I concluded is still sound —
+because "I checked it and it holds" is a result, not a non-answer.
+
+**The classification I am introducing, and it is now mandatory (see §22.15):**
+
+| Label | Meaning |
+|---|---|
+| **OWNER** | Traceable to the owner's own words, quoted. |
+| **EVIDENCE** | Derived from the repository, the schema or the database, with a `file:line` or a query behind it. Not the owner's, but not an opinion either. |
+| **TEAM** | A team inference. Reasonable, argued, possibly right — **and not validated by either of the above.** |
+
+#### 22.1.1 The register
+
+| # | Premise | Origin | Verdict after A6 |
+|---|---|---|---|
+| 1 | **Pay position implies step position** — compa-ratio, then the nearest-step rule, then the step-fitting backfill | **TEAM** — entered at §14.1 as *"the reading that honours both"*, was flagged as an inference (OQ-A1-1), and then hardened across five documents | **⛔ FALSE. Killed by A6 §2.** This is the one. |
+| 2 | **The ±2% tolerance** as the finding boundary | **TEAM** (mine, §14.2.2) | Already self-corrected in §16.2; **now dead entirely** — base is derived, so there is nothing to tolerate but rounding (§22.5.3) |
+| 3 | **The nearest-step rule** | **TEAM** (mine, §16.2) | **⛔ Withdrawn in full** (§22.2) |
+| 4 | **Check B — a group gender pay gap** | **TEAM. This is my biggest finding of the pass and it is not small.** It came from S13 — my own reading of the EU Pay Transparency Directive, labelled *Assumption / Medium confidence, not verified against any source in this repo*. **The owner has never mentioned gender pay, a gap, a group, or a regulator.** OQ-3 was recorded "CLOSED by reinterpretation" in A1 — but the reinterpretation closed *what "5%" means*; it never asked *does he want a gender check at all*. A question was marked closed by an answer to a different question | **Sound as a product idea, unvalidated as a requirement.** Ruled in §22.1.3 — **descoped from the critical path and put to him.** |
+| 5 | **A per-employee annual "hike percentage", differentiated by performance within a budget** (A2-1's ruled default, §18.4.3) | **TEAM** — a reading of *"for each"* | **⛔ WRONG. A6 §4 says "for each" means for each step transition.** Withdrawn (§22.5) and it collapses most of EP43 (§22.11) |
+| 6 | **`PAY_ABOVE_STEP` means somebody "is really at a higher step"** | **TEAM** | **⛔ Withdrawn as an interpretation.** It survives only as *"this base was set off-ladder"*, which under A6 should be rare (§22.2) |
+| 7 | **Bands as a min/max envelope (KAN-205)** | **TEAM** | **Descoped to Later.** With base = step value, a band answers a question the step value already answers. Deleting a story is the right direction after A6 |
+| 8 | **The "HR responsible" is the feature matrix, no new role** (D2) | **TEAM** | **Sound but stressed.** A6 §5 describes two HR authorities the matrix cannot currently tell apart. Re-ruled in §22.6 |
+| 9 | **Everyone defaults to step `.0` in the backfill** | **TEAM** | **⛔ Withdrawn.** Under A6, `.0` is a *claim about job content* made by the system with no human behind it. Replaced by an explicit `STEP_NOT_ASSESSED` state (§22.4) |
+| 10 | **The compensation feature's primary output is a finding queue** | **TEAM** | **Partly wrong.** At initial load the right instrument is a **reconciliation**, not a queue; findings are the exception stream afterwards (§22.4) |
+| 11 | **EP42 / EP43 split** (§18.4) | **TEAM** (mine) | **Holds, contents change.** A6 shrinks EP43 substantially (§22.11) |
+| 12 | **`PROMOTION` → `LEVEL_CHANGE` with a direction** | **TEAM** | **Sound, unaffected.** Downward moves are real and an audit row must not lie |
+| 13 | **§14.5 — EP42 does not build the review** | **TEAM** (mine) | **SUPERSEDED BY OWNER DECISION** (A3, confirmed A4 §4, cost accepted A5 §2). §22.8 |
+| 14 | **The disclosure switch governs the step, not the level** | **TEAM**, put to him and **confirmed by A5 §1** | **Now OWNER. Closed** (§22.9) |
+| 15 | **Compounding, not linear** | **TEAM** | **Sound, and generalises** to per-transition rates (§22.5.2) |
+| 16 | **Pay markets** as part of the grouping key and the home of annualisation constants | **EVIDENCE** — Telia spans five countries; Porto pays 14 monthly instalments and Hamburg 12 | **Sound, and reinforced.** A6's central rate schedule with per-market entry values needs exactly this object |
+| 17 | **R6 is a prerequisite of R5** | **EVIDENCE** — Acme 46 employees / 41 titles / one title with n≥3; Telia 100 / 75 / six | **Sound.** Unchanged by anything in A4–A6 |
+| 18 | **The two self-approval defects** (DEF-42-4/5, KAN-203) | **EVIDENCE** — `app/routes/org_change.py:55-64`, `app/services/org_change_service.py:222-249` | **Sound, and now explicitly protected** against erosion by A4-1 (§22.7) |
+| 19 | **Four-eyes binds nobody today** — `org_change_workflows` returns 0 rows | **EVIDENCE** | **Sound** |
+| 20 | **The tenant switch is not in the central resolver; 14 of 18 rows are FALSE** | **EVIDENCE** | **Sound** |
+| 21 | **Money never reaches `audit_log`** | **EVIDENCE** — `_SECRETISH_KEYS` catches no money term; the `audit_log` read audience is a different feature code | **Sound, and extended to additional pay** (§22.3) |
+| 22 | **Entry at `.0`; `step_count = 5` means six values `.0…​.5`** | **OWNER** — his own `2.0 … 2.5` | **Sound** |
+| 23 | **Job family → level, title on the level, levels family-scoped** | **OWNER** — his Full Stack Software Engineering example | **Sound** |
+| 24 | **No automatic roll-up on reaching the top step** | **OWNER** — A1 confirmed it explicitly | **Sound** |
+| 25 | **Each step carries its own responsibilities and expectations; the manager authors a per-employee roadmap** | **OWNER** — A1, twice | **Sound, and now more important**: it is the *only* legitimate input to a step assessment (§22.4) |
+| 26 | **The step increment applies to base** | **OWNER** — A2 (base only) + A6 (base tied to the step) | **Sound** |
+| 27 | **Advise, do not block** | **OWNER** — A4 §2, his own words and his own reasoning | **Sound, and bounded in §22.7** |
+
+#### 22.1.2 One inference channel that A6 makes *worse*, and nobody has spotted it
+
+**CFL-42-59 — new, High.** CFL-42-39 established that a published step increment plus a known base pay point
+plus a known step lets you compute a colleague's salary, so another person's step is scoped exactly as their
+pay is. **Under A6 that inference stops being approximate and becomes exact**, because base pay **is** the step
+value — no negotiation noise, no drift. It also runs in reverse: **anyone who learns a colleague's base pay
+learns their step to the euro**, and vice versa.
+
+Consequence, ruled: **the step-disclosure switch and the pay-visibility model are now two views of one
+control and must be reasoned about together.** Where an employee may not see a colleague's pay, they may not
+see that colleague's step; where the tenant has switched step display off, published pay points must not be
+readable by an employee either (already ruled in §21.4 for My Pay — it now extends to the ladder surface).
+**The `pay_policy:r` grant (§22.6) is where this is enforced.**
+
+#### 22.1.3 The three team premises I am acting on
+
+**(a) Check B — descoped from the critical path and put to him. Confidence High.**
+
+*Observation.* The gender pay-gap check is the second-largest single body of work in W4 and it carries
+KAN-208 (synthetic gender, which **changes live vacation-eligibility behaviour for 146 employees** —
+CFL-42-43), DPO-1 (a purpose-limitation question on Art. 9 data), the entire statistical machinery, CFL-42-32
+and CFL-42-38.
+*Evidence.* Nothing the owner has written in six messages mentions gender, a gap, a group or a regulator. Its
+sole origin is S13, my own general-knowledge reading of a directive, self-labelled *Assumption, Medium
+confidence, not verified against any source in this repo*.
+*Impact.* We were about to change behaviour in a shipped feature, and ask a DPO to clear special-category
+processing, to feed a check nobody asked for.
+*Recommendation.* **Keep it — pay-transparency measurement is a defensible product idea and compliance is a
+first-class requirement — but stop carrying it as though it were his.** Concretely: **Check B, KAN-208 and
+DPO-1 move off the critical path into one clearly separable slice** that can be dropped without touching
+anything else, **KAN-208 comes out of W0**, and the question goes to him in plain words. Until he answers,
+Check B is **⬜ conditional**.
+*Expected outcome.* W0 loses its riskiest story, the DPO conversation narrows to DPO-2 (retention) which
+actually blocks something, and if he says "I never asked for that" we lose nothing.
+
+**(b) The per-employee hike percentage — withdrawn.** A6 §4 is explicit and §18.4.3's default is simply wrong.
+Consequences in §22.5 and §22.11.
+
+**(c) Bands (KAN-205) — moved to Later.** Base = step value answers "is this pay sane for this level" exactly,
+where a band answered it approximately. **Removed from EP42.**
+
+#### 22.1.4 What I checked and found sound — stated because a challenge pass that only reports breakage is a
+sales pitch
+
+The wave model · W0's contents apart from KAN-208 · **KAN-203 and every four-eyes ruling** · KAN-188 and
+ADR-016 in full · KAN-189, half-open intervals and the CFL-4 resolution · the audit money-redaction rule and
+amendment A-2 · the job-family model · entry at `.0` and the step-count arithmetic · no automatic roll-up ·
+the step expectations and the roadmap (KAN-190, KAN-207) · pay markets and the annualisation constants ·
+`LEVEL_CHANGE` and its direction · "absent, not hidden" · the six standing rules in §13.5 and §16.6 ·
+R6-before-R5 · T5 and the demo-auth disclosure.
+
+**None of that is touched by A4–A6.** The epic's shape survived; its central *arithmetic* did not.
+
+---
+
+### 22.2 A6 §2 — what dies, and what survives of the nearest-step rule
+
+> *"that does not mean he will be assigned to 2.4 or 2.3 just to match the salary"*
+
+**Withdrawn in full, as a step-assignment mechanism and as a description. Confidence High.**
+
+A6 §2 offered the nearest-step rule a narrow survival — *"it may survive only as a way of describing a base-pay
+deviation, never as a statement about which step someone occupies."* **I am taking the stronger option and
+withdrawing it entirely, and here is why the weaker one is wrong:**
+
+*"Ravi is recorded at step 2.4 but paid closer to step 2.2"* is a sentence about Ravi's **step**. It does not
+matter that the system has not moved him; the sentence puts the move in the reader's head, and the reader is an
+HR administrator with a keyboard. **Standing rule 6 — a label is a claim** — applies to a finding's copy
+exactly as it applied to a button that said *Accept*. A description that invites the precise inference the
+owner rejected is not a safe description.
+
+**What replaces it — and it is simpler than what it replaces:**
+
+| | Withdrawn | **Replacement** |
+|---|---|---|
+| The question | "Which step is this person's pay nearest to?" | **"Does this person's base equal their step's value?"** |
+| The arithmetic | nearest-neighbour over every step's pay point, on relative distance, with a tie rule | **one subtraction** |
+| Expressed as | "paid closer to step 2.2" | **"base is €2,430 (4.8%) below the value of step 2.4"** — a magnitude, in currency and percent, against **their own** step and no other |
+| Reference to another step | central to the mechanism | **forbidden anywhere in the product** — no copy, no tooltip, no export, no notification, no API field |
+
+**`PAY_BELOW_STEP` and `PAY_ABOVE_STEP` both survive as finding types**, with the asymmetric severity of §14.1
+intact (below is primary — *"they took the responsibility, the pay never followed"*; above is secondary and
+silent per CFL-42-48). What changes is what `PAY_ABOVE_STEP` **means**: it is no longer "they might really be
+at a higher step". Under A6, over-payment has a legitimate home — additional pay — so a residual
+`PAY_ABOVE_STEP` now means precisely **"this base was set off-ladder and nobody attributed the difference"**,
+which is a governance and data-quality signal, and it should be rare. Its remedy is not a step change; it is
+**"record the difference as additional pay with a reason"** (§22.3), and that becomes its quick action in the
+register alongside `PAY_BELOW_STEP`'s "Propose adjustment".
+
+**Also withdrawn with it:** the tie rule (UAT-F-13), the relative-vs-absolute distance metric (F-13b), the
+half-increment boundary, and every fixture that computes a nearest step. **Deletions, not rework.**
+
+---
+
+### 22.3 A6 §3 — additional pay. Base and additional are two amounts, separately governed
+
+> *"implement additional pay field which will [hold] any additional payment of such situation … so he will get
+> usual hike 2.1 let say 2% but the additional pay will contain additional that employee will receive due to
+> this special resignation situation"*
+
+**Accepted as designed, as a new story — KAN-218, W2, Must · P1.**
+
+| | **Base pay** | **Additional pay** |
+|---|---|---|
+| Governed by | **The step's defined value**, as at a date, × FTE | **A human decision for a named reason**, outside the ladder |
+| Moves when | The step moves, or the ladder's economics move | Somebody decides it does, and records why |
+| Example | Step 2.1 = €51,000 | +€2,550 retention |
+| Feature gate | `compensation` r/w (unchanged) | `compensation` r/w — **the same code**; it is individual pay and local HR's job (§22.6) |
+
+**This refines OQ-5, it does not reverse it.** He said *"base salary only at this point"* and has now added
+**one** clearly-scoped supplementary component. **Architect: the record holds base and additional pay as two
+distinct, separately-governed amounts. Do not open a general `compensation_components` table on the strength of
+this** — §18.1's extensibility rule already records that shape, and a recorded shape is what that register is
+for. One named component is not a components model.
+
+#### 22.3.1 The open details, ruled
+
+**A6 §3 carried recommendations. I am taking all of them, and adding three.**
+
+| # | Question | **Ruling** | Confidence |
+|---|---|---|---|
+| 1 | **Reason code?** | **Mandatory, from a seeded company-editable list** — `Retention` · `Market premium` · `Red-circled legacy pay` · `Temporary responsibility` · `Location or assignment allowance` · `Transitional (ladder adoption)` · `Other (text required)`. A free-text-only reason is unreportable, and the whole value of this field is that it makes the exception *legible* | **High** |
+| 2 | **Effective dated?** | **Yes, from the start**, half-open, ADR-020's convention, same as base. Retrofitting effective dating is a rewrite; adding it now is a column | **High** |
+| 3 | **Time-boxed?** | **An optional end date — and where there is none, a mandatory review date, default 12 months.** A6's concern is exactly right: *a retention premium nobody ever revisits becomes invisible permanent salary*. But a hard expiry would silently cut somebody's pay on a date nobody remembers, which is worse. **So: never auto-expire; always come back and ask.** Premiums past their review date surface in the additional-pay register with the age shown | **High** |
+| 4 | **Does it count toward Check B (gender gap)?** | **Yes — Check B compares base + additional.** A gap paid through premiums is still a gap, and a check that looked only at base would be trivially avoidable by paying the difference as a premium. *(Moot while Check B is conditional — §22.1.3 — but ruled now so it is not re-derived later)* | **High** |
+| 5 | **Does it count toward the step-correspondence check?** | **No — that check uses base only.** Its question is *"does base match the step's value"*, and the entire point of A6 is that additional pay is **outside** the ladder. Including it would re-create the thing we just removed: money moving the step | **High** |
+| 6 | *(mine)* **Is additional pay an amount for visibility, audit and export purposes?** | **Yes, in every respect.** `compensation:r` to see it; **never in an `audit_log` diff** (ADR-019's per-action allowlist extends to it — `has_additional`, `reason_code`, `direction`, `pct_change_band`, effective date; never a figure); absent from every payload for anyone without scope; included in the watermarked export; included in "My Pay" for the subject | **High** |
+| 7 | *(mine)* **Does granting additional pay go through the approval chain?** | **Yes. It is a `COMPENSATION_REVIEW`**, on the existing engine, and **KAN-198's four-eyes applies** — two different people, initiator may not approve. Nothing about A6 makes this money less consequential than base; if anything the discretionary, off-ladder nature makes two pairs of eyes *more* necessary. There is no separate lightweight path | **High** |
+| 8 | *(mine)* **Is a high rate of additional pay itself a signal?** | **Yes, and this is the best thing the field gives us beyond Tom's case.** The register reports, per level and market, **what fraction of total cash is additional pay**. A level where a third of the money sits outside the ladder is a level whose ladder is set wrong — and that is a far more useful management insight than any individual finding. **Should · P3 inside KAN-218.** Same instrument as the override-rate reporting in §22.7 | **Medium-High** |
+
+**One thing additional pay is explicitly not:** a place to put anything that is not covered above. It is not
+bonus, not commission, not equity, not allowances-in-general, not benefits, not total compensation. §3.3's
+exclusion list stands unchanged. If someone proposes a second component, that is OQ-5 re-opening and it comes
+to me.
+
+---
+
+### 22.4 A6 §2 — the replacement for the step-fitting backfill. **The hardest item in this pass.**
+
+**The problem, stated precisely.** KAN-191/KAN-209 fitted each employee's step to their existing salary. That
+is now forbidden. But the fitting was also the mitigation for the day-one alert storm (§14.2.5): without it,
+everyone lands at `.0`, base ≠ step value for almost everybody, and the register opens with 146 findings on
+the first morning. **The replacement has to solve the backfill and the storm, and it cannot use salary for
+either.**
+
+**It does, in three parts. Confidence High on the shape, Medium on the effort estimate.**
+
+#### 22.4.1 Part 1 — where a step comes from now
+
+**From the job, assessed by the person who knows the job: the employee's manager.**
+
+| Input | Who | Where |
+|---|---|---|
+| **Family and level** | HR, via the title→level mapping screen (unchanged) | KAN-191, W1 |
+| **Step** | **The subject's solid-line manager**, choosing from the step expectations authored in KAN-190, for each of their direct reports | **KAN-191, W1** *(new)* |
+| **Override** | Any `job_architecture:w` holder, with a mandatory reason | KAN-191 |
+| **Nothing** | — | **The default. See below** |
+
+**Three rules on this, and they are the load-bearing ones:**
+
+1. **Nothing is pre-selected, and nothing may be suggested.** No default step, no "based on tenure", no
+   inferred value, and absolutely nothing derived from pay. This is D4c's discipline (*mandatory to answer, not
+   mandatory to change, nothing pre-selected*) applied to the one field A6 exists to protect. A pre-selection
+   is a system claim about somebody's job content.
+2. **`STEP_NOT_ASSESSED` is a real state, distinct from step `.0`.** The old design defaulted everyone to `.0`,
+   which is a *claim* — it says "this person is at entry level for their position". Under A6 the system may not
+   make that claim. An employee in `STEP_NOT_ASSESSED` has **no derived base**, is **not evaluable** by the
+   correspondence check, and is **listed for assessment**. It renders as *"Step not yet assessed"*, never as
+   `2.0`, never as a dash, never as a blank — D7's empty-state rule, which we already apply to a missing
+   salary, applied to a missing step. **This closes a hole nobody had noticed.**
+3. **The assessment cites the expectations.** The manager picks a step by reading what that step means in this
+   company (KAN-190's authored expectations) and confirming the person is doing it. That is the mechanism A1
+   describes, used for the purpose A1 describes. **If a company's ladder is not described, its steps cannot be
+   assessed** — which makes R-18 (a ladder with content nobody can use) a hard adoption dependency rather than
+   a soft quality worry, and it is worth saying so out loud.
+
+#### 22.4.2 Part 2 — what makes 146 human judgements survivable
+
+**Distribute them.** This is the adoption question and it decides whether the epic works.
+
+- **One HR person assessing 146 people is a project.** Forty-odd managers assessing three or four people each
+  is a **ten-minute task**, and they are the only people who can do it correctly anyway.
+- The surface is the manager's existing team list with the step expectations inline, one control per person,
+  one submit, and a "why" field that is optional except on an override.
+- **HR gets a completion meter**, can chase, and can assess directly for anyone with no manager (Acme has one
+  company-less record; every tenant has orphans).
+- **This is the same population, the same screen family and the same judgement as KAN-207's roadmap authoring**
+  — a manager who is about to write "here is what 2.2 requires of you" has already decided the person is at
+  2.1. **Sequencing consequence: assessment and roadmap authoring should be one sitting**, and UX should design
+  them that way rather than as two visits.
+
+**Effort, stated rather than hidden:** this is more human work than fitting was. Fitting was one click for HR.
+This is 146 assessments plus the dispositions in Part 3. **That is the price of the owner's correction, and it
+is the right price** — the alternative was a ladder built backwards from salaries, which is what he rejected.
+
+#### 22.4.3 Part 3 — what replaces the storm mitigation: **a reconciliation, not a queue**
+
+**KAN-209 is repurposed, not deleted.** It keeps its ID, its position at the end of W2 and its role as the W2
+exit gate. Its content changes completely:
+
+> **KAN-209 — Ladder pay reconciliation.** For every assessed employee, compare **recorded base** with **the
+> step's value as at the reconciliation date**, and require **one recorded disposition each** before the
+> correspondence check is allowed to run for that company.
+
+**It opens with the totals, not with a list.** The first thing HR sees is the aggregate, because the first
+question an HR director asks is *"what does adopting this ladder cost me?"*:
+
+> *132 of 146 assessed · 89 already match · 31 below their step value by €214,000 in total · 12 above by
+> €58,000 · 14 not yet assessed*
+
+**Three dispositions, mandatory, none pre-selected:**
+
+| # | Disposition | What it does | Available when |
+|---|---|---|---|
+| **1** | **Align** | Sets base to the step's value on an effective date. Creates a normal compensation record with reason `Ladder adoption` | Always |
+| **2** | **Attribute the difference as additional pay** | Base becomes the step value; the surplus becomes an **attributed premium** with a reason code and a review date (§22.3). **This is precisely what A6 §3 invented additional pay for, applied to history** | base **>** step value |
+| **3** | **Accept a residual deviation** | Base is left as it is, with a mandatory reason and a review date. Produces a finding that is **already dispositioned `JUSTIFIED`** on the day the gate opens | Always |
+
+**Approval: the reconciliation is approved once, as a batch, by two people.** Routing 31 individual
+`COMPENSATION_REVIEW` requests through the chain is absurd and would guarantee the work never finishes.
+**KAN-198's four-eyes binds the batch** — two different people, and the person who prepared it may not approve
+it. *(This sets the precedent EP43's cycle approval will inherit; better to establish it here, once, on 146
+rows, than to invent it later on 500.)*
+
+**The gate.** The **ladder-adopted-and-reconciled gate** (renamed from ladder-fitted-and-reviewed) **ships
+CLOSED with KAN-206** and is opened only by KAN-209's completion. Unassessed employees do **not** block the
+gate — they block only their own evaluability, and they are counted and shown.
+
+**Day-one finding count is therefore zero by construction** — the same outcome §16.2's nearest-step rule
+achieved, reached **honestly**: because a human decided every case, rather than arithmetically, because the
+system quietly re-labelled everyone's step to match their salary. **That difference is the whole amendment in
+one sentence.**
+
+#### 22.4.4 What this does to the build order — a defect of mine dissolves
+
+**CFL-42-41 is closed, not by a workaround but by A6.** The build-order defect I shipped in Wave 4 was that
+step fitting sat in W1 while the pay points and pay data it fitted against arrived in W2. **Job-based step
+assessment needs neither.** It needs a described ladder (KAN-190) and a manager, both of which exist in W1.
+
+| Half | Old | **New** |
+|---|---|---|
+| **Step assignment** | KAN-209, W2, fitted from pay | **KAN-191, W1, assessed from the job** |
+| **Pay reconciliation** | — *(did not exist; the fitting hid the problem)* | **KAN-209, W2 last, human dispositions** |
+
+**W1 becomes stronger again:** a described ladder, everybody assessed onto a step by their own manager, every
+employee able to read what their next step requires — **and still not one salary anywhere in it.**
+
+
+---
+
+### 22.5 A6 §4 — the rate is per step-transition, per year, set by Global HR
+
+> *"Global HR department decided from 2.0 to 2.1 the hike will be 2% this year while from 2.1 to 2.2 it will
+> be 2.4"*
+
+This sharpens A2's *"for each year company defines its own hike percentage for each"*. **"For each" means for
+each step transition** — not per employee, not per level, not company-wide.
+
+#### 22.5.1 The rate schedule — a new shape, and the Architect's is wrong
+
+**Ruled: the rate lives on the transition and is year-scoped. Confidence High.**
+
+| | Architect's current design (ADR-024) | **Under A6** |
+|---|---|---|
+| Where the rate lives | `step_increment_pct` on `job_levels` — **one rate per level** | **One rate per transition**: 2.0→2.1, 2.1→2.2, 2.2→2.3 … each its own number |
+| Per-transition variation | `job_step_increment_overrides`, **the exception path** | **The normal case.** There is no "the level's rate" to override |
+| Time | none — the rate is a current value | **Year-scoped, with history.** *"this year"* means next year's schedule is different and last year's must still be readable |
+| Authored by | `compensation:w` | **`pay_policy:w`** — Global HR (§22.6) |
+
+**So: `step_increment_pct` on the level is withdrawn, and `job_step_increment_overrides` is withdrawn as an
+override table and re-founded as the schedule itself** — every transition carries a rate for every effective
+period, and there is nothing for it to be an exception to. **Architect: this is a table rename and a
+re-modelling, not a new subsystem, and it is cheaper than what it replaces because the two-tier
+rate/override lookup collapses into one.**
+
+**Why year-scoping is not optional.** A finding raised in 2027 was computed against 2027's schedule. If 2028's
+schedule overwrites it, that finding becomes inexplicable — the exact failure §18.4.4 already ruled against for
+pay points. **Pay points are already effective-dated (KAN-206). The rate schedule must be too, on the same
+half-open convention, and `step_pay_point()`'s as-at date now selects both.**
+
+#### 22.5.2 Compounding — survives, and generalises
+
+**The compounding ruling stands. Uniform compounding was the special case.**
+
+```
+point(step n)  =  entry_value  ×  Π (1 + r_t)        for transitions t = 1 … n
+                                 t
+```
+
+His own numbers verify it: 2.0 = €50,000 · 2.1 = 50,000 × 1.02 = **€51,000** · 2.2 = 51,000 × 1.024 =
+**€52,224**. A linear reading would give 2.2 = 50,000 × (1 + 0.02 + 0.024) = €52,200 — €24 apart on one
+transition, and diverging with every rung. **Ruled compound, as before, and now confirmed against the owner's
+own arithmetic rather than against my reasoning.** BR-1.5's exact-decimal, no-intermediate-rounding, HALF_UP-
+once rule applies unchanged.
+
+**What gets simpler:** the compound-vs-linear ambiguity that made §14.2.1 worth ruling largely evaporates —
+with a rate per transition you walk the transitions, and there is no plausible way to walk them that is not
+multiplicative.
+
+#### 22.5.3 The tolerance constraint — **gone, and there is nothing left to constrain**
+
+The `tolerance < increment / 2` rule was already dissolved in §16.2. A6 removes even the residue:
+
+- **Base is derived from the step, not observed independently.** The check is an equality, not a
+  nearest-neighbour search. There are no adjacent bands to overlap, so **R-16 stays closed and there is no
+  cross-field constraint anywhere in the model.** CFL-42-36, CFL-42-37, CFL-42-45 and CFL-42-53 stay dissolved.
+- **What survives is a materiality threshold, and it governs notification only.** Ruled: **company-configurable,
+  default 1%, applied to `|base − step value × FTE| ÷ step value`.**
+- **The critical property, and it is what stops this becoming a dial that hides the truth: the deviation is
+  always computed, always shown in the register with its magnitude, and always counted in the reconciliation
+  totals — whatever the threshold is set to.** The threshold decides whether a bell rings. It never decides
+  whether a number exists. A tenant who sets it to 50% suppresses noise; they cannot suppress fact.
+- **Per-transition rates make any half-increment rule meaningless anyway** — with 2% below and 2.4% above,
+  "half the increment" is two different numbers depending which way you look. Another reason the mechanism had
+  to go.
+
+#### 22.5.4 The re-basing question — **it does NOT survive in its old form, and I am not asking it a fourth time**
+
+**I checked, as A6 §4 instructed. Verdict: the question we have asked three times is dead. A different,
+narrower question has taken its place, and it is a first asking, not a fourth.**
+
+**Why the old question is dead.** It was: *"when the company grants an annual across-the-board hike, should the
+ladder's pay points move by the same percentage?"* That question has two premises and A6 removes both.
+
+1. It assumed **an across-the-board per-employee hike that moves salaries independently of the ladder.** Under
+   A6 there is no such thing. Pay moves because the step moves (at that transition's rate) or because the
+   ladder's own numbers move. **Premise 5 in §22.1.1 — withdrawn.**
+2. It assumed **base pay and the step's value can drift apart and need re-synchronising.** Under A6 base pay
+   **is** the step's value. They cannot drift. There is nothing to keep in sync, because they are one number.
+
+**And the consequence that makes the old question incoherent rather than merely unnecessary: under A6, moving
+the ladder and paying people are the same act.** Raise step 2.1's value from €51,000 to €52,020 and every
+employee at 2.1 is, by definition, owed €52,020 — there is no second operation. That is the opposite of the old
+model, where re-basing was a bookkeeping correction that had to chase a pay event. **KAN-210 therefore stops
+being "a maintenance action that keeps the check honest" and becomes "the mechanism by which a company grants
+an across-the-board rise."** That is a promotion in importance, and it is why KAN-210 stays firmly inside EP42.
+
+**What survives, and it is genuinely new.** A6 §4 anticipated it precisely: *does the entry value of a level
+(step x.0) also move each year, or only the transition rates above it?* This is not the same question in
+smaller clothing. It is the question **"does an employee whose job has not changed get a rise?"** — and it has
+a concrete, one-number answer he can give in ten seconds:
+
+> **Anna is at step 2.1 all through 2027 and 2028. She does her job well. Her responsibilities do not change.
+> What is her base pay in 2028?**
+
+That is Q1 on the one-pager (§22.13), with three options and three numbers. **It has never been put to him, it
+is not abstract, and the reason the previous three attempts failed is that they were.**
+
+**The default being built meanwhile:** the entry value is **effective-dated and employer-authored, with no
+annual expectation imposed** (A3-1 — nothing predetermined), **plus a staleness warning** where a level's entry
+value has not moved within the company's configured period (default 18 months). That is option C in §22.13 and
+it is buildable without his answer.
+
+---
+
+### 22.6 A6 §5 — Global HR and local HR. Two authorities, and the product has one role
+
+> *"Global HR department decided…"* / *"the local HR department decides…"*
+
+| Authority | Decides | Scope |
+|---|---|---|
+| **Global HR** | The ladder's economics — entry values, the per-transition rate schedule, pay markets, the materiality threshold | Company-wide, annual |
+| **Local HR** | One person's pay — a base change, an additional-pay grant, a deviation disposition | Individual, ad hoc |
+
+**Ruling: this is a permissions distinction, and I am giving it a fifth feature code — `pay_policy`.
+Confidence High.**
+
+#### 22.6.1 The ruling
+
+| Code | Governs | Seeded defaults |
+|---|---|---|
+| **`pay_policy`** *(new)* | **Global HR.** Entry values, the per-transition rate schedule and its history, pay markets and their annualisation constants, the materiality threshold, the re-base action (KAN-210) | `HR_ADMIN` r+w · `PORTAL_ADMIN` r+w · everyone else none |
+| `compensation` | **Local HR.** An individual's base pay, additional pay, the reconciliation dispositions, proposals through the chain | Unchanged (§4.5.1) |
+| `compensation_self` · `pay_equity` · `job_architecture` | Unchanged | Unchanged |
+
+**Why a fifth code rather than the two we have.** The distinction he describes is *not expressible* with
+`compensation:w` alone: one grant would let a local HR administrator re-author the company's entire pay ladder
+because they were allowed to give Tom a retention premium. That is precisely the argument that earned
+`job_architecture` its fourth code in §14.3.2 — *a manager could not do the thing the owner says is their job
+without being granted write access to everyone's salary* — running in the other direction. **The feature-code
+matrix is the mechanism `CLAUDE.md` mandates for exactly this question, and reaching for it here is using the
+model rather than working around it.**
+
+**And it is a net simplification, not just an addition.** CFL-42-20 parked the equity thresholds, the coverage
+gate and pay markets on **`company_settings:w`** because there was no better home and a role check was
+forbidden. There is now a better home. **They move to `pay_policy:w`**, which:
+- gives UX **one gate per screen instead of two** — the "Compensation Settings page must read coherently to a
+  holder of one gate and not the other" problem in CFL-42-20 disappears;
+- makes the grant honest at the point it is made (*"set the company's pay policy"* rather than
+  *"company settings"* — standing rule 6);
+- keeps CFL-42-20's actual ruling intact: **it is still not a role check.** `pay_policy` is seeded to
+  HR_ADMIN + PORTAL_ADMIN and a tenant may widen or narrow it in one click.
+
+**Registered in all four places in KAN-199** — the first story in W2 that needs it. Per §14.3.2's note, EP42
+has no single "register the codes" story; each registers what it needs.
+
+**Reading is gated too, and this matters more than it looks.** `pay_policy:r` is required to see entry values
+and rate schedules, because **CFL-42-59 (§22.1.2) makes them exactly invertible into a colleague's salary**
+under A6. The ladder's *structure* and *expectations* stay public on `job_architecture:r`; its *money* does not.
+
+#### 22.6.2 What I am NOT building, and the question that goes to him
+
+**Reading (b) — organisational scoping**, where HR for the Nordics can act on Nordic employees and not on
+Hamburg — is **not** being built on this evidence. It would add a scoping dimension to every compensation query
+and every admin surface, it changes the access model the whole product uses, and nothing he has written asks
+for it: *"the local HR department"* is at least as likely to mean *"the HR people who handle individual cases"*
+as *"the HR people in one country"*.
+
+**It goes to him as Q2 on the one-pager (§22.13), with the distinguishing question stated as a fact about one
+person:** *can Lars in Oslo grant additional pay to a Hamburg employee?* If the answer is no, that is reading
+(b), it is a separate epic, and it is a platform change rather than a compensation feature.
+
+**Named limitation, recorded now:** under reading (a), scope is per-company, so a `compensation:w` holder can
+act on any employee in the company. This is the same class of gap as CFL-42-22 (the model cannot express
+"read company-wide, write nothing"), and it is recorded in the release notes and in
+`BUSINESS_OVERVIEW_FEATURES_AND_ACCESS.md` rather than papered over. **Revisit if he answers (b), or if OQ-8
+comes back "yes".**
+
+---
+
+### 22.7 A4 §2 — **advise, do not block** — and the boundary that protects KAN-203
+
+> *"the application will raise red flag if the hike is made beyond the set levels to manages. But local HR
+> managers can always overrde the system recommedation because otherwise there might be a situation that
+> employee may leave and so on but it will be sytem to raise this as flag to managers."*
+
+**Adopted as a standing product principle for BG7. It is his, it is right, and it is more valuable than the
+question that produced it.** His logic: a pay rule that blocks is a rule that loses you people; the local HR
+manager has context the system does not; so the system's job is to make the exception **visible**, not to
+prevent it.
+
+**Note how well it composes with A6.** The retention counter-offer he used to justify the principle now has a
+*place to live* — additional pay. So the flag fires less often and means more when it does. The two amendments
+were written to solve different problems and they solve each other's.
+
+#### 22.7.1 The rule, written down so it cannot be quoted out of shape
+
+> **Where the system holds an opinion about *how much money is right*, it advises and records; it never
+> refuses.**
+> **Where the system holds a rule about *who may act*, it refuses, and the refusal is not overridable.**
+> **Where the system cannot compute a true answer, or cannot record what was decided, it refuses to
+> proceed — but it never refuses the decision itself.**
+
+Three categories. Every guard in this programme belongs to exactly one, and the category decides the behaviour.
+
+| | **Category 1 — a judgement about an amount** | **Category 2 — an integrity control** | **Category 3 — record completeness and computability** |
+|---|---|---|---|
+| **Behaviour** | **Advise. Allow with an override** | **Refuse. Never overridable, never configurable** | **Refuse to proceed without the input. Never refuse the outcome** |
+| **Test** | Would a reasonable HR manager with more context legitimately do this anyway? | Does this put one person on both sides of a decision about themselves or their own money? | Does the refusal stop them reaching the outcome, or only reaching it without a record? |
+| **Members** | base above or below the step's value · a step move whose pay does not follow the transition rate · pay outside a band · an over-budget distribution · additional pay above a configured size · a level's entry value below the previous level's top step | **KAN-203** subject ≠ initiator · **KAN-203** subject ≠ decider · **KAN-198** initiator ≠ approver on money · **KAN-198** approver ≠ approver across levels · **KAN-198** ≥2 independently satisfiable levels on a money-bearing request · **no SYSTEM_ADMIN bypass of any of these** | a mandatory reason · a mandatory reason **code** · the mandatory pay answer on a position change (D4c) · the mandatory `review_context` on a step change · a multi-currency pay market with no FX rate · a step assessment with no assessor · a cycle opened with no authored policy |
+
+**The anti-erosion clause, and it is the point of this section:**
+
+> **The Category 2 list above is closed and enumerated. A future amendment may add to it. Nothing may be
+> removed from it by citing A4-1, because A4-1 is a statement about *amounts* and says nothing whatever about
+> *actors*.** Nobody overrides *"you may not approve your own pay rise"* for retention reasons — that is the
+> control existing at all. If a future reader believes an integrity control is blocking a legitimate business
+> case, the answer is a **configuration fix or an administrative remedy** (KAN-198's cancel-and-reconfigure
+> path, Ruling 13), **never an override.**
+
+**And the Category 3 clarification, because this is where the principle will actually be misapplied:**
+requiring a reason is **not** blocking. It does not prevent the manager giving Tom €2,550; it prevents them
+doing it anonymously. If somebody argues that a mandatory reason code violates advise-don't-block, they have
+confused a record with a veto. **Apply the test in the table.**
+
+#### 22.7.2 Override mechanics — first-class, never a silent bypass
+
+Every Category 1 override, without exception:
+
+1. **A recorded actor** — the human being, not "the system" and not the role.
+2. **A mandatory reason** — a **category** from the seeded, company-editable list, plus optional free text.
+   Structured, so it is reportable; A-2's rule holds — the free text carries the non-blocking numeric-pattern
+   warning and no criterion may claim a guarantee over it.
+3. **An `audit_log` row** — with the money-out-of-diff rule intact (ADR-019's per-action allowlist):
+   `override_of`, `reason_code`, `direction`, `pct_change_band`, effective date. **Never a figure.**
+4. **Visible to the approval chain at decision time, not merely logged.** An approver deciding a request that
+   carries an override sees *"this proposal is 6.3% above the value of step 2.1; reason: Retention"* on the
+   decision surface. An override the approver has to go and look for is an override that was not disclosed.
+   *(This is the same reasoning that suppressed the bell's one-click approve — CFL-42-28.)*
+5. **Overridable ≠ invisible afterwards.** An overridden flag stays in the register as `OVERRIDDEN` with its
+   reason, and is reportable. It does not vanish because somebody clicked through it.
+
+#### 22.7.3 Override rates are data a company should see
+
+**A4-1's last line is the most useful thing in it and it was nearly buried:** *a company whose managers override
+80% of flags has a mis-set band, and the product should be able to show them that.*
+
+**Ruled, Should · P3, in KAN-202** (which already owns history, reporting and the audited export — no new
+story):
+
+- **Override rate per company, per level, per market, per reason code.**
+- **A configuration-review tripwire at 40% overridden**, matching §1.5's existing *">40% of flags dispositioned
+  JUSTIFIED → review the configuration"* rule. One number, one meaning, two instruments. Above it, the register
+  says so in words: *"managers have overridden 62% of pay flags at level 2 in the Nordics. This usually means
+  the ladder's rates are set below the market, not that 62% of decisions were exceptional."*
+- **Paired with the additional-pay share report** (§22.3.1 item 8): a high override rate and a high additional-
+  pay share are the same disease seen from two angles, and both say *the ladder is wrong*, which is a far more
+  actionable finding than any individual case.
+
+**Terminology.** He says *"red flag"*; the product already has a `pay_equity` finding. **Ruled: one object, not
+two.** A proposal-time warning and a post-hoc finding are the same computation at two moments, and giving them
+different names would make the product speak two vocabularies about one fact. **The word in the UI is
+"flag" for both, with the finding type carrying the meaning.** *(UX: red must not be the only signal — WCAG
+1.4.1 — and "red" is questionable colour for a case HR is expected to override routinely and legitimately.
+Your call on the palette; the vocabulary is ruled.)*
+
+#### 22.7.4 Where the flag fires — a new moment, not a new feature
+
+A4-1 asks for the flag *"if the hike is made beyond the set levels"* — i.e. **at the moment of proposal**, not
+after the fact. **Ruled: this is the correspondence computation run inside the proposal surface. It is not a
+new story.**
+
+- **KAN-192** (step advancement) — when the pre-filled pay proposal is edited away from the transition rate,
+  the deviation is shown inline with its magnitude, and submitting requires a reason category.
+- **KAN-196** (pay inside the position-change request) — same, on the compensation block.
+- **KAN-218** (additional pay) — same, where a premium exceeds a configured share of base.
+- **KAN-209** (the reconciliation) — the "accept a residual deviation" disposition **is** this override, taken
+  in bulk.
+
+**This is standing rule §13.5.1 — consequences are shown where the choice is made, not where the surprise
+lands — applied for the fifth time.** It is now the most-invoked rule in the epic, which is a sign it is a good
+one.
+
+---
+
+### 22.8 A4 §4 and A5 §2 — full performance management. **EP44 is real.**
+
+> **A4:** *"I want a full performance-management capability (cycles, goals, calibration) a detailed performance
+> requirement impmlemation."*
+> **A5:** *"OK. go ahead with full implemenation cycle as Product owneer accepting the delay."*
+
+#### 22.8.1 The decision, and it is closed
+
+**He chose (b). Recorded as: recommended (a), owner chose (b). It is not re-litigated here or anywhere.**
+
+He named the three things option (b) contained — *cycles, goals, calibration* — so this is a considered choice
+against a stated cost, not a misread. And in A5 he accepted the cost **in his capacity as product owner and in
+those words**. Both go in the Decision Log verbatim, because this is exactly the decision somebody
+re-litigates six weeks from now:
+
+> **Decision D-006 — 2026-08-09.** *Context:* the SPM sized a performance **input** (2 stories, ~2–3 weeks, no
+> delay) against full performance **management** (~20–25 stories, 12–16 weeks, sequenced first, pushing the
+> hike cycle out by roughly a quarter) and recommended (a) with Confidence High.
+> *Options considered:* (a) performance input inside EP43; (b) full performance management as EP44.
+> *Decision:* **(b).** The owner's words: *"I want a full performance-management capability (cycles, goals,
+> calibration) a detailed performance requirement impmlemation"* and *"go ahead with full implemenation cycle
+> as Product owneer accepting the delay."*
+> *Rationale:* his, not mine. He was shown the quarter of slip and took it.
+> *Impact:* EP44 becomes a real epic of 22 stories, sequenced **between** EP42 and EP43. BG7 becomes ~50
+> stories and ~8–9 months. EP43 shrinks (§22.11).
+
+#### 22.8.2 §14.5 — SUPERSEDED BY OWNER DECISION
+
+> **§14.5 ruled:** *"EP42 records that a step change happened at a review. It does not build the review."*
+> **Status: SUPERSEDED BY OWNER DECISION.** Recorded, not deleted.
+
+**And it did its job.** §14.5's purpose was scope protection — it stopped performance management arriving *by
+accident*, inside an amendment, as a side-effect of a sentence about review timing. It did not, and should not,
+stop the owner choosing that scope **on purpose, with the cost in front of him.** The boundary held until he
+spent it deliberately. That is the system working, not the ruling failing.
+
+**What still holds from §14.5, and this part is not superseded:** **EP42 itself still does not build the
+review.** A step change in KAN-192 still records a `review_context` and a date, and nothing more. The review is
+built in **EP44**, and the two connect through one named seam (KAN-236, §22.11.3). **UX §25's ban list and
+ADR-025's forbidden-column table stand unchanged and are now *more* load-bearing**, because performance
+management existing next door is precisely when somebody asks whether roadmap items can be ticked off.
+
+#### 22.8.3 The two compliance items are now design inputs, carried — not notes
+
+**These are the reason EP44 gets a compliance wave rather than a compliance paragraph.**
+
+**(1) EU AI Act / GDPR Art. 22 — Charter §1. The gate is designed in from story one.**
+
+A full performance capability **with calibration**, feeding **pay**, is on the doorstep of *"a decision with
+legal or similarly significant effect"*. Nothing proposed scores, ranks or auto-decides — **but calibration is
+exactly where forced distributions and ranked lists live**, and it is one plausible-sounding increment away.
+So, ruled as requirements on EP44 rather than as warnings about it:
+
+- **KAN-232 is a story, in the calibration wave, not an appendix** — human-in-the-loop attestation on every
+  rating that changes in calibration, an explainability record (what changed, who changed it, why), and a hard
+  product rule that **no ranking, score or distribution is ever computed by the system and applied to a
+  person**.
+- **Forced distribution is refused, not configurable.** Distribution is **shown** (KAN-230) so a calibration
+  session can see its own shape; it is never **enforced**. A configurable forced curve is an automated decision
+  with significant effect wearing a settings page.
+- **Bias testing is a story (KAN-240), not a launch task** — measure the rating distribution across the
+  protected characteristics the tenant lawfully holds, **report, never auto-correct**.
+- **Flagged for DPO/legal validation** (Charter §9.7). Nothing in any EP44 document is legal advice.
+
+**(2) Works councils — OQ-8 is now plausibly market-gating, and I am saying so plainly.**
+
+Performance management with calibration, feeding pay, across Germany and four Nordic countries — which is
+exactly where the seed data lives — is close to the definition of a co-determination matter. It was a launch
+consideration in A2, a design input in A3; **under A4 it is plausibly a gating dependency for those markets.**
+
+The concrete design consequence, carried as a requirement (KAN-238, and inherited from KAN-216's precedent):
+**the policy — the rating scale, the review forms, the calibration rules, the rating-to-pay mapping — must be
+versioned, auditable and inspectable without exposing any individual's data**, because a works council may need
+to review and agree it *before* the first cycle operates. **A launch blocker, not a build blocker; and it is on
+the Customer-Readiness checklist, not the sprint board.**
+
+#### 22.8.4 The scope-growth statement — said once, factually, without editorialising
+
+**A4 §4 asked for this and it is owed.**
+
+> **His original request was: hold salary, put people on job levels, and flag a 5% pay difference.**
+> **It is now a three-epic programme of about 50 stories and 8–9 months: EP42 (23) → EP44 (22) → EP43 (5).**
+>
+> He has chosen every increment with the cost shown, and each choice is defensible on its own. That is his
+> right and I am not arguing with any of them. **But the cumulative shape deserves to be stated once, plainly,
+> rather than discovered.** It is in the one-pager (§22.13) as a fact, not a question.
+
+---
+
+### 22.9 A5 §1 — the step-disclosure switch: **CLOSED**
+
+> *"for #4: goa head with your recommendation."*
+
+**A per-company switch governing the STEP, defaulting to visible.** The recommendation put to him in A4 §5 is
+adopted. **This moves from "awaiting confirmation, built against" to a closed decision** — the design does not
+change; it is settled rather than assumed.
+
+The rationale on record, and it is the reason the switch governs the step rather than the level: **the title
+already discloses the level.** *Junior Software Fullstack Engineer* **is** level 2 of that family, and he has
+said the title is always visible (A3-4). A switch claiming to hide the *level* would hide nothing while
+claiming to, which standing rule 6 forbids. The only thing meaningfully withholdable is the step.
+
+**Everything already specified stands unchanged** — §21.4's rules, KAN-190's first-run prompt, KAN-194's
+visibility model, KAN-207's disclosure-off rendering, the *"do not display, never hide"* labelling, the honest
+sentence about inference, the manager always seeing the step, and CFL-42-57's manager-who-is-also-an-employee
+case.
+
+**One thing A6 adds to it — and it tightens the switch rather than loosening it.** Per CFL-42-59 (§22.1.2),
+base pay is now **exactly** the step's value, so under A6 the step and the salary are mutually invertible with
+no noise at all. Consequence, ruled: **where step display is off, the level's entry value and the rate schedule
+must not be readable by that employee either** — `pay_policy:r` is not granted to `EMPLOYEE`, and My Pay's
+existing rule (drop every pay-point reference when the switch is off, §21.4) extends to the `/ladder` surface.
+**The ladder's structure and expectations stay public. The ladder's money does not.**
+
+**A4 §5 housekeeping — "personal level".** He asked what the term meant; it was ours, and it was used before it
+was defined. Recorded: **the ladder** is the structure, identical for everyone and always visible; **the
+personal level** is the pin on the ladder — which level and step *this* employee occupies. Only the second is
+policy-controlled, and after A5 only its **step** component. The term itself is retired from the vocabulary in
+favour of *"the employee's own step"*, which needs no definition.
+
+---
+
+### 22.10 What A4–A6 invalidate, document by document
+
+**Every row is superseded, not deleted.** Specialists mark, they do not erase — §22.15 is about why the trail
+matters.
+
+#### 22.10.1 This document (SPM)
+
+| # | What | Status | Where it went |
+|---|---|---|---|
+| 1 | **§16.2 — the nearest-step rule** | **⛔ WITHDRAWN in full**, as a mechanism *and* as a description | §22.2 — base vs the step's own value, expressed as a magnitude |
+| 2 | **§14.2.1's compa-ratio remnants and §14.2.2's tolerance-as-boundary** | **⛔ Dead** | §22.5.3 — a materiality threshold that governs notification only |
+| 3 | **§14.2.5 — "the backfill fits the step to the pay"** | **⛔ FORBIDDEN** | §22.4 — job-based assessment by the manager, then a human reconciliation |
+| 4 | **§14.2.1 — one increment per level with per-step overrides** | **Superseded** | §22.5.1 — a rate per transition, year-scoped |
+| 5 | **§18.4.3 / A2-1 — "a company guideline % per pay market, differentiated per employee"** | **⛔ WRONG. Withdrawn** | §22.5.4 — "for each" means each step transition. It collapses most of EP43 |
+| 6 | **§18.4.4 / A3-3 / CFL-42-54 — the re-basing question and its arithmetic** | **Moot in that form** | §22.5.4 — the drift it described cannot occur when base *is* the step's value. Replaced by the entry-value question (Q1, §22.13) |
+| 7 | **§4.1 / §14.2's `PAY_ABOVE_STEP` as "really at a higher step"** | **Superseded** | §22.2 — it means "this base was set off-ladder", and its remedy is additional pay |
+| 8 | **D1's Check B as a settled requirement** | **Re-classified TEAM, conditional** | §22.1.3(a) — off the critical path, put to him |
+| 9 | **§4.5.1 / §14.3.2 — four feature codes** | **Amended to five** | §22.6 — `pay_policy` added |
+| 10 | **CFL-42-20 — thresholds on `company_settings:w`** | **Superseded** | §22.6 — `pay_policy:w`. The ruling that it must not be a role check is **preserved**; only the home changes |
+| 11 | **§14.5 — EP42 does not build the review** | **SUPERSEDED BY OWNER DECISION** | §22.8.2. *EP42 still does not build it; **EP44** does* |
+| 12 | **§21.2.3 — the SPM recommends (a)** | **Closed: recommended (a), owner chose (b)** | §22.8.1, Decision D-006. Not re-litigated |
+| 13 | **§21.7 — the owner's page** | **Superseded** | §22.13 |
+| 14 | **A1 §5 / D3.5 / KAN-205 — bands** | **Descoped to Later** | §22.1.3(c) |
+| 15 | **CFL-42-41 — the build-order defect** | **CLOSED by A6, not worked around** | §22.4.4 |
+| 16 | **"everyone defaults to step `.0`" in the backfill** | **⛔ Withdrawn** | §22.4.1 — `STEP_NOT_ASSESSED` is a distinct state |
+| 17 | **A5-1 / the disclosure switch as "awaiting confirmation"** | **CLOSED** | §22.9 |
+| 18 | **OQ-A1-1** ("we flag when pay does not match the step — is that what you meant?") | **Answered by A6, and the answer was no to the mechanism, yes to the intent** | §22.0 |
+| 19 | **OQ-A1-2** (a step change proposes rather than applies pay) | **Confirmed and strengthened** — the proposal is now pre-filled from the transition rate | Unchanged; §22.7.4 adds the inline deviation warning |
+| 20 | **Everything in §12, §16 (except §16.2), §18.1–§18.3, §18.6, §21.1, §21.4** | **Unaffected** | — |
+
+#### 22.10.2 Business Analyst — `EP42_REQUIREMENTS_AND_ACCEPTANCE_CRITERIA.md`
+
+**Invalidated:** §4.4A (Check A′) in full · §4.5A's fitted-backfill rules · **AC-200-\*** for the primary check ·
+**AC-206-\*** (the increment model and the tolerance) · **AC-209-\*** in full · **AC-191-\*** step-related
+criteria · §3.2's four-code model · §4.4's Check B **status** (unchanged in content, now conditional) ·
+BR-10.\* (the increment/tolerance rules) · §21.4A's contingency register · KAN-205's §28 in full.
+**Explicitly NOT invalidated:** §4.1 money/precision · §4.2 annualisation and FTE · §4.3 effective dating ·
+§4.7 GDPR · §4.8 visibility · §4.9 audit · §5, §6, §13, §14, §15 (KAN-188/189/196/197/198) · §26 (KAN-207).
+
+#### 22.10.3 Senior Architect — `EP42_TECHNICAL_DESIGN.md`
+
+**Invalidated:** **ADR-024** substantially — `step_increment_pct` on `job_levels` is the wrong shape and
+`job_step_increment_overrides` is the wrong concept; the tolerance `CHECK` is withdrawn (again, and this time
+permanently) · **ADR-023**'s Check A′ computation · §12.4.1's step model where it implies a derived-from-pay
+step · §5.2's feature-code registration (four → five) · §3.3's compensation table set (base + additional) ·
+§12.6's Check A′ boundary.
+**Explicitly NOT invalidated:** ADR-014 money · ADR-015 the effective-dated record · ADR-016 the tenant switch
+· ADR-017 family/level/step *structure* · ADR-018 row scoping · ADR-019 money out of `audit_log` (**extended**
+to additional pay) · ADR-020 half-open intervals · ADR-021 · ADR-022 four-eyes · ADR-025's forbidden-column
+table (**more load-bearing**, §22.8.2).
+
+#### 22.10.4 UX — `EP42_UX_SPEC.md`
+
+**Invalidated:** §7.9 (the fitted-step review screen) — replaced by a **manager step-assessment** screen in W1
+and a **reconciliation** screen in W2 · §23 (KAN-206) for the rate schedule and the withdrawn tolerance · §14's
+finding copy wherever it names another step · §13 (KAN-205) — descoped · §3.1's surface map (five codes) ·
+§13.0's compa-ratio framing.
+**New surfaces required:** manager step assessment (§22.4.2) · the reconciliation with totals-first (§22.4.3) ·
+additional pay and its register (§22.3) · the rate-schedule authoring surface (§22.5.1) · the inline deviation
+warning at proposal time (§22.7.4).
+**Explicitly NOT invalidated:** §3 discretion by design · §15 the bell · §22 KAN-207 · §25 the performance line
+(**rewrite again, do not delete** — §22.8.2) · every accessibility annotation.
+
+#### 22.10.5 UAT — `EP42_UAT_TEST_PLAN.md`
+
+**Invalidated:** **F13–F19** (the step-pay-point fixtures) in their nearest-step and tolerance parts · F-12,
+F-13, F-13b (tolerance inclusivity, the tie rule, the distance metric) — **the questions no longer exist** ·
+the KAN-200 Check A′ case set · the KAN-209 case set in full · KAN-205's cases · KAN-208's cases **paused**.
+**Explicitly NOT invalidated:** the 21-attack confidentiality catalogue (**extend to additional pay and to
+`pay_policy`**) · F1–F12's money and FTE arithmetic · Check B's statistical fixtures (**preserved, paused, not
+deleted** — §22.1.3(a) is a scope question, not a quality one) · the negative-visibility approach · the
+regression-suite plan · the Demo Gate pack.
+
+---
+
+### 22.11 Stories, waves and the corrected build order
+
+#### 22.11.1 EP42 — still 23 stories. A6 removes as much as it adds.
+
+**One new story (KAN-218), one removed (KAN-205 → Later), one repurposed (KAN-209), one made conditional
+(KAN-208). Net zero, and I am naming that rather than presenting it as free.**
+
+| Story | Change under A4–A6 |
+|---|---|
+| **KAN-190** | **+** the step expectations are now the **only** legitimate input to a step assessment, so ladder-description completeness is a hard dependency of KAN-191, not a quality nicety (R-18 escalates) |
+| **KAN-191** | **+ step assessment moves here from KAN-209** — the subject's solid-line manager assesses each direct report against the authored step expectations; **nothing pre-selected, nothing suggested, and never anything derived from pay**; `STEP_NOT_ASSESSED` is a distinct state that is not step `.0`; HR completion meter and override-with-reason. **Design it in one sitting with KAN-207's roadmap authoring** — same person, same judgement, same screen family |
+| **KAN-199** | **+ registers the fifth feature code `pay_policy`** in all four places; pay markets and the annualisation constants move to `pay_policy:w` |
+| **KAN-206** | **Substantially re-specified.** The rate is **per transition, per year**, with history: `step_increment_pct` on `job_levels` is withdrawn and `job_step_increment_overrides` is re-founded as the schedule itself. Entry values stay effective-dated. **The tolerance is withdrawn**; a **materiality threshold (default 1%) governs notification only** and never suppresses a computed number. Gated **`pay_policy:w`**. `step_pay_point(as_at)` resolves the schedule *and* the entry value at that date |
+| **KAN-210** | **Promoted in importance.** Under A6 moving the ladder **is** granting the rise — there is no second operation. Also carries the annual re-authoring of the rate schedule. Gated `pay_policy:w` |
+| **KAN-218** *(new, W2)* | **Additional pay** — a second, separately-governed amount beside base: mandatory reason code, effective-dated, optional end date with a mandatory review date otherwise, routed as a `COMPENSATION_REVIEW` through the chain with four-eyes, never in an `audit_log` diff, in "My Pay" for the subject, and an **additional-pay register** with the per-level share report. **Must · P1** |
+| **KAN-209** | **Repurposed. Same ID, same slot, new content: the ladder pay reconciliation** — totals first, three mandatory dispositions per employee (**align** · **attribute the surplus as additional pay** · **accept a residual deviation with a reason**), approved **once as a batch by two people**, and it opens the **ladder-adopted-and-reconciled gate** (renamed) |
+| **KAN-200** | **Check A″ is an equality, not a search.** `base` vs `step value × FTE` as at the evaluation date; magnitude in currency and percent against **their own step**; **no reference to any other step anywhere**; materiality threshold governs notification only; per-employee evaluability preconditions gain `STEP_NOT_ASSESSED`. **Check B unchanged in content and ⬜ conditional in status** |
+| **KAN-201** | **+** `PAY_ABOVE_STEP` gains the quick action **"Attribute as additional pay"** beside `PAY_BELOW_STEP`'s "Propose adjustment" — under A6 the over-payment case has a legitimate home and the finding should carry the route to it. `GENDER_GAP` ⬜ conditional |
+| **KAN-202** | **+** the **override-rate and additional-pay-share reporting** with the 40% configuration-review tripwire (§22.7.3). **+** the timeline shows base and additional pay as two series, never summed into one line |
+| **KAN-192 · KAN-196** | **+** the **inline deviation warning at proposal time** with a mandatory reason category on override (§22.7.4). KAN-192's pre-filled amount now comes from **that transition's** rate |
+| **KAN-208** | **⬜ Conditional and out of W0.** Moves into the Check B slice; nothing depends on it until he confirms Check B. Side benefit: W0 loses its only story that changes live behaviour in a shipped feature (R-19 drops out of the critical path) |
+| **KAN-205** | **Removed from EP42 → Later.** With base = step value, a min/max envelope answers approximately what the step value answers exactly |
+| **KAN-188 · KAN-189 · KAN-193 · KAN-194 · KAN-195 · KAN-197 · KAN-198 · KAN-203 · KAN-204 · KAN-207** | **Unchanged**, except that KAN-193/194/195 must carry additional pay through the record, the visibility model and the import alongside base |
+
+#### 22.11.2 EP43 — shrinks from 7 to 5, and A6 is why
+
+**A6 collapsed EP43's central mechanism as well as EP42's, and it is the same collapse.** The per-employee
+annual hike percentage was an artefact of the same wrong model — pay moving independently of the step. Under
+A6 pay moves for exactly three reasons, and a discretionary per-person percentage is none of them:
+
+| Reason pay moves | Where it lives |
+|---|---|
+| The step moved | EP42 — KAN-192, at that transition's rate |
+| The ladder moved | EP42 — KAN-210, and it is the same act as granting the rise |
+| An exception, attributed | EP42 — KAN-218, additional pay |
+
+| Story | Status |
+|---|---|
+| **KAN-216** | **Survives, re-pointed.** The **rating → pay** mapping: company-defined multipliers against the ratings EP44 produces. Still employer-authored, nothing predetermined, nothing suggested, versioned and works-council-inspectable |
+| **KAN-212** | **⛔ WITHDRAWN — merged.** Its "market movement per pay market" half is EP42's rate schedule (KAN-206/210); its policy half is KAN-216 |
+| **KAN-217** | **⛔ WITHDRAWN — superseded by EP44.** A manager-entered band per cycle was option (a). The owner chose (b), so the rating is produced by the review cycle, not typed into a pay screen |
+| **KAN-211 · KAN-213 · KAN-214 · KAN-215** | **Survive, re-specified.** KAN-213's worksheet becomes a **step-movement and additional-pay round**, not a percentage-distribution round |
+
+**EP43 is now a round-management epic, not a differentiation epic** — open a cycle, run the step reviews as a
+batch, approve once, apply on an effective date, close out and move the ladder. Confidence **Medium-High**; the
+one thing I am inferring is whether he still wants a discretionary per-employee percentage on top, and that is
+**Q3 on the one-pager**.
+
+#### 22.11.3 EP44 — Performance Management. Twenty-two stories, KAN-219 … KAN-240.
+
+**Real, entered, and specified to the same standard EP42 got** (*"a detailed performance requirement
+implementation"*). Numbering continues from KAN-218. **The compliance wave is designed in from the start, not
+bolted on** — that is A4 §4's explicit instruction and it is the difference between EP44 being buildable in
+Germany and not.
+
+| Wave | Stories |
+|---|---|
+| **P0 — foundations** | **KAN-219** the review-cycle object (per company, per period, `DRAFT → OPEN → IN_REVIEW → CALIBRATION → CLOSED`) and the feature codes · **KAN-220** cycle participation and eligibility (joiners, leavers, probation, part-cycle) |
+| **P1 — goals** | **KAN-221** goal/objective authoring, employee and manager · **KAN-222** progress and check-ins — **narrative, never scored** · **KAN-223** company goal templates, nothing predetermined |
+| **P2 — assessment** | **KAN-224** self-assessment · **KAN-225** manager assessment · **KAN-226** the rating scale — company-defined, versioned, nothing predetermined and nothing suggested · **KAN-227** the review form configurator · **KAN-228** the review conversation record and sign-off — **`Confirm we discussed this`, never `Accept`** (standing rule 6) |
+| **P3 — calibration, and the compliance gate** | **KAN-229** the calibration session as a **human forum** with a group view · **KAN-230** distribution **visibility, never enforcement** — a configurable forced curve is an automated decision wearing a settings page · **KAN-231** the calibration change record — every rating change carries actor, reason and before→after · **KAN-232** the **Art. 22 / EU AI Act gate**: human-in-the-loop attestation, an explainability record, and a hard rule that nothing is ranked or scored by the system |
+| **P4 — history, visibility, and the two seams** | **KAN-233** ratings history and its visibility model, with its own negative-visibility suite · **KAN-234** the employee's own view and right to comment · **KAN-235** the **pay seam**: EP43 reads a rating; single-purpose, absent from every other surface · **KAN-236** the **step seam**: a review is the `review_context` for a step change and the proposal cites the roadmap it fulfils (A2's narrative link, finally connected to a real review) · **KAN-237** reporting — completion and cycle health only, **no aggregate below n = 5** (CFL-42-32 applies here too) |
+| **P5 — governance** | **KAN-238** works-council inspectability — scale, forms, calibration rules versioned and reviewable **without individual data** · **KAN-239** retention, erasure and the DPIA items for performance data · **KAN-240** bias testing across the rating distribution — **measure, report, never auto-correct** |
+
+**Three boundaries EP44 inherits and may not weaken:** the ladder is still not a scoring instrument
+(ADR-025's forbidden-column table, UX §25) · money never reaches `audit_log` · and **nothing scores, ranks or
+auto-decides** — the moment anyone proposes a suggested rating, a ranked list or a forced distribution, it does
+not enter the backlog until it has full EU AI Act high-risk treatment.
+
+#### 22.11.4 The programme, and the build order
+
+```
+BG7 — 50 stories, ~8–9 months
+
+EP42 — Compensation, Job Architecture & Pay Equity — 23 stories
+  W0  S2   KAN-203(P0) ∥ KAN-204 ∥ KAN-188 ∥ KAN-189
+  W1  S3   KAN-190 → KAN-191 (level + STEP ASSESSMENT) → KAN-207
+  W2  S3   KAN-199 → KAN-206 → KAN-210 → KAN-193 → KAN-194 → KAN-218 → KAN-195 → KAN-209
+  W3  S3   KAN-196 → KAN-197 → KAN-198 → KAN-192
+  W4  S3   KAN-200 → KAN-201 → KAN-202
+  ⬜ conditional on the owner confirming Check B:  KAN-208 + Check B inside KAN-200/201
+
+EP44 — Performance Management — 22 stories, after EP42
+  P0 KAN-219 → KAN-220 · P1 KAN-221 → KAN-222 → KAN-223 · P2 KAN-224 → KAN-225 → KAN-226 → KAN-227 → KAN-228
+  P3 KAN-229 → KAN-230 → KAN-231 → KAN-232 · P4 KAN-233 → KAN-234 → KAN-235 → KAN-236 → KAN-237
+  P5 KAN-238 → KAN-239 → KAN-240
+
+EP43 — Annual Compensation Review Cycle — 5 stories, after EP44
+  KAN-216 → KAN-211 → KAN-213 → KAN-214 → KAN-215
+
+Later:  KAN-205 (bands) · total compensation · pay-transparency statements · statutory gap reporting
+```
+
+**Five sequencing rulings:**
+
+1. **EP42 does not wait for EP44.** *"Implement this first if this is the blocker"* was about the **hike
+   cycle**, not the compensation record. Nothing in EP42 needs a performance rating: a step assessment is a
+   judgement about job content, and A1 already anchored it to a review that happens off-system today.
+2. **EP44 goes ahead of EP43**, per his re-sequencing instruction. EP43's differentiation input comes from
+   EP44, so the other order builds a cycle with nothing to differentiate on.
+3. **EP43's KAN-211 and KAN-215 may run in parallel with EP44's later waves if capacity allows** — they have no
+   performance dependency. **A4 §4 asked me to confirm this and that is the answer: partially, and it is a
+   capacity call for the Delivery Manager, not a dependency.**
+4. **Nothing is blocked while EP44 runs.** KAN-210 gives a company a manual annual round today: re-author the
+   rates, move the entry values, and every employee's base follows. That fallback is *stronger* under A6 than
+   it was under A2, because moving the ladder now moves the money.
+5. **W1 is unchanged as the first shippable slice and W2 is still the minimum shippable slice for EP42.** W2
+   now exits with pay recorded, visibility enforced, additional pay available, backfilled, **and the ladder
+   reconciled by a human** — a better exit than before.
+
+**The one hard gate is unchanged: KAN-168 (real-DB test tier) still blocks W4.** A6 makes the primary check
+arithmetically simpler, which reduces R-12 but does not remove it — Check B, group formation, the exclusion
+constraints and every effective-dated lookup are still SQL semantics that a mocked suite cannot prove.
+
+---
+
+### 22.12 Registers — conflicts, risks, assumptions
+
+**Conflicts.** Continuing from CFL-42-58.
+
+| ID | Conflict | Sev | **SPM ruling** |
+|---|---|---|---|
+| **CFL-42-59** | **A6 makes the step↔salary inference exact.** Base *is* the step's value, so a published entry value + rate schedule + a known step yields a colleague's salary to the euro, and the inference runs both ways. CFL-42-39 ruled this for an approximate channel; it is now exact | **High** | **Ruled §22.1.2 and §22.6.** The ladder's *money* is gated `pay_policy:r`; its *structure and expectations* stay public on `job_architecture:r`. Where step display is off, pay points are unreadable by that employee. **Extends the surface list to a second derivation class** |
+| **CFL-42-60** | **The team built its central mechanism on an unvalidated inference and four specialist reviews reinforced it** — "pay position implies step position" was never in the owner's request | **High** *(process)* | **Ruled §22.15.** A Load-Bearing Premise Register, origin tagging, and a challenge instruction in every tasking brief |
+| **CFL-42-61** | **Check B has no owner requirement behind it** and carries KAN-208 (which changes live vacation eligibility), DPO-1 (Art. 9 data) and the whole statistical machinery | **High** | **Ruled §22.1.3(a).** Kept, re-labelled TEAM, descoped to a separable conditional slice, KAN-208 out of W0, and put to him |
+| **CFL-42-62** | **`step_increment_pct` on the level, with an override table, cannot express per-transition per-year rates** | Medium | **Ruled §22.5.1.** The rate lives on the transition and is year-scoped; the override table becomes the schedule. Architect re-cuts ADR-024 |
+| **CFL-42-63** | **A4-1 (advise, do not block) can be read as licence to weaken KAN-203 and KAN-198** | **High** *(pre-emptive)* | **Ruled §22.7.1.** Three categories, a closed and enumerated Category 2 list, and an explicit anti-erosion clause: A4-1 is about amounts and says nothing about actors |
+| **CFL-42-64** | **§14.5 (EP42 does not build the review) vs the owner's authorisation of full performance management** | Medium | **Ruled §22.8.2.** Superseded by owner decision. §14.5 still holds *for EP42*; EP44 builds the review |
+
+**Risks.** Continuing from R-19.
+
+| # | Risk | Change |
+|---|---|---|
+| **R-1** *(alert fatigue)* | **Reduced again, and for a better reason than last time.** §16.2 got day-one findings to zero arithmetically; §22.4.3 gets them to zero because a human dispositioned each case. The second is durable; the first was a property of a mechanism that turned out to be wrong |
+| **R-2** *(the mapping is a data project)* | **Worsened, and I am saying so.** It is no longer "map 116 titles to levels" — it is that **plus 146 human step assessments plus a reconciliation disposition each**. The manager distribution (§22.4.2) is the mitigation and it is the difference between a ten-minute task and a quarter-long project. **This is now the single biggest adoption risk in the programme** |
+| **R-12** *(equity arithmetic wrong)* | **Reduced.** An equality is far easier to verify than a nearest-neighbour search. KAN-168 still gates W4 |
+| **R-16** *(a configuration silently disables the check)* | **Stays closed**, and is now closed twice over: no cross-field constraint exists, and the materiality threshold cannot suppress a computed number (§22.5.3) |
+| **R-18** *(the ladder ships with content nobody can use)* | **Escalated to High × High.** Step expectations were a transparency feature; under A6 they are **the only legitimate input to a step assessment**. An undescribed ladder now blocks the backfill, not just the reading experience |
+| **R-19** *(KAN-208's vacation side effect)* | **Off the critical path** — KAN-208 is conditional and out of W0 |
+| **R-20** *(new)* | **The step assessment is done badly at speed** — forty managers clicking through a list to clear a task, producing a ladder placement nobody believes. **Medium × High.** No acceptance criterion can test it. Held by: the expectations shown inline at the point of choice, nothing pre-selected, HR's completion meter and override, and **a new Demo Gate human-check item — "a manager can explain why this person is at this step"**. Same family as R-18 |
+| **R-21** *(new)* | **Additional pay becomes the dumping ground.** Every awkward number gets attributed as a premium, base drifts into fiction, and the ladder looks perfect while meaning nothing. **Medium × High.** Held by the mandatory reason **code** (not free text), the review date, and the **per-level additional-pay share report** (§22.3.1 item 8) — which is the instrument that makes the disease visible |
+| **R-22** *(new)* | **EP44 crosses the Art. 22 line by increment.** Calibration is one plausible-sounding feature request away from a forced distribution. **Medium × Critical.** Held by KAN-232 as a story rather than a note, distribution-shown-never-enforced, and the standing statement in §22.8.3 |
+
+**Assumption register — new and changed entries.**
+
+| Item | Type | Impact if wrong | Validation | Owner |
+|---|---|---|---|---|
+| An employee's base pay **is** the step's value × FTE, exactly, with any difference either attributed as additional pay or recorded as a deviation | **Known** — A6 §6, his own worked example | — | — | SPM |
+| The entry value of a level moves only when the employer moves it, with no annual expectation imposed | **Assumption (Medium)** — A3-1 says nothing predetermined; A6 does not say | If he expects an automatic annual lift, employees who do not move a step are silently frozen and nothing detects it | **Q1, §22.13** | SPM |
+| *"Local HR"* means "HR acting on individual cases", not "HR scoped to a country" | **Assumption (Medium)** | Reading (b) is a platform change to the access model and a separate epic | **Q2, §22.13** | SPM |
+| A discretionary per-employee percentage is no longer wanted, because step moves and additional pay cover the cases | **Assumption (Medium-High)** — follows from A6 §4 | EP43 grows back by ~2 stories | **Q3, §22.13** | SPM |
+| Managers can and will assess their own reports against written step expectations | **Assumption (Medium)** — the population and team sizes support it (Acme: 46 people, median team 3–4) | The backfill stalls and the whole equity feature stays gated behind a closed reconciliation | First tenant; R-20 | SPM / Delivery |
+| The owner wants a gender pay-gap check at all | **Needs Validation** — **downgraded from "closed"**, see §22.1.3(a) | We change live vacation behaviour and ask a DPO to clear Art. 9 processing for a check nobody requested | **Q4, §22.13**, with DPO-1 | SPM |
+| A single named supplementary component is sufficient; no general components model is needed | **Assumption (High)** — A6 §3 is explicitly one field for one situation | OQ-5 re-opens and KAN-193/218's record shape changes | Watch item: a second component request | SPM / Architect |
+
+---
+
+### 22.13 For the product owner — one page, with the numbers *(supersedes §21.7)*
+
+*Four questions. Each one is a worked example with real numbers, per your instruction. **Every one has a
+default we are already building, so nothing here is blocking you.** If you answer only one, answer Q1.*
+
+**First — thank you for the correction. You were right and we had it wrong.** We had built a model where the
+salary decided the step. Your model is the other way round and it is better:
+
+> **The job decides the step. The step decides the base pay. Pay never decides the step.**
+> Anything extra — the retention save, the market premium — is **additional pay**, recorded with a reason,
+> sitting beside the base and never touching the ladder. **Tom stays a 2.1.**
+
+**The ladder we are working from, in your numbers.** Level 2, Full Stack Software Engineering. Global HR sets
+for 2027: **2.0→2.1 = 2%**, **2.1→2.2 = 2.4%**. Step 2.0 = **€50,000**, so 2.1 = **€51,000** and 2.2 =
+**€52,224**.
+
+---
+
+#### Q1 — Anna stays at step 2.1 all through 2027 and 2028. She does her job well. Her responsibilities do not change. **What is her base pay in 2028?**
+
+*This is the one question with a real cost attached, and it has never been put to you — the three earlier
+attempts asked something else, badly.*
+
+| | What it means | **Anna in 2028** |
+|---|---|---|
+| **A — the whole ladder moves every year** | Global HR raises step 2.0 from €50,000 to €51,000 each January, so every step above it lifts too | **€52,020.** Everyone gets the market movement whether or not they move a step |
+| **B — the ladder never moves** | Only the transition rates are re-authored. Your pay changes when your step changes, and only then | **€51,000** — the same as 2027, and the same in 2029 |
+| **C — the ladder moves when Global HR decides, and the system asks** | No automatic rise. Global HR sets the new entry value each year if they want one, and the product warns when 18 months have gone by without one | **Whatever Global HR set** — and if they set nothing, €51,000 with a warning on the screen |
+
+**We recommend C, and we are building C.** B silently freezes everyone who does not move a step, and nothing in
+the system would notice — that is the failure mode I would least like to explain later. A takes the decision
+out of the employer's hands, which contradicts your own instruction that nothing about pay may be
+predetermined. **C is A's tooling with B's discipline: the employer decides every year, and the product makes
+sure they know when they have not.**
+
+---
+
+#### Q2 — Lars is an HR administrator in Oslo. Tom in Oslo is resigning, so Lars grants him €2,550 of additional pay. **Can Lars also grant additional pay to somebody in Hamburg?**
+
+| | What it means | **Can Lars pay a Hamburg employee?** | Cost |
+|---|---|---|---|
+| **A — two permissions, one HR role** | We add one permission, "set the company's pay policy". Ingrid has it, so she authors the ladder's rates for the whole company. Lars does not, so he can grant Tom his premium but **cannot change the 2.1→2.2 rate** | **Yes** — Lars can act on any individual in the company | **Nothing.** Seed values and one new permission |
+| **B — HR is scoped to part of the organisation** | HR people are attached to a country or region and can only act on people in it | **No** — Hamburg is not his | **4–6 stories and a change to the access model the whole product uses.** It would delay the pay record by a month or more |
+
+**We recommend A and we are building A.** Your sentence — *"the local HR department decides to hike salary of
+one employee"* — reads at least as easily as *"the HR people who handle individual cases"* as it does *"the HR
+people in Norway"*, and A gives you the important half of the distinction for nothing: **local HR can no longer
+rewrite the company's pay ladder.** If you need the Hamburg answer to be **no**, tell us — that is a separate
+piece of work and we would rather know now than build A twice.
+
+---
+
+#### Q3 — Anna performs very well in 2028. Her job has not changed and she does not move a step. **Should her manager be able to give her 3% while giving someone else 1%?**
+
+| | What it means | **Anna's 2028 rise** |
+|---|---|---|
+| **A — step moves and additional pay only** *(your A6 model, taken literally)* | Pay moves when the step moves, or when the ladder moves. Anything else is additional pay with a reason. If her manager wants to reward her specifically, they either **move her to 2.2** (because she is doing 2.2's job) or **grant additional pay** (because it is an exception, and it says so) | **Nothing extra** unless the ladder moves — and then everyone at 2.1 gets the same |
+| **B — plus a discretionary percentage each year** | On top of the above, managers get a per-person percentage in the annual round, differentiated by performance within a budget | **3%**, at her manager's discretion |
+
+**We recommend A and we are building A.** B re-opens the exact door you just closed: a per-person percentage
+pulls base pay away from the step's value, and within two years nobody's base matches their step again. Under A
+the two legitimate cases are both still served — *she is doing more* is a **step move**, and *we need to pay
+her more anyway* is **additional pay with a reason on it**.
+
+**What this changes for you: the annual cycle gets much smaller.** It becomes "open the round, review the
+steps, approve once, move the ladder" instead of a budget-and-percentages exercise. **That epic drops from 7
+stories to 5.**
+
+---
+
+#### Q4 — We have been building a **gender pay-gap check**. **Did you ask for that?**
+
+*We do not think you did, and we should have noticed sooner. It came from us, reading the EU Pay Transparency
+Directive, and it then travelled through five rounds of documents looking like your requirement.*
+
+| | What it means | Cost |
+|---|---|---|
+| **A — yes, build it** | For each job level and market with at least five people, compare the median pay of men and women and report gaps over 5%. It needs gender recorded for every employee — which today changes which leave types 146 people are offered — and a data-protection sign-off, because gender is special-category data | ~1 wave of W4, plus a DPO clearance and a change to live behaviour in a shipped feature |
+| **B — no** | We drop it. **Nothing else in the epic is affected** — we have deliberately kept it separable | **Zero.** We stop |
+| **C — later** | Park it. Everything else ships; this comes back when you have a customer who needs it | Zero now |
+
+**We recommend C and we have parked it accordingly** — it is off the critical path and nothing depends on it.
+**Your original ask is already satisfied without it:** two people at the same step in the same market now earn
+the same base by construction, so a "5% difference for the same position" cannot arise quietly at all.
+
+---
+
+#### Confirmations — no action needed unless one of these is wrong
+
+- **Additional pay** carries a **mandatory reason** (retention, market premium, red-circled legacy pay,
+  transitional, other), an **effective date**, and either an **end date or a review date** — so a premium
+  nobody revisits does not quietly become permanent salary. It needs **two people to approve**, like any other
+  pay change.
+- **Full performance management is confirmed** — cycles, goals, calibration — in your words, *"go ahead with
+  full implementation cycle as Product owner accepting the delay."* It is now a real epic of 22 stories and it
+  runs **after** the compensation work and **before** the annual cycle, as you instructed.
+- **The step display switch is closed** — a company may choose not to display an employee's step; the job
+  title, the job family and every level's expectations stay visible always. Labelled *"do not display"*, not
+  *"hide"*, because an employee can still work it out from the expectations.
+- **Base salary only** stands (your *"at this point"*), now with additional pay as the one supplementary
+  amount. No bonus, commission or equity.
+
+#### Three things that are not questions
+
+1. **Where this has got to, stated once.** You asked for salary, job levels and a pay flag. It is now a
+   three-epic programme of about **50 stories and 8–9 months** — compensation (23) → performance management
+   (22) → the annual cycle (5). You have chosen every step of that with the cost shown, which is your call to
+   make. It is worth seeing the total in one place.
+2. **The first real pay figure entered — even one, even by us, even "just to see how it looks" — triggers the
+   security and login phase before anything else ships.** Much better known now than on the day you want to
+   show a prospect their own numbers.
+3. **Until real login exists, the pay visibility rules are correct in code and unenforceable in practice** —
+   anyone can pick any identity from the demo tiles. Every compensation demo will say so at the start rather
+   than let somebody find out.
+
+---
+
+### 22.14 Wave 7 tasking — the amendment round for A4–A6
+
+*Each brief names what A4–A6 invalidate in **your** document and what to write instead. It is precise enough to
+act on without re-deriving the amendments. Report in Charter §6 format.*
+
+#### 22.14.0 The instruction that comes first, and it goes to all four of you
+
+**⚠️ Challenge the premises before you apply them.** The reason this round exists is that *"pay position implies
+step position"* entered the epic as a **team inference**, was never in the owner's request, and survived four
+specialist reviews and two of my reconciliations because everybody — including me — was tasked to **apply** the
+model rather than **test** it.
+
+So, as a **required deliverable and not an optional extra**, each of you returns a short section headed
+**"Premises I challenged"** covering:
+
+1. **Every requirement in your document that is a TEAM inference rather than something the owner said or
+   something the repository proves** — tag it, and say what would falsify it. §22.1.1 is my list; **find the
+   ones I missed, especially in your own file.**
+2. **At least one premise you went and checked at source** — his verbatim words, the code, the database — and
+   what you found. *"I checked this and it holds, here is the evidence"* is a result and I want it written
+   down. The BA found the model wrong in Wave 5 only because somebody went and looked at what
+   `employees.gender` is actually used for.
+3. **Anything in §22 you think is wrong.** Say so under the Conflict Log convention and build to the stated
+   rule meanwhile. **Agreement between four people all tasked from the same brief is not evidence** — that
+   sentence is in §22.15 because I wrote the opposite in §16.1 and it was the error that let this run.
+
+#### 22.14.1 Business Analyst
+
+**Invalidated in your file:** §4.4A in full · §4.5A's fitted-backfill rules · AC-200-\* (primary check) ·
+AC-206-\* · AC-209-\* in full · AC-191-\* step criteria · §3.2's four codes · BR-10.\* · §21.4A · §28
+(KAN-205). **Not invalidated:** §4.1, §4.2, §4.3, §4.7, §4.8, §4.9, §5, §6, §13, §14, §15, §26.
+
+1. **Rewrite §4.4A as Check A″ — an equality, not a search.** `base` vs `step value(as_at) × FTE`; the
+   deviation expressed as a magnitude in currency and percent **against their own step**; a **materiality
+   threshold, default 1%, that governs notification only and never suppresses a computed number**. **No
+   criterion anywhere may reference another step** — that is a testable prohibition and I want it written as
+   one.
+2. **Withdraw, do not amend:** every nearest-step criterion, the tie rule, the distance metric, the
+   half-increment boundary, the tolerance constraint, and every criterion that fits a step from pay. These are
+   deletions.
+3. **New business rules** for: the **per-transition, per-year rate schedule** and its history (§22.5.1) ·
+   compounding across transitions with his own 2%/2.4% worked example as a fixture (§22.5.2) · **base = step
+   value × FTE** as an invariant · `STEP_NOT_ASSESSED` as a state distinct from step `.0`, with its own
+   rendering rule.
+4. **Rewrite AC-191-\* for step assessment** (§22.4.1–2): manager-authored against the step expectations,
+   **nothing pre-selected, nothing suggested, nothing derived from pay**, HR override with a reason, completion
+   meter, and the `STEP_NOT_ASSESSED` rules.
+5. **Rewrite AC-209-\* entirely for the reconciliation** (§22.4.3): totals first, three mandatory dispositions
+   with none pre-selected, the **batch approval by two people**, and the renamed
+   **ladder-adopted-and-reconciled gate**. Include the case where an employee is unassessed — it must **not**
+   block the gate, only their own evaluability.
+6. **New criteria for KAN-218 (additional pay)** — all eight rulings in §22.3.1, each as a testable criterion.
+   The ones most likely to be lost: **additional pay is excluded from the correspondence check and included in
+   Check B**; **it never appears in an `audit_log` diff**; **it goes through the chain with four-eyes**.
+7. **Amend §3.2 to five feature codes** — `pay_policy` registered in KAN-199, and **CFL-42-20's thresholds move
+   from `company_settings:w` to `pay_policy:w`.** Note that CFL-42-20's *ruling* (not a role check) is
+   preserved; only the home changes.
+8. **Write §22.7's three categories as a business rule**, with the Category 2 list enumerated and the
+   anti-erosion clause stated. This is the rule that protects KAN-203 from a future reader with a good
+   argument, and it belongs in your business rules where an engineer will find it.
+9. **Mark Check B ⬜ conditional throughout** — content unchanged, status changed. **Do not delete a single
+   Check B criterion**; §22.1.3(a) is a scope question, and if he says yes we want them intact.
+10. **Withdraw AC-205-\*** and record KAN-205 as Later. **Re-check §21.4A's contingency register** — several
+    contingencies died with the tolerance and the nearest-step rule.
+
+**Do not:** design schema · re-decide §22 · re-open Check B's arithmetic · write EP44 criteria yet (that is a
+separate exercise once its epic outline is agreed).
+
+#### 22.14.2 Senior Architect
+
+**Invalidated:** ADR-024 substantially · ADR-023's Check A′ computation · §12.4.1 where the step model implies
+derivation from pay · §5.2's four-code registration · §3.3's compensation set · §12.6.
+**Not invalidated:** ADR-014, 015, 016, 017 (structure), 018, 019 (**extended**), 020, 021, 022, 025.
+
+1. **Re-cut ADR-024.** `step_increment_pct` on `job_levels` is **withdrawn**; `job_step_increment_overrides` is
+   **re-founded as the schedule itself** — a rate per transition, **effective-dated**, with history, on
+   ADR-020's half-open convention. There is no longer a level rate to override, so the two-tier lookup
+   collapses to one. **This should be cheaper than what it replaces — say whether it is.**
+2. **`step_pay_point(level, market, step, as_at)` now resolves two effective-dated things** — the entry value
+   *and* the rate schedule — at the same date. **Every caller passes a date; that is the change most likely to
+   be missed by a caller, and it was already true before A6, so it needs a callable-level guard, not a comment.**
+3. **Withdraw the tolerance `CHECK`** — for the third and final time. There is no cross-field constraint left
+   in the model. The materiality threshold is a plain configurable value with **no constraint against it**
+   (§22.5.3), and its semantics are notification-only: **the deviation is always computed and stored.**
+4. **Re-cut ADR-023's primary computation as an equality.** `|base − step_value × fte|` against a threshold —
+   no nearest-neighbour, no windowing, no tie rule. **Re-run the cost model; it should improve markedly.**
+   Check B's group machinery is unchanged and stays behind a feature switch (conditional).
+5. **The compensation record gains additional pay** (§22.3) — a separate, effective-dated, reason-coded amount
+   beside base, **not** a general components table. Extend **ADR-019's per-action allowlist** to it explicitly:
+   `has_additional`, `reason_code`, `direction`, `pct_change_band`, `effective_date`. **Never a figure.**
+6. **Add the fifth feature code `pay_policy`** — four places, registered in KAN-199. Confirm
+   `TestFeatureRegistryHasNoDrift` catches a miss on it. Confirm the `pay_policy:r` / `job_architecture:r`
+   split resolves CFL-42-59 cleanly, and that no payload leaks an entry value or a rate to a holder of
+   `job_architecture:r` alone.
+7. **Rule on where the step assessment lives.** It is job content, so it belongs in the job-architecture
+   service — but it must be **structurally incapable** of reading compensation. §2.2's one-way call rule
+   applies, and I want it stated as a prohibition in ADR-025's style: **no function that assigns a step may
+   take, read or import a monetary value.** That is the A6 prohibition made architectural rather than
+   procedural, and it is the single most valuable thing you can add this round.
+8. **KAN-209's reconciliation** — a batch that writes N compensation records and M additional-pay records in
+   **one** transaction with **one** correlated audit set (the EP43 pattern, established here first). Say how
+   partial application is made unreachable at 146 rows.
+9. **EP44 — an architecture sketch only, no ADRs.** Where the review cycle sits; how the rating reaches EP43
+   without becoming readable anywhere else; and **one paragraph on how KAN-232's no-ranking rule is held
+   structurally** rather than by review discipline. ADR-025's forbidden-column table is unchanged and now more
+   load-bearing.
+
+**Do not:** re-open the product decisions in §22 · build a components table · build organisational scoping for
+Global/local HR.
+
+#### 22.14.3 UX / Product Designer
+
+**Invalidated:** §7.9 (the fitted-step review) · §23 (KAN-206) for the rate schedule and the tolerance · §14's
+finding copy wherever it names another step · §13 (KAN-205, descoped) · §3.1's surface map.
+**Not invalidated:** §3 discretion by design · §15 the bell · §22 (KAN-207) · every accessibility annotation.
+
+1. **The manager step-assessment screen — the most important new surface in this round, and treat it that
+   way.** Forty managers, three or four reports each, assessing against written expectations. It decides
+   whether the backfill finishes (R-2) **and** whether the placements mean anything (R-20). Constraints:
+   **nothing pre-selected**, the step expectations readable **at the point of choice** without leaving the
+   screen, and **no number on the screen that could be mistaken for a salary or a fit**. Design it **in one
+   sitting with KAN-207's roadmap authoring** — it is the same person making the same judgement, and two
+   separate visits will get one of them skipped.
+2. **The reconciliation screen (KAN-209) — totals first.** The HR director's first question is *"what does
+   adopting this ladder cost?"*, so the aggregate opens the screen and the per-person list is second. Three
+   dispositions, none pre-selected, and a batch confirmation proportionate to the blast radius.
+3. **Rewrite every finding string that names another step.** *"Paid closer to step 2.2"* is forbidden — the
+   copy states the magnitude against **their own** step. This is standing rule 6 applied to a finding: naming
+   another step is a claim about somebody's job.
+4. **Additional pay (KAN-218)** — the grant flow with its reason code and review date, its place on "My Pay"
+   (the subject sees their own premium; it is their money), the **additional-pay register**, and the per-level
+   share report. And the copy that keeps base and additional **visibly separate and never silently summed** —
+   a single "total pay" number would undo A6 on the screen.
+5. **The rate-schedule surface (§22.5.1)** — a grid of transitions × years, authored annually by Global HR,
+   with history readable. And **KAN-210's re-base screen changes meaning**: under A6 moving the ladder *is*
+   granting the rise, so the preview must say so in those words and show how many people's base pay moves.
+6. **The inline deviation warning at proposal time** (§22.7.4) in KAN-192, KAN-196 and KAN-218 — the flag he
+   asked for, at the moment he asked for it. **"Red" must not be the only signal (WCAG 1.4.1), and consider
+   whether red is even right** for a case HR is expected to override routinely and legitimately. Vocabulary is
+   ruled ("flag", one object); the palette is yours.
+7. **The `STEP_NOT_ASSESSED` empty state** — *"Step not yet assessed"*, never `2.0`, never a dash, never blank.
+   Same discipline as "No salary recorded" versus "Not applicable — contractor".
+8. **§25 — rewrite for the third time, do not delete.** Performance management now exists next door as a real
+   epic. The line is no longer *"the ladder is not performance management"* as a defence against drift; it is
+   **which surface owns what**, and the ladder must still not become a scoring instrument. Expect *"can we tick
+   off roadmap items?"* to be asked far more often once EP44 is visible, and pre-refuse it there too.
+9. **Surface map: five codes.** What "no access" looks like for `pay_policy`, and — per CFL-42-59 — what an
+   employee sees on `/ladder` when they hold `job_architecture:r` but not `pay_policy:r`: **structure and
+   expectations, no money.**
+
+#### 22.14.4 UAT Lead
+
+**Invalidated:** F13–F19 in their nearest-step and tolerance parts · F-12/F-13/F-13b (the questions no longer
+exist) · the KAN-200 Check A′ set · the KAN-209 set in full · KAN-205's cases · KAN-208's cases **paused, not
+deleted**. **Not invalidated:** the attack catalogue · F1–F12 · Check B's fixtures (**preserved and paused**) ·
+the negative-visibility approach · the regression plan · the Demo Gate pack.
+
+1. **New arithmetic fixtures, hand-computed as before, and use his numbers**: entry €50,000, 2.0→2.1 at **2%**,
+   2.1→2.2 at **2.4%** → 2.1 = **€51,000**, 2.2 = **€52,224**. **Put the linear values (€52,200) alongside so a
+   linear implementation fails loudly.** Add a three-transition case with three different rates, and a case
+   where the schedule changes between years so an as-at lookup that ignores its date fails.
+2. **The prohibition as a test, and this is your highest-value contribution this round.** Assert that **no
+   API payload, DOM node, export, notification body or audit row ever references a step other than the
+   employee's own** in a correspondence context, and that **no step-assignment path accepts or reads a monetary
+   input**. A6 is a prohibition; a prohibition needs a negative test or it is a comment.
+3. **Tom's case, end to end, as the epic's headline fixture** (A6 §6): step 2.1, base €51,000, additional
+   €2,550, total cash €53,550 → **the correspondence check raises nothing**, his step does not move, and the
+   €2,550 appears attributed with its reason. **If that test fails, the amendment has not landed.**
+4. **The reconciliation (KAN-209)**: all three dispositions; the batch approval binding **two different
+   people**; an unassessed employee that does **not** block the gate; and — the one that matters —
+   **the day-one finding count is zero after a completed reconciliation.**
+5. **Additional pay**: excluded from the correspondence check, included in Check B, absent from every payload
+   without `compensation:r`, absent from every `audit_log` diff, present in "My Pay" for the subject only,
+   present in the watermarked export. Extend the attack catalogue to it and to `pay_policy`.
+6. **CFL-42-59** — assert that a holder of `job_architecture:r` without `pay_policy:r` cannot retrieve an entry
+   value or a rate in any payload, and that with step display off the employee's own payloads carry neither a
+   step nor a pay point.
+7. **Withdraw and say which**: for every F13–F19 fixture, state withdrawn / re-scoped / retained. **Check B's
+   statistical fixtures must not be lost in the clear-out** — that is the specific risk in this amendment, and
+   it is the second time I have had to say it.
+8. **Two additions to the Demo Gate's must-be-walked-by-a-human list** (§7.3): *"a manager can explain why this
+   person is at this step"* (R-20) and *"the ladder reads as a real description of the work"* (R-18, already
+   there — it is now load-bearing rather than aspirational, because an undescribed ladder cannot be assessed
+   against).
+
+---
+
+### 22.15 Process finding — how an unexamined team premise survived five rounds
+
+*Charter §9 (evidence before opinion; never invent product facts). **A finding, not a blame exercise** — I
+wrote the premise, I reinforced it in Wave 5, and I wrote the tasking that told four specialists to apply it.*
+
+#### 22.15.1 What happened
+
+"Pay position implies step position" entered the epic in **§14.1**, as my reconciliation of two of the owner's
+messages. **I labelled it correctly at the time** — *"this is an inference, and it should be confirmed rather
+than assumed forever"* — and logged the validating question as **OQ-A1-1** with the default *"build it as
+reconciled"*.
+
+Then four things happened, in this order:
+
+1. **The inference acquired a decision number.** Once it was §14.2 it read like a ruling, and every document
+   downstream cited it as one. **A label travels; a caveat does not.**
+2. **The validating question was never chased.** OQ-A1-1 went onto a one-page list of eleven items, each with
+   a default so that *"nothing blocks"*. Nothing blocked — and nothing was answered either. **The mechanism
+   that stops work stalling also removes the pressure that gets questions answered.**
+3. **Every tasking brief said "apply", not "test".** My Wave 4 and Wave 6 briefs are lists of *invalidated
+   sections* and *what to change*. A specialist reading that is being asked to conform. The one time somebody
+   went and looked at source instead — the BA checking what `employees.gender` is actually used for — they
+   found a live behavioural defect and logged their own earlier assumption as **KNOWN TO BE FALSE**.
+   §16.4 even says so: *"the register caught it because somebody went and looked, not because anybody reasoned
+   about it."* We noticed the lesson and did not generalise it.
+4. **I read agreement as confirmation, and wrote it down.** §16.1: *"Nobody attacked A1's shape... which is the
+   strongest evidence available that the model is right."* **That sentence is the defect in one line, and it is
+   mine.** Four specialists, tasked from one brief, told the model was authoritative, agreeing about it is not
+   four pieces of evidence. It is one assumption wearing four coats. Contrast §12.1, where three roles found
+   the same hole in my four-eyes rule *from three different starting points* — **that** was independent
+   convergence, and the difference between the two cases is exactly the thing I failed to notice.
+
+**Net cost:** five rounds, four specialist documents, two reconciliations and a build order all constructed on
+a premise the owner had never stated, discovered only when he read a worked example and said *"No you have not
+got correct!!"*. **He was the test. That is the wrong person to be the test.**
+
+#### 22.15.2 The change — three rules, effective immediately, for every epic
+
+**1. The Load-Bearing Premise Register.** Every epic carries one, owned by the SPM, **maximum ten rows** —
+if it is longer than ten it is not a register of what the design cannot survive being wrong about. Each row:
+the premise · **its origin, tagged OWNER / EVIDENCE / TEAM** (§22.1.1) · for TEAM rows, **the single question
+that would falsify it** and who is chasing the answer.
+
+> **The hard rule: a TEAM premise may not be load-bearing across more than one wave without a validating
+> answer.** If a wave closes and it is still unvalidated, it goes to the **top** of the owner's page, above
+> everything else, and the next tasking brief says so. Defaults keep work moving; they must not be allowed to
+> keep questions comfortable.
+
+**2. Origin tagging on requirements.** Every requirement in every deliverable carries its origin — the owner's
+verbatim words, a `file:line`, or *TEAM inference*. It is a column, it costs nothing, and under it **"pay
+position implies step position" would have carried `TEAM inference — SPM §14.1` in all five documents.** The
+fifth reader would have seen it. Four of them read past it because it looked like his.
+
+**3. "Premises I challenged" is a required section in every specialist report**, and it is in §22.14.0 for this
+round. It must name the TEAM premises in that specialist's own file, and it must contain at least one premise
+checked **at source** — his words, the code, the database — with the result stated either way. *"I checked and
+it holds"* is a deliverable.
+
+**And one line for my own review checklist** (role file, "Reviewing a specialist report"):
+
+> **Agreement between specialists tasked from the same brief is not evidence.** Only a specialist who went to
+> the source produces evidence. When four reports converge, ask what they converged *from* before treating it
+> as confirmation.
+
+#### 22.15.3 What I am not changing, and why
+
+I am **not** adding a review stage, a sign-off or a gate. The problem was not too little process; it was that
+the process had no step at which somebody was **asked to disagree**. Three cheap rules that change what a brief
+asks for beat a fifth wave that asks the same question again more formally.
+
+And I am **not** treating the defaults mechanism as the culprit. Building against a stated default is right —
+it is why EP42 has 23 specified stories rather than eleven open questions. **The failure was that a default
+was allowed to age into a fact.** Rule 1 is aimed precisely at that and nothing else.
+
+*A4, A5 and A6 applied. Backlog and roadmap updated in the same pass. EP42 at 23 stories, EP44 entered at 22,
+EP43 reduced to 5; four questions with the owner, all with defaults being built against, none of them blocking.*

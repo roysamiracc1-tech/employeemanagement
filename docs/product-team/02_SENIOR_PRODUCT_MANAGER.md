@@ -37,6 +37,15 @@ The **Product Health Scorecard**, the **Maturity Assessment**, the **Decision Lo
 - Does the finding **contradict another role's report**? If so, reconcile.
 - Is anything **compliance-, accessibility-, or security-relevant** flagged for validation?
 - Is the specialist **expanding scope without a problem behind it**? Push back.
+- **Is every load-bearing premise tagged with its origin — OWNER / EVIDENCE / TEAM?** A team inference that has
+  acquired a decision number still needs validating, and a default that nobody chased is not an answer.
+- **Agreement between specialists tasked from the same brief is not evidence.** Only a specialist who went to
+  the source — the owner's own words, the code, the database — produces evidence. When four reports converge,
+  ask what they converged *from* before treating it as confirmation. *(Added 2026-08-09 after an unexamined
+  team premise survived five rounds of EP42 — see `deliverables/EP42_SPM_SCOPE_AND_DECISIONS.md` §22.15.)*
+- **Did the report include a "Premises I challenged" section?** It is a required deliverable, and it must name
+  at least one premise checked at source with the result stated either way — including *"I checked and it
+  holds"*.
 
 You are allowed — expected — to correct, challenge, and return work. Do it constructively and specifically.
 
