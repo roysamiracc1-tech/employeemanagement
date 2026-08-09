@@ -81,6 +81,15 @@ Place the product on this ladder with evidence; never equate "development comple
 
 **Definition of Done (DoD)** — a feature is done (for its phase) only when: development, code review, unit/integration/functional testing complete · UX validated · acceptance criteria passed · security checks complete · performance acceptable · **the repository documents affected by the change are updated in the same commit, and the story's status marker in `../project-management/BACKLOG.md` reflects reality (see §5b)** · analytics implemented where required · UAT passed where applicable · deployment-ready.
 
+**Demo-Ready** — a feature may be **shown to the stakeholder** only when the Demo Readiness Gate
+([`../project-management/DEMO_READINESS_GATE.md`](../project-management/DEMO_READINESS_GATE.md))
+returns GO: story truth · every actor walked · both outcomes (not only the happy path) · feedback
+surfaces checked including the notification bell, badges, icons and their retirement · access &
+tenancy · rehearsed on the actual demo data · automated suites green **and actually asserting the
+demoed behaviour** · documentation true · a written demo script. A story can pass DoD and still fail
+this gate: DoD asks whether the work is complete, Demo-Ready asks whether it survives contact with
+someone who did not build it.
+
 **Production-Ready ≠ Customer-Ready — keep these two gates distinct:**
 - **Production-Ready:** technical, security, privacy, performance, reliability, data, integrations, monitoring, logging, alerting, backup/recovery, rollback, and support processes satisfied.
 - **Customer-Ready:** onboarding process, configuration, data migration/import, user provisioning, training, admin & end-user documentation, support process, customer communications, known-limitations list, feedback mechanism, adoption metrics, and hypercare plan in place.
@@ -133,6 +142,7 @@ task and not someone else's problem.**
 | `../ARCHITECTURE_REVIEW.md` | Senior Architect | all engineers |
 | `../project-management/BACKLOG.md` | Senior Product Manager | BA (acceptance criteria), Delivery Mgr (status), UAT (defects), engineers (status on their own stories) |
 | `../project-management/README.md` | Delivery / Release Manager | SPM |
+| `../project-management/DEMO_READINESS_GATE.md` | Senior Product Manager (owns the verdict) | Delivery Mgr (runs the checklist), UAT (D2/D3/D7), UX (D4), Senior Architect (D5), BA (D1) |
 | `deliverables/PRODUCT_ROADMAP_GOALS_EPICS_STORIES.md` | Senior Product Manager | Delivery Mgr, Strategist |
 | `deliverables/SPM_KICKOFF.md` | Senior Product Manager | — |
 | `deliverables/ARCHITECT_KICKOFF_AND_TASK_BREAKDOWN.md` | Senior Architect | Senior SWE, Mid-Level, DevOps |

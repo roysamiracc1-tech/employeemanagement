@@ -163,6 +163,17 @@ routes; SNR reviews MID PRs.
 | T-155-2 | SNR | Wrap vacation-type create/edit (`vacation.py:87-93,142-150`) and org-change apply (`org_change_service.py:56-68,162-163`). | mid-loop failure leaves **no** partial rows (integration) |
 | T-155-3 | MID | Ensure read paths don't sit idle-in-transaction (autocommit for reads or commit/rollback in `query`). | connection-state test |
 
+**Status — KAN-155 ✅ delivered (SNR).** T-155-1 ✅ `app/db.py::transaction()`. T-155-2 ✅ vacation-type
+create/edit + org-change `save_workflow`, `create_request`, `apply_change` and every `decide()` outcome —
+including the final apply + status close-out as one unit (closes **TD-7**). **T-155-3 ✅ absorbed into
+T-155-1 — MID should not pick it up:** the chosen mechanism is `autocommit=True` on the connection with
+`transaction()` toggling it off for the duration of a block, so reads are idle-in-transaction-free by
+construction rather than by a separate change to `query()`. Evidence: pytest 4,524 pass · browser 77/77 ·
+vacation 39/39 · `tests/test_transactions.py` (12 checks incl. a real-Postgres rollback tier).
+**Deliberately out of scope, reported for tracking:** employee registration (`admin.py:178-232`, already
+TD-11/T-183-4), role reassignment `api_update_roles`, company-role & admin seeding, company create
+(`company.py:96-147`), CSV import apply (`import_service.py:123-175`).
+
 #### KAN-156 — Kill N+1s — **F22** — lead: MID · review: SNR
 | Task | Owner | Detail | Tests |
 |---|---|---|---|

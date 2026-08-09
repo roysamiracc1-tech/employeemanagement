@@ -35,6 +35,17 @@
     <div style="display:flex;align-items:center;gap:5px;font-size:.72rem;color:#64748b">
       Click card → view profile
     </div>
+    {% if can_move %}
+    <div style="display:flex;align-items:center;gap:5px;font-size:.72rem;color:#64748b">
+      Drag a card onto another to propose a move
+    </div>
+    {# WCAG 2.1.1 / 2.5.7 — dragging is the only pointer path to a position
+       change, so the legend names its keyboard equivalent (UX spec §6.5). The
+       profile Transfer… entry point now exists, so this is safe to render. #}
+    <div style="display:flex;align-items:center;gap:5px;font-size:.72rem;color:#64748b">
+      Keyboard: open a person's profile and choose Transfer… to request the same change.
+    </div>
+    {% endif %}
   </div>
 
   <!-- ── Family tree ────────────────────────────────────────── -->
@@ -50,50 +61,8 @@
 </div>
 
 {% if can_move %}
-<!-- ── Move (position change) modal ─────────────────────────────── -->
-<div id="move-modal" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.45);align-items:center;justify-content:center" onclick="if(event.target===this)closeMoveModal()">
-  <div class="modal-box" style="width:480px" onclick="event.stopPropagation()">
-    <div class="modal-header">
-      <div>
-        <div class="modal-title">Request Position Change</div>
-        <div class="modal-sub" id="mv-sub"></div>
-      </div>
-      <button class="modal-close" onclick="closeMoveModal()">×</button>
-    </div>
-    <div class="modal-body" style="display:flex;flex-direction:column;gap:12px">
-      <div style="font-size:.78rem;color:#64748b;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px">
-        This change is <strong>not applied immediately</strong> — it is submitted for approval.
-      </div>
-      <div class="form-group" style="margin:0">
-        <label>New reporting manager</label>
-        <select id="mv-manager" class="form-control"></select>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <div class="form-group" style="margin:0">
-          <label>Business unit</label>
-          <select id="mv-bu" class="form-control" onchange="mvFilterFU()"></select>
-        </div>
-        <div class="form-group" style="margin:0">
-          <label>Functional unit</label>
-          <select id="mv-fu" class="form-control"></select>
-        </div>
-      </div>
-      <div class="form-group" style="margin:0">
-        <label>Location</label>
-        <select id="mv-loc" class="form-control"></select>
-      </div>
-      <div class="form-group" style="margin:0">
-        <label>Reason *</label>
-        <textarea id="mv-reason" class="form-control" rows="2" placeholder="Why is this move needed?" style="resize:vertical"></textarea>
-      </div>
-      <div id="mv-error" style="display:none;color:#dc2626;font-size:.78rem;background:#fef2f2;padding:8px 12px;border-radius:6px"></div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-ghost btn-sm" onclick="closeMoveModal()">Cancel</button>
-      <button class="btn btn-primary btn-sm" id="mv-submit" onclick="submitMove()">Submit for Approval</button>
-    </div>
-  </div>
-</div>
+<!-- ── Shared "Request Position Change" dialog (drag-and-drop opener) ────────── -->
+{% include 'org_change/_move_modal.html' %}
 <style>
   .ft-card[draggable=true]{cursor:grab}
   .ft-card.ft-dragging{opacity:.45}
@@ -425,74 +394,9 @@ async function loadPendingCounts() {
   } catch (_) {}
 }
 
-// ── Position-change move modal ────────────────────────────────────────────────
-let mvSubjectId = null, mvFUAll = [];
-
-function opt(value, label, selected) {
-  return `<option value="${escH(value)}"${selected ? ' selected' : ''}>${escH(label)}</option>`;
-}
-
-async function openMoveModal(subjectId, subjectName, targetId, targetName) {
-  mvSubjectId = subjectId;
-  const err = document.getElementById('mv-error'); err.style.display = 'none';
-  document.getElementById('mv-reason').value = '';
-  document.getElementById('mv-sub').textContent = `Move ${subjectName} → under ${targetName}`;
-  document.getElementById('move-modal').style.display = 'flex';
-
-  const res  = await fetch(`/api/org-change/prefill?target=${targetId}&subject=${subjectId}`);
-  const data = await res.json();
-  const t    = data.target || {};
-  mvFUAll = data.functional_units || [];
-
-  document.getElementById('mv-manager').innerHTML =
-    opt('', '— No change —', false) +
-    (data.managers || []).map(m => opt(m.id, `${m.name}${m.job_title ? ' · ' + m.job_title : ''}`, m.id === targetId)).join('');
-  document.getElementById('mv-bu').innerHTML =
-    opt('', '— No change —', false) +
-    (data.business_units || []).map(b => opt(b.id, b.name, b.id === t.bu)).join('');
-  document.getElementById('mv-loc').innerHTML =
-    opt('', '— No change —', false) +
-    (data.locations || []).map(l => opt(l.id, l.name, l.id === t.loc)).join('');
-  mvFilterFU(t.fu);
-}
-
-function mvFilterFU(selectFu) {
-  const bu  = document.getElementById('mv-bu').value;
-  const cur = selectFu !== undefined ? selectFu : document.getElementById('mv-fu').value;
-  const list = mvFUAll.filter(f => !bu || f.business_unit_id === bu);
-  document.getElementById('mv-fu').innerHTML =
-    opt('', '— No change —', false) +
-    list.map(f => opt(f.id, f.name, f.id === cur)).join('');
-}
-
-function closeMoveModal() { document.getElementById('move-modal').style.display = 'none'; }
-
-async function submitMove() {
-  const err = document.getElementById('mv-error'); err.style.display = 'none';
-  const reason = document.getElementById('mv-reason').value.trim();
-  if (!reason) { err.textContent = 'Please give a reason for the move.'; err.style.display = ''; return; }
-  const body = {
-    employee_id:        mvSubjectId,
-    manager_id:         document.getElementById('mv-manager').value || null,
-    business_unit_id:   document.getElementById('mv-bu').value || null,
-    functional_unit_id: document.getElementById('mv-fu').value || null,
-    location_id:        document.getElementById('mv-loc').value || null,
-    reason,
-  };
-  if (!body.manager_id && !body.business_unit_id && !body.functional_unit_id && !body.location_id) {
-    err.textContent = 'Pick at least one change (manager, unit or location).'; err.style.display = ''; return;
-  }
-  const btn = document.getElementById('mv-submit');
-  btn.disabled = true; btn.textContent = 'Submitting…';
-  const res = await fetch('/api/org-change/request', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
-  });
-  btn.disabled = false; btn.textContent = 'Submit for Approval';
-  const data = await res.json();
-  if (!res.ok) { err.textContent = data.error || 'Failed.'; err.style.display = ''; return; }
-  closeMoveModal();
-  alert('Position change submitted for approval.');
-}
+// The "Request Position Change" dialog (openMoveModal / submitMove / mvFilterFU)
+// lives in templates/org_change/_move_modal.html — one dialog, shared with the
+// Transfer… entry point so there is never a second request path (KAN-185).
 
 // ── Initial load ──────────────────────────────────────────────────────────────
 loadPendingCounts().then(() => focusTree(OWN_ID));

@@ -119,10 +119,13 @@
             <th>Skill Ratings</th>
             <th>Solid-Line Manager</th>
             <th>Dotted-Line Manager</th>
+            {% if can_transfer_any or can_transfer_reports %}
+            <th><span class="sr-only">Actions</span></th>
+            {% endif %}
           </tr>
         </thead>
         <tbody id="employee-table-body">
-          <tr class="empty-row"><td colspan="11">Loading employees…</td></tr>
+          <tr class="empty-row"><td colspan="{{ 12 if (can_transfer_any or can_transfer_reports) else 11 }}">Loading employees…</td></tr>
         </tbody>
       </table>
     </div>
@@ -163,11 +166,22 @@
     <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
   </button>
 </div>
+
+{# The one shared Request Position Change dialog — same component, endpoint and
+   engine as the profile and the org tree (UX spec §6.0). #}
+{% if can_transfer_any or can_transfer_reports %}{% include 'org_change/_move_modal.html' %}{% endif %}
 {% endblock %}
 
 {% block scripts %}
 <script>
 const ACTIVE_COMPANY_ID = {{ active_company_id | tojson }};
+
+// Row-action inputs (KAN-185). `DIR_ACTIONS` also drives the extra column, so
+// the header, the body rows and the empty-state colspan cannot disagree.
+const CAN_TRANSFER_ANY = {{ can_transfer_any | tojson }};
+const DIR_ACTIONS      = {{ (can_transfer_any or can_transfer_reports) | tojson }};
+const VIEWER_EMP_ID    = {{ viewer_employee_id | tojson }};
+const DIR_COLS         = DIR_ACTIONS ? 12 : 11;
 
 function toggleDirCoPicker() {
   document.getElementById('dir-co-picker-menu').classList.toggle('co-picker-menu--open');
@@ -264,8 +278,66 @@ function buildRow(emp) {
     <td>${ratingsHtml}</td>
     <td>${managerCell(emp.solid_manager_name, emp.solid_manager_title, emp.solid_manager_id)}</td>
     <td>${emp.dotted_manager_name?`<div class="manager-cell"><span class="manager-name">${escH(emp.dotted_manager_name)}</span>${emp.dotted_manager_title?`<span class="manager-desig">${escH(emp.dotted_manager_title)}</span>`:''}</div>`:'—'}</td>
+    ${DIR_ACTIONS ? `<td class="row-actions">${rowActions(emp)}</td>` : ''}
   </tr>`;
 }
+
+// ── Row actions (KAN-185 — Transfer…, UX spec §6.1.2) ────────────────────────
+// The menu will also carry KAN-184's Offboard…; per the spec an empty menu means
+// no ⋯ button at all, so each row is tested rather than rendering a dead control.
+function canTransfer(emp) {
+  if (!DIR_ACTIONS) return false;
+  if (emp.id === VIEWER_EMP_ID) return false;                 // P3 — never yourself
+  if (emp.employment_status && emp.employment_status !== 'ACTIVE') return false;
+  if (CAN_TRANSFER_ANY) return true;                          // HR / Portal / System admin
+  return emp.solid_manager_id === VIEWER_EMP_ID;              // their own report
+}
+
+function rowActions(emp) {
+  if (!canTransfer(emp)) return '';
+  const id = escH(emp.id);
+  return `<div class="row-menu">
+    <button type="button" class="row-menu-btn" aria-haspopup="menu" aria-expanded="false"
+            aria-label="Actions for ${escH(emp.full_name)}"
+            onclick="toggleRowMenu(event, '${id}')">⋯</button>
+    <div class="row-menu-list" id="row-menu-${id}" role="menu" hidden>
+      <a role="menuitem" href="/profile/${encodeURIComponent(emp.id)}">View profile</a>
+      <button type="button" role="menuitem"
+              onclick='closeRowMenus(); openTransferModal(${JSON.stringify(emp.id)}, ${JSON.stringify(emp.full_name)}, ${JSON.stringify(emp.employee_number || "")})'>Transfer…</button>
+    </div>
+  </div>`;
+}
+
+function closeRowMenus() {
+  document.querySelectorAll('.row-menu-list:not([hidden])').forEach(m => {
+    m.hidden = true;
+    const b = m.parentElement.querySelector('.row-menu-btn');
+    if (b) b.setAttribute('aria-expanded', 'false');
+  });
+}
+
+function toggleRowMenu(ev, id) {
+  ev.stopPropagation();
+  const list = document.getElementById('row-menu-' + id);
+  if (!list) return;
+  const wasOpen = !list.hidden;
+  closeRowMenus();
+  if (wasOpen) return;
+  list.hidden = false;
+  list.parentElement.querySelector('.row-menu-btn').setAttribute('aria-expanded', 'true');
+  const first = list.querySelector('[role=menuitem]');
+  if (first) first.focus();
+}
+
+document.addEventListener('click', closeRowMenus);
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  const open = document.querySelector('.row-menu-list:not([hidden])');
+  if (!open) return;
+  const btn = open.parentElement.querySelector('.row-menu-btn');
+  closeRowMenus();
+  if (btn) btn.focus();                                       // focus restore
+});
 
 function pagesToShow(c,t){
   if(t<=7) return Array.from({length:t},(_,i)=>i+1);
@@ -277,7 +349,7 @@ function pagesToShow(c,t){
 function renderPage(){
   const tbody=document.getElementById('employee-table-body');
   if(!filtered.length){
-    tbody.innerHTML='<tr class="empty-row"><td colspan="11">No employees found.</td></tr>';
+    tbody.innerHTML=`<tr class="empty-row"><td colspan="${DIR_COLS}">No employees found.</td></tr>`;
     ['top','bottom'].forEach(s=>document.getElementById(`pagination-bar-${s}`).style.display='none');
     return;
   }

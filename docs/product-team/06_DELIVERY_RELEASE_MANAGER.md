@@ -32,6 +32,9 @@ Alpha (internal) → private beta (design-partner customers) → public beta →
 - **Production Readiness:** requirements · dev · QA · security · privacy · performance · reliability · data · integrations · monitoring · logging · alerting · backup/recovery · rollback · documentation · support.
 - **Customer Readiness:** onboarding process · configuration · **data migration/import** · user provisioning · training · admin & end-user documentation · support process · customer communications · known-limitations list · feedback mechanism · adoption metrics · **hypercare plan.** Do not confuse the two: a product can be production-ready and still not customer-ready.
 
+## Demo Readiness Gate — you run it (D6 is yours)
+The SPM owns the verdict; **you run the checklist** in [`../project-management/DEMO_READINESS_GATE.md`](../project-management/DEMO_READINESS_GATE.md), chase the evidence from each accountable role, and refuse to mark a box on an assurance. Your own check is **D6 · state & rehearsal**: the demo data is in a known state, the run has been rehearsed end to end at least once, and it is **re-runnable** — a demo that only works once is not a demo. Also **D6a · concurrency**: if anything else may be writing to the demo database, name it before starting and pick uncontended demo data; a demo that collides with another writer mid-run is indistinguishable from a bug.
+
 ## Release Gate
 Before recommending release, produce the gate table and a single recommendation:
 

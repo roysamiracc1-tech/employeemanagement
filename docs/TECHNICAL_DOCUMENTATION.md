@@ -182,6 +182,48 @@ org_change_approvals            ← one row per step (audit trail)
 
 Feature gate: a new `org_change` row in `portal_features`, with default `role_feature_access` (read+write) for `SOLID_LINE_MANAGER`, `HR_ADMIN`, `PORTAL_ADMIN` (also seeded in `scripts/setup_db.py`).
 
+### 3.6 Audit Table
+
+Migration: `database/migrations/08_audit_log.sql` (reverse with `08_audit_log_down.sql`). One
+append-only, company-scoped trail shared by every subsystem — see **§23** for the service and the rules.
+
+#### `audit_log`
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | BIGSERIAL PK | **Deliberately not UUID.** Append + range-scan-by-time only; a monotonic key keeps inserts at the B-tree right edge (ADR-009 §3.1) |
+| `company_id` | UUID NOT NULL → `companies(id)` | Tenant scope. Taken from the **affected entity**, never the session. No `ON DELETE` — the trail is not removable by deleting the company |
+| `actor_user_id` | UUID NULL → `users(id)` ON DELETE SET NULL | |
+| `actor_employee_id` | UUID NULL → `employees(id)` ON DELETE SET NULL | |
+| `actor_label` | VARCHAR(255) NOT NULL | `"Name <email>"` **as at the time of the action** — denormalised so a later delete cannot anonymise the history |
+| `actor_roles` | JSONB NOT NULL `[]` | Snapshot of the roles the actor held at the time |
+| `actor_ip` / `actor_session_id` | VARCHAR NULL | Best-effort; only fully meaningful once real auth lands (EP28) |
+| `subject_employee_id` | UUID NULL → `employees(id)` ON DELETE SET NULL | |
+| `subject_employee_number` | VARCHAR(50) NULL | **The subject's name is never stored** — an audit row must survive a GDPR erasure without re-leaking the erased data |
+| `action` | VARCHAR(60) NOT NULL | Closed enumeration held in `audit_service.ACTIONS`, not a DB CHECK, so later epics extend it without a migration |
+| `entity_type` / `entity_id` | VARCHAR(50) / UUID NOT NULL | Polymorphic — no FK on `entity_id` |
+| `before_state` / `after_state` | JSONB NULL | **Field-level diffs only, never whole rows.** Both sides must carry the same key set |
+| `reason` | TEXT NOT NULL | `CHECK (btrim(reason) <> '')` — every row answers "why" |
+| `correlation_id` | UUID NOT NULL | Groups every row from one unit of work, so an offboarding reads as one story |
+| `outcome` / `error_code` | VARCHAR NOT NULL `'SUCCESS'` / VARCHAR NULL | `CHECK (outcome IN ('SUCCESS','FAILED'))` |
+| `metadata` | JSONB NOT NULL `{}` | Same PII rules as the diff |
+| `retention_class` | VARCHAR(20) NOT NULL `'STANDARD'` | `STANDARD` / `EMPLOYMENT` / `SECURITY`. Written now so a future purge job needs no backfill; the retention **periods** are a legal determination and nothing is purged until they exist |
+| `created_at` | **TIMESTAMPTZ** NOT NULL `NOW()` | The only timezone-aware timestamp in the schema. Deliberate — "when" must be unambiguous here (TD-12) |
+
+Indexes: `idx_audit_entity (company_id, entity_type, entity_id, created_at DESC)`,
+`idx_audit_company_time (company_id, created_at DESC)`, `idx_audit_correlation (company_id, correlation_id)`.
+No GIN index on the JSONB columns — nothing queries inside the blobs yet.
+
+**Append-only is enforced in the database:** `audit_log_immutable()` + trigger `trg_audit_log_no_update`
+(BEFORE UPDATE) raises `audit_log is append-only (attempted UPDATE)`. **`DELETE` is deliberately NOT
+blocked** — retention purge must be able to delete and there is no DB role separation here to tell a purge
+job from the app user; blocking it would either make retention impossible or force an escape hatch any code
+path could set. Tracked as **TD-13**, with the purge role belonging to the purge job's own story.
+
+Feature gate: an `audit_log` row in `portal_features` (`sort_order` 13 — 11/12 are reserved for
+`onboarding`/`offboarding`), with default `role_feature_access` **read-only** for `PORTAL_ADMIN` and
+`HR_ADMIN` (also seeded in `scripts/setup_db.py`). Never granted to `EMPLOYEE`.
+
 ---
 
 ## 4. Application Architecture
@@ -194,9 +236,11 @@ Browser → Flask Route
             ├─ @login_required / @require_roles decorator
             │     └─ checks session['user_id'] and session['roles']
             │
-            ├─ get_db() → psycopg2 connection (stored in Flask g)
+            ├─ get_db() → psycopg2 connection (stored in Flask g, autocommit=True)
             │
             ├─ query() / execute() / insert_returning()
+            │     └─ composite writes wrapped in with transaction():
+            │            one commit, one rollback (ADR-006)
             │
             └─ render_template() or jsonify()
                   │
@@ -209,9 +253,10 @@ Browser → Flask Route
 
 | Function | Purpose |
 |----------|---------|
-| `query(sql, params, one)` | SELECT; returns list of dicts or single dict |
-| `execute(sql, params)` | INSERT/UPDATE/DELETE with auto-commit |
-| `insert_returning(sql, params)` | INSERT … RETURNING id; returns first row as dict |
+| `query(sql, params, one)` | SELECT; returns list of dicts or single dict. Runs under autocommit, so a read never leaves the connection idle-in-transaction |
+| `execute(sql, params)` | INSERT/UPDATE/DELETE. Stands alone (autocommit) **unless** a `transaction()` block is open, in which case the block commits |
+| `insert_returning(sql, params)` | INSERT … RETURNING id; returns first row as dict. Same commit rule as `execute()` |
+| `transaction()` | Context manager making a composite write **one unit of work** — single commit, single rollback (see §4.2a) |
 | `to_dict(row)` | Converts RealDictRow; serialises datetime → ISO, Decimal → float |
 | `_next_employee_number()` | Computes next EMP-NNN from current MAX |
 | `_vacation_types_for_employee(emp_id)` | Location filter + rule evaluation |
@@ -219,6 +264,48 @@ Browser → Flask Route
 | `_used_days(emp_id, vt_id, year)` | Sums PENDING+APPROVED working days for year |
 | `_save_logo(file_storage, old_url)` | Saves uploaded logo, cleans up old file |
 | `_build_nested(flat)` | Converts flat CTE rows → nested tree dict |
+
+### 4.2a Transactions — `transaction()` (ADR-006 / KAN-155)
+
+Connections are opened with `autocommit = True`. A single statement is therefore durable on its own,
+reads never hold an open transaction, and a failed statement cannot poison the rest of the request
+with `current transaction is aborted`.
+
+**Anything that writes more than one row/table must opt in to a transaction:**
+
+```python
+from app.db import transaction, execute, insert_returning
+
+with transaction():
+    vt = insert_returning("INSERT INTO vacation_types (...) VALUES (...) RETURNING id::text", (...))
+    for lid in location_ids:
+        execute("INSERT INTO vacation_type_locations VALUES (%s::uuid,%s::uuid)", (vt['id'], lid))
+```
+
+Inside the block `execute()` / `insert_returning()` **do not commit individually** — that is the whole
+point. A failure anywhere in the block rolls back every earlier statement in it, so a partly-written
+composite can never become durable. On exit the block commits exactly once and autocommit is restored.
+
+Rules:
+
+| Rule | Why |
+|---|---|
+| One `transaction()` per public entry point — not per cascade, not per table | The unit of work is the business operation, not the statement |
+| Side effects that cannot be undone (notifications, email) go **after** the block | A committed notification for a rolled-back change is unrecoverable |
+| Never nest — a helper runs inside the caller's open block | A nested block would commit independently and create a false boundary. Nesting raises `RuntimeError` |
+
+**Wrapped today:** vacation-type create and edit (`app/routes/vacation.py`); org-change
+`save_workflow`, `create_request`, `apply_change`, and each `decide()` outcome — including final
+approval, where the step decision, the applied move and the request close-out commit together
+(`app/services/org_change_service.py`). `apply_change()` is the atomic standalone entry point;
+`decide()` calls the inner `_apply_change()` inside its own wider transaction.
+
+**Not yet wrapped** (found during KAN-155, tracked separately — deliberately out of its scope):
+employee registration (`app/routes/admin.py` `admin_register_user`), role reassignment
+(`api_update_roles` — delete-all then re-insert), company-role seeding and per-company admin
+seeding (`seed_company_roles`, `api_seed_company_admin_user`, `api_company_role_set_permissions`),
+company create with its seeded admin (`app/routes/company.py`), and CSV import apply
+(`app/services/import_service.py`, a per-row loop). See the Architect's debt register.
 
 ### 4.3 Session Keys
 
@@ -295,13 +382,13 @@ Vacation submit/review responses and the manager pending list (`team-pending`) n
 | Method | Path | Access | Description |
 |--------|------|--------|-------------|
 | GET | `/org-change` | `org_change` (r) | Position Changes inbox page (Pending My Approval + My Requests) |
-| POST | `/api/org-change/request` | `org_change` (w) + must manage subject, or be HR/Portal | Create a request (validates initiator; `EMPLOYEE` cannot self-initiate) |
+| POST | `/api/org-change/request` | `org_change` (w) + must manage subject, or be HR/Portal | **The single creation path** for both drag-and-drop and Transfer… (§22.5a). Validates initiator (`EMPLOYEE` cannot self-initiate), ACTIVE subject + manager, company scope of every proposed unit, reporting cycles, no-op moves, and one PENDING request per person (`409`) |
 | GET | `/api/org-change/pending` | `org_change` (r) | Requests whose **current** step this user may decide |
 | GET | `/api/org-change/my-requests` | login | Requests the caller raised (status + level) |
 | GET | `/api/org-change/pending-count` | login | Count for the bell/badge |
 | POST | `/api/org-change/<id>/decide` | `org_change` (w) | Approve/reject the current step (advances or stops the chain) |
 | POST | `/api/org-change/<id>/cancel` | login (requester or admin) | Cancel a PENDING request |
-| GET | `/api/org-change/prefill?target=&subject=` | `org_change` (w) | Drop-target placement + company BU/FU/location/manager option lists for the modal |
+| GET | `/api/org-change/prefill?target=&subject=` | `org_change` (w) | Everything the dialog needs, for both entry points: drop-target placement, company BU/FU/location/manager option lists, and (when `subject` is given) the subject, their current placement **by name**, the company's approval chain, their direct-report count and any PENDING request id |
 | GET/POST | `/admin/org-change-workflow`, `/api/admin/org-change-workflow` | `org_structure` (w) | Config page + load / replace-all workflow steps |
 
 ---
@@ -508,7 +595,7 @@ In production, `APP_ENV=production` also turns on `SESSION_COOKIE_SECURE` and fo
 (`app/config.py`). Serve strictly over HTTPS behind a proxy so the Secure cookie is honoured.
 
 ### Building the database
-`database/schema.sql` is the **authoritative** schema (a `pg_dump --schema-only` baseline of all 46
+`database/schema.sql` is the **authoritative** schema (a `pg_dump --schema-only` baseline of all 47
 tables/indexes/functions/triggers). Build a fresh DB from it, then seed:
 ```bash
 psql -d employee -f database/schema.sql        # full structure (canonical)
@@ -575,6 +662,7 @@ is a separate, VISIBLE Chrome + audio session — see the FLOW TESTS rule in `CL
 tests/
 ├── conftest.py                    # Fixtures: app, client, session helpers, sample data
 ├── test_db.py                     # serialize() and to_dict() helpers
+├── test_transactions.py           # transaction() — atomicity, rollback, nesting (real DB tier auto-skips)
 ├── test_helpers.py                # Business logic and pure functions
 ├── test_auth.py                   # Auth decorators and login/logout routes
 ├── test_routes_employees.py       # Employee directory, profile, self-edit APIs
@@ -590,6 +678,7 @@ tests/
 | File | Tests | What is covered |
 |------|-------|----------------|
 | `test_db.py` | 13 | `serialize()` — date, datetime, Decimal, primitives; `to_dict()` — type conversion |
+| `test_transactions.py` | 12 | `transaction()` (KAN-155): statements not durable until the single commit, mid-write failure retracts everything, autocommit restored after commit *and* rollback, nesting refused, reads never idle-in-transaction. Includes a **real-Postgres tier** (skipped when no DB is reachable) proving a failed vacation-type composite write leaves no rows |
 | `test_helpers.py` | 39 | `rule_label`, `build_nested`, `next_employee_number`, `employee_solid_manager`, `used_days`, `is_direct_report`, vacation eligibility engine, `save_logo` |
 | `test_auth.py` | 18 | `@login_required`, `@require_roles`, login form, unknown email error, logout |
 | `test_routes_employees.py` | 24 | Directory role gating, profile, self-edit APIs |
@@ -598,8 +687,9 @@ tests/
 | `test_routes_auth_login.py` | 21 | POST login sets session keys, company_id stored, Tech Admin gets null company, branding loaded, protected-route redirects |
 | `test_routes_org.py` | 31 | BU/loc/FU list with company filter, create (conflict, missing name), update (403 cross-company), delete (409 with employees), company context switch, role-feature permission matrix CRUD |
 | `test_ui_ux.py` | 48 | Login page 200/CSS path/split-panel structure/demo chips/no-old-classes, base.html CSS path, sidebar nav gating, admin panel tab visibility, CSS file integrity (all classes defined), template asset consistency (no bare `style.css`) |
-| `test_org_change.py` | 17 | Position-change initiator permissions (employee blocked, manager own-reports-only, HR/Portal open), sequential `decide` (advance / reject-stops / final-applies), approver eligibility, `apply_change` SQL, `create_request` notifications, workflow-config save |
-| **Total (representative core files)** | **255** | Full repository suite: **4,511 passing** |
+| `test_org_change.py` | 18 | Position-change initiator permissions (employee blocked, manager own-reports-only, HR/Portal open), sequential `decide` (advance / reject-stops / final-applies), approver eligibility, `apply_change` SQL, `create_request` notifications, workflow-config save, **and the KAN-155 transaction boundaries** — every write inside exactly one committed unit, notifications only after commit, a failed final approval commits nothing and notifies nobody |
+| `test_audit_service.py` | 44 | Audit subsystem (KAN-187 / ADR-009): the twelve required audit fields, closed action enumeration, mandatory `company_id` and `reason`, diff-only/no-nesting/no-secrets rules, subject never named. **Transaction mechanics** — `record()` commits nothing inside the caller's block and opens no transaction of its own; a rolled-back change leaves no audit row. **Real-Postgres tier** — atomic commit with the audited change, append-only trigger rejects targeted *and* blanket `UPDATE`, `company_id` NOT NULL, cross-tenant isolation, and the migration applies/re-applies/reverses on a fresh database |
+| **Total (representative core files)** | **312** | Full repository suite: **4,568 passing** |
 
 ### Pre-Commit Test Gate
 
@@ -737,18 +827,23 @@ portal_features (id, code, label, description, sort_order)
 role_feature_access (role_id, feature_id, can_read, can_write, can_delete)
 ```
 
-`portal_features` defines the 8 feature areas:
+`portal_features` defines the 11 feature areas:
 
-| code | label |
-|------|-------|
-| `employee_profiles` | Employee Profiles |
-| `org_structure` | Organisation Structure |
-| `user_accounts` | User Accounts |
-| `skills` | Skills & Certifications |
-| `vacations` | Vacations & Leave |
-| `reports` | Reports & Analytics |
-| `company_settings` | Company Settings |
-| `system_config` | System Configuration |
+| code | label | sort_order |
+|------|-------|-----------|
+| `employee_profiles` | Employee Profiles | 1 |
+| `org_structure` | Organisation Structure | 2 |
+| `user_accounts` | User Accounts | 3 |
+| `skills` | Skills & Certifications | 4 |
+| `vacations` | Vacations & Leave | 5 |
+| `reports` | Reports & Analytics | 6 |
+| `company_settings` | Company Settings | 7 |
+| `system_config` | System Configuration | 8 |
+| `skills_intelligence` | Skills Intelligence | 9 |
+| `org_change` | Position Change Requests | 10 |
+| `audit_log` | Audit Log | 13 |
+
+`sort_order` 11 and 12 are reserved for `onboarding` / `offboarding` (EP38 KAN-183/KAN-184).
 
 `role_feature_access` stores three boolean flags (`can_read`, `can_write`, `can_delete`) per role–feature pair.
 
@@ -829,16 +924,47 @@ The raw SQL seed (`telia_seed.sql`) uses hardcoded UUIDs and requires the Telia 
 
 ```sql
 CREATE TABLE user_notifications (
-    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    event_type  VARCHAR(60) NOT NULL,   -- VACATION_APPROVED | VACATION_REJECTED | VACATION_CANCELLED
-    message     TEXT NOT NULL,
-    link        TEXT,                   -- /vacation or /vacation/team
-    is_read     BOOLEAN NOT NULL DEFAULT FALSE,
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id       UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    event_type    VARCHAR(60) NOT NULL,   -- see the event vocabulary in 19.3
+    message       TEXT NOT NULL,
+    link          TEXT,                   -- /vacation | /vacation/team | /org-change
+    is_read       BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    -- What this notification is ABOUT, so it can be retired when that thing is
+    -- decided (migration 09, DEF-003). Polymorphic and deliberately without a
+    -- foreign key: a notification must outlive the entity it describes, and the
+    -- column points at several subsystems.
+    related_type  VARCHAR(40),            -- e.g. 'ORG_CHANGE_REQUEST'
+    related_id    UUID
 );
 CREATE INDEX idx_user_notif_user_unread ON user_notifications(user_id, is_read, created_at DESC);
+-- Partial: the resolve path only ever touches unread rows.
+CREATE INDEX idx_user_notifications_related_unread
+    ON user_notifications (related_type, related_id) WHERE NOT is_read;
 ```
+
+### 19.1a Calls to action vs. receipts vs. outcomes
+
+A notification is one of three things, and the distinction is load-bearing:
+
+| Kind | Example event | Retired when the entity is decided? | Icon |
+|---|---|---|---|
+| **Call to action** | `ORG_CHANGE_REQUESTED` ("awaiting your approval") | **Yes** — `resolve_related()` | ⏳ |
+| **Receipt** | `ORG_CHANGE_SUBMITTED` ("your request was submitted") | No — it is the requester's record | 📨 |
+| **Outcome** | `ORG_CHANGE_APPROVED` / `ORG_CHANGE_REJECTED` | No — the user has not seen it yet | ✅ / ❌ |
+
+`notification_service.resolve_related(related_type, related_id, event_types)` marks the matching
+unread rows read. `org_change_service` calls it on **reject, level advance, final approval and
+cancel**, always *before* writing the next announcement — retiring afterwards would sweep away the
+notification just created for the next level. Several users can hold an approving role, so retiring
+per-entity (not per-user) is the point: the approver who never opened the bell must also stop being
+asked (DEF-003).
+
+**Icon rule (DEF-002).** `templates/base.html` maps `event_type → icon` explicitly via `NOTIF_ICON`,
+with a neutral 🔔 fallback. Never derive a status icon from a single-event comparison
+(`x === 'VACATION_APPROVED' ? '✅' : '❌'`): every other event on the system then inherits the failure
+icon, and an item with no outcome yet renders as a refusal.
 
 ### 19.2 Service Layer (`app/services/notification_service.py`)
 
@@ -993,7 +1119,9 @@ approval into a configurable N-step chain.
 | Schema | `database/migrations/06_org_change_workflow.sql` | 4 tables + `org_change` feature (§3.5) |
 | Engine | `app/services/org_change_service.py` | create / decide / apply / notify + config |
 | Routes | `app/routes/org_change.py` | request lifecycle, inbox, prefill, admin config |
-| Drag-drop | `templates/org/tree.html` | draggable cards + move modal (gated by `can_move`) |
+| Dialog | `templates/org_change/_move_modal.html` | the **one** Request Position Change dialog, shared by every entry point |
+| Drag-drop | `templates/org/tree.html` | draggable cards (gated by `can_move`); includes the dialog |
+| Transfer… | `templates/employees/profile.html`, `templates/employees/directory.html` | the task-oriented entry point (KAN-185, §22.5a) |
 | Inbox | `templates/org_change/inbox.html` | Pending My Approval + My Requests tabs |
 | Config | `templates/admin/org_change_workflow.html` | ordered step editor (role or person) |
 | Nav | `templates/base.html` | "Position Changes" + "Change Workflow" links |
@@ -1001,12 +1129,15 @@ approval into a configurable N-step chain.
 ### 22.2 Engine logic (`org_change_service.py`)
 
 - `workflow_steps(company_id)` — ordered steps; **falls back to a single `HR_ADMIN` step** when a company has no configured chain.
-- `create_request(...)` — snapshots the subject's current placement (BU/FU/location/manager), inserts the request + one `org_change_approvals` row per step, sets `current_step=1`, notifies step-1 approvers and the requester.
-- `decide(request_id, user, decision, note)` — verifies the caller is eligible for the **current** step (`_user_matches_step`: role held, or employee id equals the named approver), records the decision, then:
+- `create_request(...)` — snapshots the subject's current placement (BU/FU/location/manager), inserts the request + one `org_change_approvals` row per step **in one transaction** (a request with a partial chain would be approvable in fewer levels than configured), then notifies step-1 approvers and the requester **after** it commits.
+- `decide(request_id, user, decision, note)` — verifies the caller is eligible for the **current** step (`_user_matches_step`: role held, or employee id equals the named approver), then, in **one transaction per outcome**, records the step decision plus what it triggers:
   - **reject** → `status=REJECTED`, chain stops, notify requester + subject;
   - **approve, more steps** → `current_step += 1`, notify next approvers + requester;
-  - **approve, last step** → `apply_change()`, `status=APPROVED`, notify requester + subject.
-- `apply_change(request)` — sets the old `employee_org_assignments.is_current=FALSE` (`effective_to=today`), inserts a new current row (carrying cost centre), and re-points the `SOLID_LINE` `manager_relationships` row if the manager changed. Mirrors the registration logic in `admin.py`.
+  - **approve, last step** → the decision, `_apply_change()` and `status=APPROVED` commit together (KAN-155 / TD-7), then notify requester + subject.
+  Any failure inside the block leaves the request PENDING with the step undecided and the employee's placement untouched.
+- `apply_change(request)` — atomic standalone entry point; wraps `_apply_change()` in a transaction. `_apply_change()` sets the old `employee_org_assignments.is_current=FALSE` (`effective_to=today`), inserts a new current row, and re-points the `SOLID_LINE` `manager_relationships` row if the manager changed. `decide()` calls `_apply_change()` directly because it already holds the transaction — `transaction()` must never be nested. Mirrors the registration logic in `admin.py` (which is **not** yet atomic — see §4.2a).
+  > **The new row is the old row overlaid with what changed.** A request stores only the fields the requester actually altered; the rest are `NULL`, and `NULL` means *no change*, **not** *clear this*. `_apply_change()` therefore carries location, business unit, functional unit and cost centre forward from the outgoing assignment and overlays the proposed values. **This was a live data-loss defect** (found by driving the approval chain in a browser, Aug 2026): only the cost centre was carried, so approving a business-unit-only move silently erased the employee's location **and** functional unit. Every existing test passed a fully-populated proposal, which is why none caught it. KAN-185 made it far more likely to fire — the Transfer… dialog starts every select at *— No change —*, so partial proposals became the normal case rather than the exception. Regression coverage: `TestApplyCarriesUnchangedFieldsForward` in `tests/test_org_change.py` (BU-only, location-only, manager-only, full proposal, and an employee with no prior assignment).
+- `save_workflow(...)` — replace-all of the company's chain, in one transaction: a partial rewrite would silently change who can approve.
 - Approver resolution: `_step_approver_user_ids` returns all active company users holding the step's role, or the single user behind the named employee.
 
 ### 22.3 Authorisation
@@ -1028,9 +1159,147 @@ becomes `draggable`; dropping card **S** onto card **T** calls `openMoveModal(S,
 `/api/org-change/prefill` to pre-fill the new manager (= T) and T's unit/location, all overridable via
 company-scoped selects, plus a mandatory reason. Submit → `POST /api/org-change/request`.
 
+### 22.5a Transfer… entry point (KAN-185)
+
+A transfer **is** a position change, so it is a second *entry point* — never a second system. There is
+no `/transfer` page, no `POST /api/transfer`, no transfer table and no `transfer` feature code; the
+word "Transfer" appears only on the affordance, and the dialog it opens says *Request Position Change*.
+
+Three entry points, one dialog (`_move_modal.html`), one endpoint (`POST /api/org-change/request`),
+one engine:
+
+| Entry point | Opener | Prefilled from |
+|---|---|---|
+| Org-tree drag-and-drop | `openMoveModal(S, T)` | the drop target **T**'s placement |
+| Employee profile | `openTransferModal(...)` | the subject's **own** placement — every select starts at "no change" |
+| Directory row `⋯` menu | `openTransferModal(...)` | as above |
+
+Each is gated by **four** conditions: `org_change` write access, the initiator rule, an `ACTIVE`
+subject, and not-your-own-record. The profile computes this server-side in
+`employees._can_transfer()`, which **borrows** `org_change.can_initiate_org_change_for()` rather than
+re-implementing the rule. The directory renders rows client-side, so the route passes
+`can_transfer_any` / `viewer_employee_id` and the per-row rule compares the row's existing
+`solid_manager_id`. **All of this is display only** — `POST /api/org-change/request` re-checks the
+feature gate, `_can_initiate_for`, the ACTIVE status and company scope on every call.
+
+The dialog also blocks before submit on: a no-op move, an existing PENDING request for the subject
+(one at a time — a second would carry a stale "from" snapshot), a non-ACTIVE subject or proposed
+manager, a reporting cycle, and any BU/FU/location/manager belonging to another company. It shows the
+company's configured approval chain (read from `workflow_steps`, so it can never describe a chain the
+engine would not build) and warns that direct reports do **not** move with a manager.
+
+> **`AC-185-07` effective-dating is not implemented and is deliberately absent from the UI.**
+> `org_change_requests` has no column for an effective date and `create_request()` takes no such
+> parameter, so rendering the field would silently discard what the user typed. Blocked pending a
+> schema decision (CFL-4).
+
+Because the drag is a pointer-only interaction, the org-tree legend names the keyboard equivalent —
+"open a person's profile and choose Transfer…" (WCAG 2.1.1 / 2.5.7).
+
 ### 22.6 Tests
 
-`tests/test_org_change.py` (17 tests): initiator permission matrix (employee blocked, manager
+`tests/test_org_change.py` (18 tests): initiator permission matrix (employee blocked, manager
 limited to own reports, HR/Portal unrestricted), sequential `decide` (advance / reject-stops /
 final-applies), approver eligibility, `apply_change` SQL (assignment + conditional manager re-point),
-`create_request` notifications, and workflow-config save. Full suite: **4,511 passing**.
+`create_request` notifications, workflow-config save, and the **transaction boundaries** (KAN-155):
+each path opens exactly one committed unit of work, every write happens inside it, notifications fire
+only after it commits, and a failed final approval commits nothing and notifies nobody.
+
+`tests/test_transfer_entry_point.py` (59 tests) is the **anti-bypass suite** for KAN-185. The risk in
+that story is not building it — it is someone building a *second path* — so the suite asserts, by
+inspecting the route module as well as exercising it: the route module contains no SQL writes and
+does not even import `execute`/`insert_returning`; nothing is applied at creation or before the final
+approval; a single rejection applies nothing; approvals stay strictly sequential; every read and
+write is company-scoped and a foreign UUID posted straight at the API is refused; `employees.company_id`
+is never modified; and both entry points produce **identical** engine calls. It also pins the display
+gates, including that the profile handler survives quotes in a name — an escaped-attribute bug that a
+naive substring assertion missed. Full suite: **4,627 passing**; browser 84/84, vacation 39/39.
+
+---
+
+## 23. Audit Trail — `audit_log` + `audit_service` (EP38 / KAN-187, ADR-009)
+
+One append-only, company-scoped trail for the whole platform. Schema in **§3.6**; the service is
+`app/services/audit_service.py` and is the **only** write path into the table.
+
+### 23.1 API
+
+```python
+from app.services import audit_service as audit
+
+audit.record(action, entity_type, entity_id, *, company_id, actor, reason,
+             before=None, after=None,
+             subject_employee_id=None, subject_employee_number=None,
+             correlation_id=None, outcome='SUCCESS', error_code=None,
+             metadata=None, retention_class='STANDARD',
+             actor_ip=None, actor_session_id=None)          -> None
+audit.record_many(entries)                                   -> None
+audit.entity_timeline(company_id, entity_type, entity_id, limit=50, offset=0)
+audit.company_timeline(company_id, *, action=None, actor_user_id=None,
+                       correlation_id=None, since=None, until=None,
+                       limit=50, offset=0)
+audit.new_correlation_id()                                   -> str
+```
+
+`actor` is the same light dict the org-change engine uses —
+`{'user_id', 'employee_id', 'roles', 'company_id'}`, optionally `user_name` / `user_email` so
+`actor_label` can be built. Do not invent a second actor shape.
+
+### 23.2 The load-bearing property — it joins the caller's transaction
+
+`record()` **never opens a connection and never commits.** It writes through `app.db.execute` on the
+request-scoped `g.db`, so it runs inside whatever `transaction()` the caller already has open (§4.2a).
+`transaction()` refuses to nest, so audit **must not** open one of its own.
+
+```python
+with transaction():                          # opened by the CALLER, once
+    execute("UPDATE employees SET employment_status='TERMINATED' ...")
+    audit.record('EMPLOYEE_STATUS_CHANGED', 'employee', emp_id,
+                 company_id=company_id, actor=actor,
+                 reason='End of fixed-term contract',
+                 before={'employment_status': 'ACTIVE'},
+                 after={'employment_status': 'TERMINATED'},
+                 correlation_id=cid)
+# both durable, or neither
+```
+
+The audit row commits atomically with the change it describes, and a rolled-back change takes its audit
+row with it. **A false audit entry is worse than a missing one.**
+
+Corollary: **failed and rejected attempts are not in `audit_log`** when they roll back — authorisation
+denials and validation failures belong in the application log. A `FAILED` row (`outcome='FAILED'`,
+`error_code=...`) can only be written **after** the failed transaction has already rolled back, where
+`execute()` is back in autocommit.
+
+### 23.3 Rules the service enforces at runtime
+
+| Rule | Behaviour |
+|---|---|
+| `action` is a closed enumeration | Anything outside `audit_service.ACTIONS` raises `AuditError` |
+| `company_id` is mandatory | Comes from the **affected entity**, never the session or request input. When a SYSTEM_ADMIN acts cross-tenant the row lands in the *affected* tenant's trail |
+| `reason` is mandatory | Non-blank, enforced in the service **and** by a DB CHECK |
+| Diffs only, never whole rows | `before` / `after` must be **flat** maps of `field -> scalar`; nested structures raise (that is how a whole row gets smuggled in) |
+| Both sides describe the same fields | Mismatched key sets raise — a row holds a field-level **diff**, not two snapshots |
+| No secrets, ever | Keys containing `password`, `token`, `secret`, `api_key`, `private_key`, `salt`, `credential` … are refused in `before`/`after` **and** `metadata` |
+| Subject is id + employee number | There is no column and no parameter for the subject's name |
+| `record_many` validates the whole batch first | A malformed entry cannot leave a half-written set behind |
+| Reads are company-scoped | Both timelines filter `company_id = %s::uuid` **only** — never `OR company_id IS NULL` |
+
+### 23.4 Correlation ids
+
+One unit of work = one correlation id. Generate it once with `new_correlation_id()` and pass it to every
+row so `company_timeline(company_id, correlation_id=cid)` returns the whole story in order.
+
+### 23.5 Tests
+
+`tests/test_audit_service.py` (44 tests), three tiers:
+
+- **Contract** — the twelve required fields, the closed enumeration, mandatory `company_id` / `reason`,
+  diff-shape and secret rejection, subject-never-named.
+- **Transaction mechanics** (fake connection, reusing `tests/test_transactions.FakeConnection`) —
+  `record()` commits nothing inside the caller's block, opens no transaction of its own, and a
+  rolled-back change leaves no audit row.
+- **Real Postgres** — atomic commit with the audited change; rollback leaves nothing; the append-only
+  trigger rejects both a targeted and a blanket `UPDATE`; `company_id` NOT NULL and the blank-reason
+  CHECK are enforced by the database; one tenant never sees another's rows; and the migration **applies,
+  re-applies, reverses and re-applies** on a genuinely fresh database built from `schema.sql`.

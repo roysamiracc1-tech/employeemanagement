@@ -40,6 +40,7 @@ Delivered on branch `chore/arch-review-and-hardening` (PR #2), each verified + t
 | F23 | KAN-157 | ✅ `(company_id)` indexes on BU/loc/FU + `vacation_requests(vacation_type_id)` |
 | F9 | KAN-165 | ✅ Authoritative `database/schema.sql` baseline + `seed_rbac.sql`; README bootstrap updated |
 | F11 | KAN-169 | ✅ GitHub Actions CI — test job (schema+seed) + fresh-DB schema/boot drift check |
+| F8 | KAN-155 | ✅ `transaction()` in `app/db.py` (ADR-006) — single commit/rollback; `execute()` no longer commits per statement inside a block; connections `autocommit=True` so reads never sit idle-in-transaction and a failed statement no longer poisons the request. Wrapped: vacation-type create/edit, org-change `save_workflow`/`create_request`/`apply_change`/`decide()` (incl. final apply + close-out, TD-7). Remaining non-atomic paths are **out of F8's named scope and now tracked separately** — employee registration (`admin.py:178-232`), role reassignment (`api_update_roles`), company-role/admin seeding, company create (`company.py:96-147`), CSV import apply (`import_service.py:123-175`) |
 
 **Also surfaced by CI:** a chunk of the "unit" suite is really integration tests needing a live DB, and
 `setup_db.py` can't bootstrap the canonical `schema.sql` (rolls back on `ON CONFLICT`) — captured as

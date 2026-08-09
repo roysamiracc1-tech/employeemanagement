@@ -298,6 +298,19 @@
           <div class="bell-divider" id="bell-divider" style="display:none"></div>
           {% endif %}
 
+          <!-- Section A2: position changes awaiting MY decision (DEF-001).
+               Feature-gated, never role-gated (CLAUDE.md access-control rule 2).
+               An approval the user must act on belongs here, next to vacation —
+               not as a read-only line in My Notifications. -->
+          {% if has_feature_access('org_change') %}
+          <div class="bell-drop-hdr" id="bell-oc-hdr" style="display:none">
+            <span style="font-weight:700;font-size:.85rem">Position Changes</span>
+            <a href="{{ url_for('org_change_inbox') }}" style="font-size:.74rem;color:var(--primary)">View all →</a>
+          </div>
+          <div id="bell-oc-list"></div>
+          <div class="bell-divider" id="bell-oc-divider" style="display:none"></div>
+          {% endif %}
+
           <!-- Section B: my in-app notifications (everyone) -->
           <div class="bell-drop-hdr" id="bell-notif-hdr" style="display:none">
             <span style="font-weight:700;font-size:.85rem">My Notifications</span>
@@ -402,17 +415,21 @@ async function loadBellCount() {
     const badge = document.getElementById('bell-badge');
     if (!badge) return;
 
-    // Fetch both counts in parallel
-    const [pendingRes, notifRes] = await Promise.all([
+    // Fetch every count in parallel. Position changes are counted here too:
+    // the badge must mean "things waiting for me", and an approval the badge
+    // stays silent about is an approval nobody does (DEF-001).
+    const [pendingRes, ocRes, notifRes] = await Promise.all([
       fetch('/api/vacation/pending-count').catch(() => null),
+      fetch('/api/org-change/pending-count').catch(() => null),
       fetch('/api/my-notifications').catch(() => null),
     ]);
 
-    let pending = 0, notifCount = 0;
-    if (pendingRes?.ok) { const d = await pendingRes.json(); pending = d.count || 0; }
+    let pending = 0, ocPending = 0, notifCount = 0;
+    if (pendingRes?.ok) { const d = await pendingRes.json(); pending   = d.count || 0; }
+    if (ocRes?.ok)      { const d = await ocRes.json();      ocPending = d.count || 0; }
     if (notifRes?.ok)   { const d = await notifRes.json();   notifCount = d.count || 0; }
 
-    const total = pending + notifCount;
+    const total = pending + ocPending + notifCount;
     if (total > 0) {
       badge.textContent = total > 99 ? '99+' : total;
       badge.style.display = 'flex';
@@ -455,6 +472,43 @@ async function loadBellList() {
     }
   }
 
+  // ── Section A2: position changes awaiting MY decision (DEF-001) ──────────
+  // Same treatment vacation gets: the item itself, and the two buttons that
+  // decide it. Approve is a one-click quick action; Reject deliberately hands
+  // off to the review dialog because a rejection needs a reason.
+  const ocList = document.getElementById('bell-oc-list');
+  const ocHdr  = document.getElementById('bell-oc-hdr');
+  const ocDiv  = document.getElementById('bell-oc-divider');
+  if (ocList) {
+    try {
+      const res = await fetch('/api/org-change/pending');
+      const data = res.ok ? await res.json() : [];
+      if (data.length) {
+        if (ocHdr) ocHdr.style.display = '';
+        if (ocDiv) ocDiv.style.display = '';
+        ocList.innerHTML = data.map(r => `
+          <div class="bell-item" id="bell-oc-${r.id}">
+            <div class="bell-item-top">
+              <span class="bell-item-name">${escH(r.employee_name)}</span>
+              <span class="bell-item-type" style="background:#3b82f620;color:#3b82f6">Level ${r.current_step} / ${r.total_steps}</span>
+            </div>
+            <div class="bell-item-dates">${escH(ocSummary(r))} · raised by ${escH(r.requested_by_name)}</div>
+            <div class="bell-item-actions">
+              <button class="bell-approve" onclick="quickApproveOrgChange('${r.id}', this)">✓ Approve</button>
+              <a class="bell-reject" href="/org-change?review=${encodeURIComponent(r.id)}&action=reject"
+                 style="text-decoration:none;text-align:center">✗ Reject</a>
+            </div>
+          </div>`).join('');
+      } else {
+        if (ocHdr) ocHdr.style.display = 'none';
+        if (ocDiv) ocDiv.style.display = 'none';
+        ocList.innerHTML = '';
+      }
+    } catch (_) {
+      ocList.innerHTML = '<p class="bell-empty">Error loading.</p>';
+    }
+  }
+
   // ── Section B: my in-app notifications (everyone) ────────────────────────
   const notifList = document.getElementById('bell-notif-list');
   const notifHdr  = document.getElementById('bell-notif-hdr');
@@ -470,7 +524,7 @@ async function loadBellList() {
           notifList.innerHTML = notifications.map(n => `
             <div class="bell-item bell-notif-item" id="bell-notif-${n.id}">
               <div class="bell-item-top">
-                <span class="bell-notif-icon">${n.event_type === 'VACATION_APPROVED' ? '✅' : '❌'}</span>
+                <span class="bell-notif-icon">${notifIcon(n.event_type)}</span>
                 <span class="bell-item-name" style="font-size:.83rem">${escH(n.message)}</span>
               </div>
               <div class="bell-item-dates" style="margin-top:2px">${escH(String(n.created_at||'').slice(0,16).replace('T',' '))}</div>
@@ -542,6 +596,65 @@ async function quickReview(reqId, action, triggerEl, note) {
     if (typeof loadCalendar === 'function') loadCalendar();
   } catch (_) {
     if (triggerEl) { triggerEl.disabled=false; }
+  }
+}
+
+// ── Notification icons (DEF-002) ────────────────────────────────────────────
+// This used to read `event_type === 'VACATION_APPROVED' ? '✅' : '❌'`, so every
+// event on the system except one rendered as a red cross — an approval, a
+// receipt, and a request still awaiting a decision all looked like refusals.
+// The icon states the OUTCOME, and an event with no outcome yet must not claim
+// one. Unknown events fall back to neutral, never to ❌.
+const NOTIF_ICON = {
+  // Decided — an outcome really happened
+  VACATION_APPROVED:      '✅',
+  VACATION_REJECTED:      '❌',
+  VACATION_CANCELLED:     '🚫',
+  ORG_CHANGE_APPROVED:    '✅',
+  ORG_CHANGE_REJECTED:    '❌',
+  // In flight — no outcome yet, so no outcome icon
+  VACATION_REQUESTED:     '⏳',
+  ORG_CHANGE_REQUESTED:   '⏳',
+  ORG_CHANGE_SUBMITTED:   '📨',
+  ORG_CHANGE_STEP_APPROVED: '⏳',
+  // Informational
+  EMPLOYEE_CREATED:       '👤',
+  SKILL_VALIDATED:        '⭐',
+};
+function notifIcon(eventType) { return NOTIF_ICON[eventType] || '🔔'; }
+
+// ── Position-change quick actions in the bell (DEF-001) ─────────────────────
+
+// "BU → Integrated Logistic · mgr → Ana Costa" — only the dimensions that
+// actually change, so the approver can decide without opening anything.
+function ocSummary(r) {
+  const parts = [];
+  if (r.to_manager && r.to_manager !== r.from_manager) parts.push('mgr → ' + r.to_manager);
+  if (r.to_bu  && r.to_bu  !== r.from_bu)  parts.push('BU → '   + r.to_bu);
+  if (r.to_fu  && r.to_fu  !== r.from_fu)  parts.push('unit → ' + r.to_fu);
+  if (r.to_loc && r.to_loc !== r.from_loc) parts.push('loc → '  + r.to_loc);
+  return parts.join(' · ') || 'No change';
+}
+
+// Approve only. Reject is a link to the review dialog on purpose: a rejection
+// ends the whole request at every level, and doing that without a recorded
+// reason is not a decision anybody can audit later.
+async function quickApproveOrgChange(reqId, triggerEl) {
+  if (triggerEl) { triggerEl.disabled = true; triggerEl.textContent = '…'; }
+  try {
+    const res = await fetch(`/api/org-change/${reqId}/decide`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ action: 'approve', note: null }),
+    });
+    if (!res.ok) { if (triggerEl) { triggerEl.disabled=false; triggerEl.textContent='✓ Approve'; } return; }
+    document.getElementById(`bell-oc-${reqId}`)?.remove();
+    _bellLoaded = false;
+    await loadBellCount();
+    // The Position Changes page defines this; refresh it if we are standing on it.
+    if (typeof init === 'function') init();
+  } catch (_) {
+    if (triggerEl) { triggerEl.disabled = false; triggerEl.textContent = '✓ Approve'; }
   }
 }
 

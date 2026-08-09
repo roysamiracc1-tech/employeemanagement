@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict Gcu8IXPC6Vsa7Zmo4lOBd6YUbAITxYKe0fFlhMvmWj6AvkeSjYnAdeByLQTh2Wc
+\restrict XiY6RKY4mDMxOg9WG7uxJWOUuRmRfembAemzlsOCUmUTwm0MLc9MGiUUryDTvF0
 
 -- Dumped from database version 16.13 (Homebrew)
 -- Dumped by pg_dump version 16.13 (Homebrew)
@@ -33,6 +33,19 @@ COMMENT ON EXTENSION "uuid-ossp" IS 'generate universally unique identifiers (UU
 
 
 --
+-- Name: audit_log_immutable(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.audit_log_immutable() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    RAISE EXCEPTION 'audit_log is append-only (attempted %)', TG_OP
+        USING ERRCODE = 'restrict_violation';
+END; $$;
+
+
+--
 -- Name: fn_update_employee_search(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -60,6 +73,58 @@ $$;
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
+
+--
+-- Name: audit_log; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.audit_log (
+    id bigint NOT NULL,
+    company_id uuid NOT NULL,
+    actor_user_id uuid,
+    actor_employee_id uuid,
+    actor_label character varying(255) NOT NULL,
+    actor_roles jsonb DEFAULT '[]'::jsonb NOT NULL,
+    actor_ip character varying(45),
+    actor_session_id character varying(64),
+    subject_employee_id uuid,
+    subject_employee_number character varying(50),
+    action character varying(60) NOT NULL,
+    entity_type character varying(50) NOT NULL,
+    entity_id uuid NOT NULL,
+    before_state jsonb,
+    after_state jsonb,
+    reason text NOT NULL,
+    correlation_id uuid NOT NULL,
+    outcome character varying(10) DEFAULT 'SUCCESS'::character varying NOT NULL,
+    error_code character varying(60),
+    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    retention_class character varying(20) DEFAULT 'STANDARD'::character varying NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT chk_audit_outcome CHECK (((outcome)::text = ANY ((ARRAY['SUCCESS'::character varying, 'FAILED'::character varying])::text[]))),
+    CONSTRAINT chk_audit_reason_not_blank CHECK ((btrim(reason) <> ''::text)),
+    CONSTRAINT chk_audit_retention_class CHECK (((retention_class)::text = ANY ((ARRAY['STANDARD'::character varying, 'EMPLOYMENT'::character varying, 'SECURITY'::character varying])::text[])))
+);
+
+
+--
+-- Name: audit_log_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.audit_log_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: audit_log_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.audit_log_id_seq OWNED BY public.audit_log.id;
+
 
 --
 -- Name: business_units; Type: TABLE; Schema: public; Owner: -
@@ -686,7 +751,9 @@ CREATE TABLE public.user_notifications (
     message text NOT NULL,
     link text,
     is_read boolean DEFAULT false NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    related_type character varying(40),
+    related_id uuid
 );
 
 
@@ -812,10 +879,25 @@ CREATE TABLE public.widget_refresh_settings (
 
 
 --
+-- Name: audit_log id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.audit_log ALTER COLUMN id SET DEFAULT nextval('public.audit_log_id_seq'::regclass);
+
+
+--
 -- Name: employee_directory employee_id; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.employee_directory ALTER COLUMN employee_id SET DEFAULT nextval('public.employee_directory_employee_id_seq'::regclass);
+
+
+--
+-- Name: audit_log audit_log_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.audit_log
+    ADD CONSTRAINT audit_log_pkey PRIMARY KEY (id);
 
 
 --
@@ -1395,6 +1477,27 @@ ALTER TABLE ONLY public.widget_refresh_settings
 
 
 --
+-- Name: idx_audit_company_time; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_audit_company_time ON public.audit_log USING btree (company_id, created_at DESC);
+
+
+--
+-- Name: idx_audit_correlation; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_audit_correlation ON public.audit_log USING btree (company_id, correlation_id);
+
+
+--
+-- Name: idx_audit_entity; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_audit_entity ON public.audit_log USING btree (company_id, entity_type, entity_id, created_at DESC);
+
+
+--
 -- Name: idx_business_units_company; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1675,6 +1778,13 @@ CREATE INDEX idx_user_notif_user_unread ON public.user_notifications USING btree
 
 
 --
+-- Name: idx_user_notifications_related_unread; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_user_notifications_related_unread ON public.user_notifications USING btree (related_type, related_id) WHERE (NOT is_read);
+
+
+--
 -- Name: idx_vacation_requests_type; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1738,10 +1848,49 @@ CREATE UNIQUE INDEX roles_global_name_uniq ON public.roles USING btree (name) WH
 
 
 --
+-- Name: audit_log trg_audit_log_no_update; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_audit_log_no_update BEFORE UPDATE ON public.audit_log FOR EACH ROW EXECUTE FUNCTION public.audit_log_immutable();
+
+
+--
 -- Name: employees trg_employee_search; Type: TRIGGER; Schema: public; Owner: -
 --
 
 CREATE TRIGGER trg_employee_search AFTER INSERT OR UPDATE OF first_name, last_name, job_title, email ON public.employees FOR EACH ROW EXECUTE FUNCTION public.fn_update_employee_search();
+
+
+--
+-- Name: audit_log audit_log_actor_employee_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.audit_log
+    ADD CONSTRAINT audit_log_actor_employee_id_fkey FOREIGN KEY (actor_employee_id) REFERENCES public.employees(id) ON DELETE SET NULL;
+
+
+--
+-- Name: audit_log audit_log_actor_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.audit_log
+    ADD CONSTRAINT audit_log_actor_user_id_fkey FOREIGN KEY (actor_user_id) REFERENCES public.users(id) ON DELETE SET NULL;
+
+
+--
+-- Name: audit_log audit_log_company_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.audit_log
+    ADD CONSTRAINT audit_log_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id);
+
+
+--
+-- Name: audit_log audit_log_subject_employee_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.audit_log
+    ADD CONSTRAINT audit_log_subject_employee_id_fkey FOREIGN KEY (subject_employee_id) REFERENCES public.employees(id) ON DELETE SET NULL;
 
 
 --
@@ -2388,5 +2537,5 @@ ALTER TABLE ONLY public.visibility_scopes
 -- PostgreSQL database dump complete
 --
 
-\unrestrict Gcu8IXPC6Vsa7Zmo4lOBd6YUbAITxYKe0fFlhMvmWj6AvkeSjYnAdeByLQTh2Wc
+\unrestrict XiY6RKY4mDMxOg9WG7uxJWOUuRmRfembAemzlsOCUmUTwm0MLc9MGiUUryDTvF0
 

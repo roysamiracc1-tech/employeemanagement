@@ -112,6 +112,8 @@ def step4_seed_portal_features(cur):
         ('system_config',        'System Configuration',     'Widget settings and global platform config',                8),
         ('skills_intelligence',  'Skills Intelligence',      'Benchmark company skills against industry trends',          9),
         ('org_change',           'Position Change Requests', 'Raise and approve business unit / department / manager changes', 10),
+        # sort_order 11/12 are reserved for onboarding/offboarding (EP38 KAN-184/183).
+        ('audit_log',            'Audit Log',                'View the immutable audit trail of changes within the company',   13),
     ]
     for code, label, desc, order in features:
         cur.execute(
@@ -142,7 +144,10 @@ def step4_seed_portal_features(cur):
                                 ('vacations',           True, True,  True),
                                 ('reports',             True, True,  False),
                                 ('skills_intelligence', True, False, False),
-                                ('org_change',          True, True,  False)],
+                                ('org_change',          True, True,  False),
+                                # Read-only: audit_log is append-only, there is
+                                # no legitimate write or delete path.
+                                ('audit_log',           True, False, False)],
         'PORTAL_ADMIN':        [('employee_profiles',   True, True,  True),
                                 ('org_structure',       True, True,  True),
                                 ('user_accounts',       True, True,  True),
@@ -151,7 +156,8 @@ def step4_seed_portal_features(cur):
                                 ('reports',             True, True,  False),
                                 ('company_settings',    True, True,  False),
                                 ('skills_intelligence', True, True,  False),
-                                ('org_change',          True, True,  False)],
+                                ('org_change',          True, True,  False),
+                                ('audit_log',           True, False, False)],
     }
     for role_name, perms in access_map.items():
         for feat_code, r, w, d in perms:

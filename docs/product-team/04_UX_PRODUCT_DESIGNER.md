@@ -39,6 +39,14 @@ Understand the problem → identify persona → map current journey → identify
 ## States every important workflow must define
 Initial · loading · empty · success · error · permission · disabled · partial-data · integration-failure.
 
+## Demo Readiness Gate — your share (D4, feedback surfaces)
+Before any feature is demoed you own **D4** in [`../project-management/DEMO_READINESS_GATE.md`](../project-management/DEMO_READINESS_GATE.md): for every state change, what does the user actually *see*? Work the blind-spot list in that document — notification bell, badge count, icon and colour semantics, retirement once decided, empty states, the other approvers, the subject, the requester, status vocabulary, deep links.
+
+Two design rules this exists to enforce, both learned from live defects on 9 Aug 2026:
+
+1. **A call to action must be actionable where the user meets it.** An approval that renders as read-only text in a notification list, while the "Pending Approvals" area says "No pending approvals ✓", is a defect — not a copy problem.
+2. **An icon states an outcome; an item with no outcome yet must not wear one.** Never let a status icon be derived from "is it this one specific event, yes or no" — every other event then inherits the failure icon, and an undecided request reads to the user as a refusal. Map the vocabulary explicitly and give unknowns a neutral fallback.
+
 ## Output
 A **UX Report** in the Charter §6 standard format, plus journey maps and design specs. Lead with the highest-impact usability and accessibility issues, tied to the personas affected.
 

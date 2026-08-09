@@ -135,7 +135,7 @@ pip install -r requirements.txt
 ### 3. Set up the database
 
 `database/schema.sql` is the **authoritative, complete schema** (a `pg_dump --schema-only`
-baseline of all 46 tables, indexes, functions and triggers — regenerate with
+baseline of all 47 tables, indexes, functions and triggers — regenerate with
 `pg_dump -d employee --schema-only --no-owner --no-privileges -f database/schema.sql`).
 Build a fresh database from it, then seed roles/features:
 

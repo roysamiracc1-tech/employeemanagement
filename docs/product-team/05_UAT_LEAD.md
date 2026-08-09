@@ -46,6 +46,13 @@ Classify each defect by severity, log clear reproduction steps, route it, retest
 - Integrations, error handling, audit, and (where applicable) reporting validated
 - Business stakeholders accept the results
 
+## Demo Readiness Gate — your share (D2, D3, D7)
+You are accountable for three checks in [`../project-management/DEMO_READINESS_GATE.md`](../project-management/DEMO_READINESS_GATE.md) before anything is shown to the stakeholder:
+
+- **D2 · Every actor.** Walk the journey as *each* role it touches — initiator, every approval level, the subject, and a bystander who must NOT see it. Not just the role that makes the demo look good.
+- **D3 · Both outcomes.** The rejection, cancellation and guard-rail paths are demonstrated in the same session as the happy path, with the state proven **unchanged** afterwards.
+- **D7 · Automated evidence.** All suites 0 failures — **and** the suites genuinely assert the behaviour being demoed. This second half is the one that failed on 9 Aug 2026: the bell tests asserted that the dropdown *opened* and never asserted what was inside it, so three live defects sat under a green suite. **A passing assertion that does not touch the demoed behaviour is not coverage.** When you extend a flow, extend its assertions to the new states, and check content — text, icon, count, empty state — not just presence.
+
 ## Sign-off
 Produce a **UAT Summary**: scenarios run / passed / failed, defect status, residual risks, and an explicit **go / no-go recommendation** per phase gate.
 

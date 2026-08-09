@@ -18,6 +18,7 @@ Do not create issues or wiki pages there, and do not link to `roysamiracc1-17771
 | Feature catalogue, access-rights matrices, nav-by-role | [`../BUSINESS_OVERVIEW_FEATURES_AND_ACCESS.md`](../BUSINESS_OVERVIEW_FEATURES_AND_ACCESS.md) |
 | Schema, APIs, architecture, deployment, testing | [`../TECHNICAL_DOCUMENTATION.md`](../TECHNICAL_DOCUMENTATION.md) |
 | Epics, user stories, acceptance criteria, delivery status | [`BACKLOG.md`](BACKLOG.md) |
+| Checks required before any feature is demoed to the stakeholder | [`DEMO_READINESS_GATE.md`](DEMO_READINESS_GATE.md) |
 | Business goals → epics → stories, sequencing | [`../product-team/deliverables/PRODUCT_ROADMAP_GOALS_EPICS_STORIES.md`](../product-team/deliverables/PRODUCT_ROADMAP_GOALS_EPICS_STORIES.md) |
 | Technical task breakdown for the roadmap | [`../product-team/deliverables/ARCHITECT_KICKOFF_AND_TASK_BREAKDOWN.md`](../product-team/deliverables/ARCHITECT_KICKOFF_AND_TASK_BREAKDOWN.md) |
 | Technical debt findings (`F1`–`F31`) | [`../ARCHITECTURE_REVIEW.md`](../ARCHITECTURE_REVIEW.md) |
@@ -45,6 +46,7 @@ engineering's share. Summary:
 | [`../ARCHITECTURE_REVIEW.md`](../ARCHITECTURE_REVIEW.md) | Senior Architect | all engineers |
 | [`BACKLOG.md`](BACKLOG.md) | Senior Product Manager | BA (acceptance criteria), Delivery Mgr (status), UAT (defects), engineers (own stories) |
 | `README.md` (this file) | Delivery / Release Manager | SPM |
+| [`DEMO_READINESS_GATE.md`](DEMO_READINESS_GATE.md) | Senior Product Manager (verdict) | Delivery Mgr (runs it), UAT (D2/D3/D7), UX (D4), Architect (D5), BA (D1) |
 | [`../product-team/deliverables/PRODUCT_ROADMAP_GOALS_EPICS_STORIES.md`](../product-team/deliverables/PRODUCT_ROADMAP_GOALS_EPICS_STORIES.md) | Senior Product Manager | Delivery Mgr, Strategist |
 | [`../product-team/deliverables/ARCHITECT_KICKOFF_AND_TASK_BREAKDOWN.md`](../product-team/deliverables/ARCHITECT_KICKOFF_AND_TASK_BREAKDOWN.md) | Senior Architect | Senior SWE, Mid-Level, DevOps |
 | [`../../README.md`](../../README.md) | Delivery / Release Manager | Architect, DevOps |

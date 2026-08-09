@@ -552,6 +552,15 @@ def run_all(playwright):
     except Exception as e:
         fail("Plain employee can view own profile", str(e))
 
+    try:
+        # KAN-185 / P3 — an employee can never initiate their own move, through
+        # any entry point. The button must be absent, not merely disabled.
+        assert page.query_selector("button:has-text('Transfer')") is None
+        assert page.query_selector("#move-modal") is None
+        ok("Plain employee has no Transfer… entry point on their own profile")
+    except Exception as e:
+        fail("Plain employee has no Transfer… entry point on their own profile", str(e))
+
     # ══════════════════════════════════════════════════════════
     section("15 · Mobile responsive (viewport simulation)")
     # ══════════════════════════════════════════════════════════
@@ -632,6 +641,229 @@ def run_all(playwright):
             fail(f"  {path} → redirects to login", str(e))
 
     anon_ctx.close()
+
+    # ══════════════════════════════════════════════════════════
+    section("17 · Transfer… entry point (KAN-185)")
+    # ══════════════════════════════════════════════════════════
+    # The HR-initiated entry point to the org-change engine. There is exactly one
+    # dialog, one endpoint and one engine (EP38 UX spec §6.0), so these checks
+    # assert the entry points reach the SAME "Request Position Change" dialog —
+    # a second transfer flow appearing here is the failure this guards against.
+    logout(page)
+    subject_href = None
+    try:
+        login(page, PORTAL_ADMIN)          # also HR_ADMIN — may initiate for anyone
+        page.goto(BASE + "/directory")
+        page.wait_for_load_state("networkidle")
+        page.wait_for_selector("#employee-table-body tr", timeout=8000)
+        ok("Directory loads for Portal/HR Admin")
+    except Exception as e:
+        fail("Directory loads for Portal/HR Admin", str(e))
+
+    try:
+        btns = page.query_selector_all(".row-menu-btn")
+        assert btns, "no row-action menu rendered"
+        btns[0].click()
+        page.wait_for_timeout(300)
+        items = page.eval_on_selector_all(
+            ".row-menu-list:not([hidden]) [role=menuitem]",
+            "els => els.map(e => e.textContent.trim())")
+        assert "Transfer…" in items, f"menu items were {items}"
+        ok("Directory row menu offers Transfer…")
+    except Exception as e:
+        fail("Directory row menu offers Transfer…", str(e))
+
+    try:
+        page.click(".row-menu-list:not([hidden]) button[role=menuitem]")
+        page.wait_for_timeout(1200)
+        assert page.eval_on_selector("#move-modal", "e => e.style.display") == "flex"
+        # Same dialog as the drag-and-drop — the word "Transfer" stays on the
+        # entry point and never becomes a second status vocabulary.
+        assert page.inner_text("#mv-title") == "Request Position Change"
+        ok("Directory Transfer… opens the shared Request Position Change dialog")
+    except Exception as e:
+        fail("Directory Transfer… opens the shared Request Position Change dialog", str(e))
+
+    try:
+        page.keyboard.press("Escape")
+        page.wait_for_timeout(300)
+        subject_href = page.eval_on_selector_all(
+            "#employee-table-body a[href^='/profile/']",
+            "a => a.length ? a[0].getAttribute('href') : null")
+        assert subject_href, "no employee profile link in the directory"
+        page.goto(BASE + subject_href)
+        page.wait_for_load_state("networkidle")
+        assert page.query_selector("button:has-text('Transfer')") is not None
+        ok("Profile shows the Transfer… entry point for an eligible subject")
+    except Exception as e:
+        fail("Profile shows the Transfer… entry point for an eligible subject", str(e))
+
+    try:
+        page.click("button:has-text('Transfer')")
+        page.wait_for_timeout(1400)
+        assert page.eval_on_selector("#move-modal", "e => e.style.display") == "flex"
+        assert page.inner_text("#mv-title") == "Request Position Change"
+        # PD2 — the approval-chain line is never blank, even unconfigured.
+        assert "approval" in page.inner_text("#mv-chain").lower()
+        ok("Profile Transfer… opens the dialog with a non-empty approval chain")
+    except Exception as e:
+        fail("Profile Transfer… opens the dialog with a non-empty approval chain", str(e))
+
+    try:
+        # Nothing is applied by opening or cancelling — the dialog only ever
+        # creates a PENDING request, and only on submit.
+        page.click("#mv-cancel")
+        page.wait_for_timeout(300)
+        assert page.eval_on_selector("#move-modal", "e => e.style.display") == "none"
+        ok("Cancelling the transfer dialog applies nothing and closes it")
+    except Exception as e:
+        fail("Cancelling the transfer dialog applies nothing and closes it", str(e))
+
+    # ══════════════════════════════════════════════════════════
+    section("18 · Bell content — approvals are actionable (DEF-001/2/3)")
+    # ══════════════════════════════════════════════════════════
+    # Section 9 only proves the bell OPENS. These checks prove what is INSIDE
+    # it, which is where three defects lived while section 9 stayed green:
+    #   DEF-001  a position change awaiting you never appeared in the bell's
+    #            approvals area at all — it fetched vacation only — so the bell
+    #            said "No pending approvals ✓" while an approval sat waiting.
+    #   DEF-002  every event except VACATION_APPROVED rendered a red ❌, so an
+    #            undecided request and a successful approval both read as
+    #            refusals.
+    #   DEF-003  "awaiting your approval" survived in the bell after the request
+    #            had been decided and could no longer be acted on.
+    # The request raised here is REJECTED at the end, never approved: a
+    # rejection applies no org change, so the suite stays re-runnable and never
+    # mutates anybody's placement.
+    logout(page)
+    oc_id = oc_name = None
+    try:
+        login(page, PORTAL_ADMIN)          # HR_ADMIN — level-1 approver AND may initiate
+        page.goto(BASE + "/directory")
+        page.wait_for_load_state("networkidle")
+        page.wait_for_selector("#employee-table-body tr", timeout=8000)
+        # Find any colleague we can genuinely raise a move for: skip anyone who
+        # already has a pending request (one per person, AC-185-08) and anyone
+        # whose only units match their current placement.
+        created = page.evaluate("""async () => {
+          const hrefs = [...document.querySelectorAll("#employee-table-body a[href^='/profile/']")]
+            .map(a => a.getAttribute('href').split('/profile/')[1]).slice(0, 8);
+          for (const id of hrefs) {
+            const pre = await (await fetch('/api/org-change/prefill?subject=' + id)).json();
+            if (pre.pending_request_id) continue;
+            const bu = (pre.business_units || []).find(b => b.id !== (pre.subject_current || {}).bu);
+            if (!bu) continue;
+            const res = await fetch('/api/org-change/request', {
+              method: 'POST', headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({ employee_id: id, business_unit_id: bu.id,
+                                     reason: 'UAT — bell actionability check' }) });
+            if (res.ok) { const d = await res.json();
+                          return { id: d.id, name: (pre.subject || {}).name }; }
+          }
+          return null;
+        }""")
+        assert created, "could not raise a position change to test the bell with"
+        oc_id, oc_name = created["id"], created["name"]
+        ok("Raised a position change to exercise the bell with")
+    except Exception as e:
+        fail("Raised a position change to exercise the bell with", str(e))
+
+    try:
+        assert oc_id, "no request was raised"
+        page.goto(BASE + "/dashboard")
+        page.wait_for_load_state("networkidle")
+        badge = page.eval_on_selector(
+            "#bell-badge", "e => e.style.display !== 'none' ? e.textContent.trim() : '0'")
+        assert badge != '0', "badge stayed silent while an approval was waiting"
+        ok("DEF-001 · Bell badge counts a position change awaiting me")
+    except Exception as e:
+        fail("DEF-001 · Bell badge counts a position change awaiting me", str(e))
+
+    try:
+        page.locator(".bell-btn").click()
+        page.wait_for_timeout(1500)
+        assert page.eval_on_selector("#bell-oc-hdr", "e => e.style.display") != "none", \
+            "Position Changes section stayed hidden"
+        assert oc_name in page.inner_text("#bell-oc-list"), \
+            f"{oc_name} not listed in the bell's Position Changes section"
+        ok("DEF-001 · Position change appears in the bell's approvals area")
+    except Exception as e:
+        fail("DEF-001 · Position change appears in the bell's approvals area", str(e))
+
+    try:
+        # Actionable, not a read-only line of text.
+        assert page.query_selector(f"#bell-oc-{oc_id} .bell-approve") is not None
+        href = page.eval_on_selector(f"#bell-oc-{oc_id} .bell-reject", "e => e.getAttribute('href')")
+        assert href and f"review={oc_id}" in href and "action=reject" in href, \
+            f"reject control does not deep-link to the review dialog (href={href})"
+        ok("DEF-001 · Bell offers Approve, and Reject deep-links for a reason")
+    except Exception as e:
+        fail("DEF-001 · Bell offers Approve, and Reject deep-links for a reason", str(e))
+
+    try:
+        # The call to action has NO outcome yet, so it must not wear one.
+        # Scoped to OUR subject: a shared dev database legitimately holds other
+        # people's pending requests, and asserting on "any" notification would
+        # pass or fail on someone else's data.
+        icon = page.evaluate("""(name) => {
+          const it = [...document.querySelectorAll('#bell-notif-list .bell-notif-item')]
+            .find(e => e.innerText.includes('awaiting your approval') && e.innerText.includes(name));
+          return it ? it.querySelector('.bell-notif-icon').textContent.trim() : null; }""", oc_name)
+        assert icon is not None, "no 'awaiting your approval' notification was written"
+        assert icon != '❌', "an undecided request is still rendered as a rejection"
+        assert icon == '⏳', f"expected the in-flight icon, got {icon!r}"
+        ok("DEF-002 · Undecided request shows ⏳, not a rejection cross")
+    except Exception as e:
+        fail("DEF-002 · Undecided request shows ⏳, not a rejection cross", str(e))
+
+    try:
+        # Reject from the bell — the deep link must open the review dialog.
+        page.goto(BASE + f"/org-change?review={oc_id}&action=reject")
+        page.wait_for_load_state("networkidle")
+        page.wait_for_timeout(1500)
+        assert page.eval_on_selector("#review-modal", "e => e.style.display") == "flex", \
+            "the bell's Reject link did not open the review dialog"
+        ok("DEF-001 · Reject from the bell opens the review dialog")
+    except Exception as e:
+        fail("DEF-001 · Reject from the bell opens the review dialog", str(e))
+
+    try:
+        page.fill("#rv-note", "UAT — rejected, applies nothing.")
+        page.click("#review-modal button:has-text('Reject')")
+        page.wait_for_timeout(1800)
+        rows = page.evaluate("""() => [...document.querySelectorAll('#pending-tbody tr')]
+            .map(r => r.innerText)""")
+        assert not any((oc_name or '') in r for r in rows), "request survived its own rejection"
+        ok("Rejecting from the bell's deep link decides the request")
+    except Exception as e:
+        fail("Rejecting from the bell's deep link decides the request", str(e))
+
+    try:
+        # DEF-003 — the call to action is retired; the OUTCOME notification is not.
+        page.goto(BASE + "/dashboard")
+        page.wait_for_load_state("networkidle")
+        page.locator(".bell-btn").click()
+        page.wait_for_timeout(1500)
+        stale = page.evaluate("""(name) => [...document.querySelectorAll('#bell-notif-list .bell-notif-item')]
+            .some(e => e.innerText.includes('awaiting your approval') && e.innerText.includes(name))""",
+            oc_name)
+        assert not stale, "a decided request still asks to be approved in the bell"
+        icon = page.evaluate("""(name) => {
+          const it = [...document.querySelectorAll('#bell-notif-list .bell-notif-item')]
+            .find(e => e.innerText.includes('was rejected') && e.innerText.includes(name));
+          return it ? it.querySelector('.bell-notif-icon').textContent.trim() : null; }""", oc_name)
+        assert icon is not None, "the rejection outcome was never announced"
+        assert icon == '❌', f"a rejection should read as one, got {icon!r}"
+        ok("DEF-003 · Decided request leaves the bell; outcome shows ❌")
+    except Exception as e:
+        fail("DEF-003 · Decided request leaves the bell; outcome shows ❌", str(e))
+
+    try:
+        assert page.query_selector(f"#bell-oc-{oc_id}") is None, \
+            "the Position Changes section is still offering a decided request"
+        ok("DEF-001 · Decided request leaves the bell's approvals area")
+    except Exception as e:
+        fail("DEF-001 · Decided request leaves the bell's approvals area", str(e))
 
     browser.close()
 

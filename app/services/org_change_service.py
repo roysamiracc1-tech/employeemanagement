@@ -17,7 +17,7 @@ Public API (used by app/routes/org_change.py):
 """
 import datetime
 
-from app.db import query, execute, insert_returning, to_dict
+from app.db import query, execute, insert_returning, to_dict, transaction
 from app.services import notification_service as notif
 
 # Default chain when a company has not configured one: a single HR approval step.
@@ -49,27 +49,32 @@ def save_workflow(company_id, name, steps):
     """Replace-all: (re)create the company's chain and its ordered steps."""
     wf = query("SELECT id::text FROM org_change_workflows WHERE company_id=%s::uuid",
                (company_id,), one=True)
-    if wf:
-        wf_id = wf['id']
-        execute("UPDATE org_change_workflows SET name=%s, is_active=TRUE WHERE id=%s::uuid",
-                (name or 'Position Change Approval', wf_id))
-        execute("DELETE FROM org_change_workflow_steps WHERE workflow_id=%s::uuid", (wf_id,))
-    else:
-        wf_id = insert_returning(
-            "INSERT INTO org_change_workflows (company_id, name) VALUES (%s::uuid,%s) RETURNING id::text",
-            (company_id, name or 'Position Change Approval'))['id']
 
-    for i, s in enumerate(steps, start=1):
-        atype = s.get('approver_type')
-        role  = (s.get('approver_role') or None) if atype == 'ROLE' else None
-        emp   = (s.get('approver_employee_id') or None) if atype == 'EMPLOYEE' else None
-        if atype not in ('ROLE', 'EMPLOYEE') or (atype == 'ROLE' and not role) or (atype == 'EMPLOYEE' and not emp):
-            continue
-        execute("""
-            INSERT INTO org_change_workflow_steps
-              (workflow_id, step_order, approver_type, approver_role, approver_employee_id, label)
-            VALUES (%s::uuid,%s,%s,%s,%s::uuid,%s)
-        """, (wf_id, i, atype, role, emp, (s.get('label') or None)))
+    # ADR-006: replace-all is one unit of work. A failure part-way through the step
+    # loop must not leave the company with its old chain deleted and a partial new
+    # one — that would silently change who can approve a position change.
+    with transaction():
+        if wf:
+            wf_id = wf['id']
+            execute("UPDATE org_change_workflows SET name=%s, is_active=TRUE WHERE id=%s::uuid",
+                    (name or 'Position Change Approval', wf_id))
+            execute("DELETE FROM org_change_workflow_steps WHERE workflow_id=%s::uuid", (wf_id,))
+        else:
+            wf_id = insert_returning(
+                "INSERT INTO org_change_workflows (company_id, name) VALUES (%s::uuid,%s) RETURNING id::text",
+                (company_id, name or 'Position Change Approval'))['id']
+
+        for i, s in enumerate(steps, start=1):
+            atype = s.get('approver_type')
+            role  = (s.get('approver_role') or None) if atype == 'ROLE' else None
+            emp   = (s.get('approver_employee_id') or None) if atype == 'EMPLOYEE' else None
+            if atype not in ('ROLE', 'EMPLOYEE') or (atype == 'ROLE' and not role) or (atype == 'EMPLOYEE' and not emp):
+                continue
+            execute("""
+                INSERT INTO org_change_workflow_steps
+                  (workflow_id, step_order, approver_type, approver_role, approver_employee_id, label)
+                VALUES (%s::uuid,%s,%s,%s,%s::uuid,%s)
+            """, (wf_id, i, atype, role, emp, (s.get('label') or None)))
     return wf_id
 
 
@@ -100,9 +105,25 @@ def _user_matches_step(user, step):
     return step['approver_role'] in (user.get('roles') or [])
 
 
-def _notify(user_ids, event_type, message, link='/org-change'):
+# Every notification this engine writes is ABOUT one request, so it can be
+# retired when that request stops being actionable (DEF-003).
+_RELATED = 'ORG_CHANGE_REQUEST'
+# The call-to-action event. Retiring this one clears "awaiting your approval"
+# from the bell of every approver at the level just decided — including the ones
+# who never opened it.
+_CALL_TO_ACTION = ['ORG_CHANGE_REQUESTED']
+
+
+def _notify(user_ids, event_type, message, link='/org-change', req_id=None):
     for uid in set(u for u in user_ids if u):
-        notif.create_user_notification(uid, event_type, message, link=link)
+        notif.create_user_notification(uid, event_type, message, link=link,
+                                       related_type=_RELATED if req_id else None,
+                                       related_id=req_id)
+
+
+def _retire_call_to_action(request_id):
+    """The level just decided is closed — nobody is 'awaiting' it any more."""
+    notif.resolve_related(_RELATED, request_id, _CALL_TO_ACTION)
 
 
 def _emp_name(emp_id):
@@ -141,44 +162,62 @@ def create_request(company_id, subject_id, requester_user_id, proposed, reason):
                (company_id,), one=True)
     wf_id = wf['id'] if wf else None
 
-    req = insert_returning("""
-        INSERT INTO org_change_requests
-          (company_id, employee_id, requested_by_user_id, reason,
-           from_business_unit_id, from_functional_unit_id, from_location_id, from_manager_id,
-           proposed_business_unit_id, proposed_functional_unit_id, proposed_location_id, proposed_manager_id,
-           workflow_id, current_step, status)
-        VALUES (%s::uuid,%s::uuid,%s::uuid,%s,
-                %s::uuid,%s::uuid,%s::uuid,%s::uuid,
-                %s::uuid,%s::uuid,%s::uuid,%s::uuid,
-                %s::uuid,1,'PENDING')
-        RETURNING id::text
-    """, (company_id, subject_id, requester_user_id, (reason or None),
-          cur['bu'], cur['fu'], cur['loc'], cur['mgr'],
-          proposed.get('business_unit_id'), proposed.get('functional_unit_id'),
-          proposed.get('location_id'), proposed.get('manager_id'),
-          wf_id))
-    req_id = req['id']
+    # ADR-006: the request and its full approval chain are one unit of work. A
+    # request with a partial chain would be approvable in fewer levels than the
+    # company configured — a silent weakening of the control.
+    with transaction():
+        req = insert_returning("""
+            INSERT INTO org_change_requests
+              (company_id, employee_id, requested_by_user_id, reason,
+               from_business_unit_id, from_functional_unit_id, from_location_id, from_manager_id,
+               proposed_business_unit_id, proposed_functional_unit_id, proposed_location_id, proposed_manager_id,
+               workflow_id, current_step, status)
+            VALUES (%s::uuid,%s::uuid,%s::uuid,%s,
+                    %s::uuid,%s::uuid,%s::uuid,%s::uuid,
+                    %s::uuid,%s::uuid,%s::uuid,%s::uuid,
+                    %s::uuid,1,'PENDING')
+            RETURNING id::text
+        """, (company_id, subject_id, requester_user_id, (reason or None),
+              cur['bu'], cur['fu'], cur['loc'], cur['mgr'],
+              proposed.get('business_unit_id'), proposed.get('functional_unit_id'),
+              proposed.get('location_id'), proposed.get('manager_id'),
+              wf_id))
+        req_id = req['id']
 
-    for s in steps:
-        execute("""
-            INSERT INTO org_change_approvals
-              (request_id, step_order, approver_type, approver_role, approver_employee_id)
-            VALUES (%s::uuid,%s,%s,%s,%s::uuid)
-        """, (req_id, s['step_order'], s['approver_type'],
-              s.get('approver_role'), s.get('approver_employee_id')))
+        for s in steps:
+            execute("""
+                INSERT INTO org_change_approvals
+                  (request_id, step_order, approver_type, approver_role, approver_employee_id)
+                VALUES (%s::uuid,%s,%s,%s,%s::uuid)
+            """, (req_id, s['step_order'], s['approver_type'],
+                  s.get('approver_role'), s.get('approver_employee_id')))
 
+    # Notifications are sent only after the unit of work has committed — they
+    # cannot be rolled back (EP38 technical design §5.4).
     subj = _emp_name(subject_id)
     total = len(steps)
-    # Notify first-step approvers
+    # Notify first-step approvers. ORG_CHANGE_REQUESTED is the CALL TO ACTION —
+    # it is retired the moment the level it belongs to is decided.
     _notify(_step_approver_user_ids(company_id, steps[0]), 'ORG_CHANGE_REQUESTED',
-            f"Position change requested for {subj} — awaiting your approval (level 1 of {total}).")
-    # Notify the requester
-    _notify([requester_user_id], 'ORG_CHANGE_REQUESTED',
-            f"Your position change request for {subj} was submitted ({total}-level approval).")
+            f"Position change requested for {subj} — awaiting your approval (level 1 of {total}).",
+            req_id=req_id)
+    # Notify the requester. A DIFFERENT event type on purpose: this is a receipt,
+    # not a call to action, so it must not be swept away when a level is decided
+    # and it must not render with a decision icon (DEF-002).
+    _notify([requester_user_id], 'ORG_CHANGE_SUBMITTED',
+            f"Your position change request for {subj} was submitted ({total}-level approval).",
+            req_id=req_id)
     return req_id
 
 
 # ── Decide ────────────────────────────────────────────────────────────────────
+
+_STEP_DECISION_SQL = """
+    UPDATE org_change_approvals
+    SET decision=%s, note=%s, decided_by_user_id=%s::uuid, decided_at=NOW()
+    WHERE request_id=%s::uuid AND step_order=%s
+"""
+
 
 def decide(request_id, user, decision, note):
     """Approve/reject the CURRENT step. Returns (ok, status_or_error)."""
@@ -210,20 +249,26 @@ def decide(request_id, user, decision, note):
         return False, 'you are not an approver for this step'
 
     new_dec = 'APPROVED' if decision == 'approve' else 'REJECTED'
-    execute("""
-        UPDATE org_change_approvals
-        SET decision=%s, note=%s, decided_by_user_id=%s::uuid, decided_at=NOW()
-        WHERE request_id=%s::uuid AND step_order=%s
-    """, (new_dec, (note or None), user['user_id'], request_id, req['current_step']))
+    step_params = (new_dec, (note or None), user['user_id'], request_id, req['current_step'])
 
     subj = _emp_name(req['employee_id'])
 
+    # ADR-006: recording the step decision and whatever it triggers (reject the
+    # request / advance a level / apply the move and close it out) is ONE unit of
+    # work. Anything else can leave a step marked decided while the request never
+    # moved, or a move applied against a request still showing PENDING.
     if decision == 'reject':
-        execute("UPDATE org_change_requests SET status='REJECTED', decided_at=NOW(), updated_at=NOW() WHERE id=%s::uuid",
-                (request_id,))
+        with transaction():
+            execute(_STEP_DECISION_SQL, step_params)
+            execute("UPDATE org_change_requests SET status='REJECTED', decided_at=NOW(), updated_at=NOW() WHERE id=%s::uuid",
+                    (request_id,))
+        # Retire BEFORE announcing: a rejection ends the request, so no approver
+        # at any level is still "awaiting" it. Without this the other HR admins
+        # keep a dead call to action in their bell for ever (DEF-003).
+        _retire_call_to_action(request_id)
         msg = f"The position change for {subj} was rejected at level {req['current_step']}."
-        _notify([req['requested_by_user_id']], 'ORG_CHANGE_REJECTED', msg)
-        _notify(_subject_user_ids(req['employee_id']), 'ORG_CHANGE_REJECTED', msg)
+        _notify([req['requested_by_user_id']], 'ORG_CHANGE_REJECTED', msg, req_id=request_id)
+        _notify(_subject_user_ids(req['employee_id']), 'ORG_CHANGE_REJECTED', msg, req_id=request_id)
         return True, 'REJECTED'
 
     # approve — is there a next step?
@@ -231,27 +276,39 @@ def decide(request_id, user, decision, note):
                   (request_id,), one=True)['c']
     if req['current_step'] < total:
         nxt = req['current_step'] + 1
-        execute("UPDATE org_change_requests SET current_step=%s, updated_at=NOW() WHERE id=%s::uuid",
-                (nxt, request_id))
+        with transaction():
+            execute(_STEP_DECISION_SQL, step_params)
+            execute("UPDATE org_change_requests SET current_step=%s, updated_at=NOW() WHERE id=%s::uuid",
+                    (nxt, request_id))
         next_step = to_dict(query("""
             SELECT step_order, approver_type, approver_role,
                    approver_employee_id::text AS approver_employee_id
             FROM org_change_approvals WHERE request_id=%s::uuid AND step_order=%s
         """, (request_id, nxt), one=True))
+        # Level N is closed. Retire its call to action for EVERY approver at that
+        # level — several people can hold the approving role and only one acted —
+        # then raise the call to action for level N+1 (DEF-003).
+        _retire_call_to_action(request_id)
         _notify(_step_approver_user_ids(req['company_id'], next_step), 'ORG_CHANGE_REQUESTED',
-                f"Position change for {subj} — awaiting your approval (level {nxt} of {total}).")
+                f"Position change for {subj} — awaiting your approval (level {nxt} of {total}).",
+                req_id=request_id)
         _notify([req['requested_by_user_id']], 'ORG_CHANGE_STEP_APPROVED',
-                f"Your position change request for {subj} passed level {req['current_step']} — now at level {nxt} of {total}.")
+                f"Your position change request for {subj} passed level {req['current_step']} — now at level {nxt} of {total}.",
+                req_id=request_id)
         return True, 'PENDING'
 
-    # final approval — apply the change
-    apply_change(request_id)
-    execute("UPDATE org_change_requests SET status='APPROVED', decided_at=NOW(), updated_at=NOW() WHERE id=%s::uuid",
-            (request_id,))
+    # final approval — apply the change. The decision, the move itself and the
+    # status close-out commit together or not at all (TD-7).
+    with transaction():
+        execute(_STEP_DECISION_SQL, step_params)
+        _apply_change(request_id)
+        execute("UPDATE org_change_requests SET status='APPROVED', decided_at=NOW(), updated_at=NOW() WHERE id=%s::uuid",
+                (request_id,))
+    _retire_call_to_action(request_id)
     msg = f"The position change for {subj} was fully approved and applied."
-    _notify([req['requested_by_user_id']], 'ORG_CHANGE_APPROVED', msg)
+    _notify([req['requested_by_user_id']], 'ORG_CHANGE_APPROVED', msg, req_id=request_id)
     _notify(_subject_user_ids(req['employee_id']), 'ORG_CHANGE_APPROVED',
-            "Your position change has been approved and applied.")
+            "Your position change has been approved and applied.", req_id=request_id)
     return True, 'APPROVED'
 
 
@@ -263,7 +320,21 @@ def _subject_user_ids(emp_id):
 # ── Apply ─────────────────────────────────────────────────────────────────────
 
 def apply_change(request_id):
-    """Apply the approved move: new current org assignment + re-point solid-line manager."""
+    """Apply the approved move atomically (standalone entry point).
+
+    `decide()` does NOT call this — it calls `_apply_change` inside its own
+    transaction, because the move and the request's status close-out are a single
+    unit of work. ADR-006 forbids nesting transaction().
+    """
+    with transaction():
+        _apply_change(request_id)
+
+
+def _apply_change(request_id):
+    """The statements of the move. MUST run inside an open transaction():
+    closing the old assignment, opening the new one and re-pointing the manager
+    are meaningless individually — a partial apply leaves an employee with no
+    current org assignment or no manager."""
     r = to_dict(query("""
         SELECT employee_id::text, from_manager_id::text AS from_manager_id,
                proposed_business_unit_id::text AS bu, proposed_functional_unit_id::text AS fu,
@@ -272,12 +343,28 @@ def apply_change(request_id):
     """, (request_id,), one=True))
     emp_id = r['employee_id']
 
-    # carry cost centre from the outgoing current assignment
-    old = query("""
-        SELECT cost_center_id::text AS cc FROM employee_org_assignments
+    # Carry EVERY unchanged field forward from the outgoing current assignment.
+    #
+    # A proposal only stores the fields the requester actually changed; the rest
+    # are NULL, which means "no change" — NOT "clear this". Inserting the raw
+    # proposal therefore wiped the employee's location and functional unit
+    # whenever a move touched only their business unit. The cost centre was
+    # already carried this way; the other three were not, and that asymmetry was
+    # the bug. Now the new row is the old row overlaid with what changed.
+    old_row = query("""
+        SELECT location_id::text AS loc, business_unit_id::text AS bu,
+               functional_unit_id::text AS fu, cost_center_id::text AS cc
+        FROM employee_org_assignments
         WHERE employee_id=%s::uuid AND is_current ORDER BY effective_from DESC LIMIT 1
     """, (emp_id,), one=True)
-    cc = old['cc'] if old else None
+    # An employee may have no current assignment at all, so this must stay
+    # None-safe — there is then simply nothing to carry forward.
+    old = to_dict(old_row) if old_row else {}
+
+    loc = r['loc'] or old.get('loc')
+    bu  = r['bu']  or old.get('bu')
+    fu  = r['fu']  or old.get('fu')
+    cc  = old.get('cc')
 
     execute("""
         UPDATE employee_org_assignments
@@ -288,7 +375,7 @@ def apply_change(request_id):
         INSERT INTO employee_org_assignments
           (employee_id, location_id, business_unit_id, functional_unit_id, cost_center_id, is_current)
         VALUES (%s::uuid,%s::uuid,%s::uuid,%s::uuid,%s::uuid,TRUE)
-    """, (emp_id, r['loc'], r['bu'], r['fu'], cc))
+    """, (emp_id, loc, bu, fu, cc))
 
     if r['mgr'] and r['mgr'] != r['from_manager_id']:
         execute("""
@@ -316,6 +403,10 @@ def cancel(request_id, user):
         return False, 'only pending requests can be cancelled'
     execute("UPDATE org_change_requests SET status='CANCELLED', decided_at=NOW(), updated_at=NOW() WHERE id=%s::uuid",
             (request_id,))
+    # A cancelled request is not awaiting anyone either — same reasoning as a
+    # rejection (DEF-003). Approvers are not told it was cancelled (they never
+    # asked for it); the dead call to action simply leaves their bell.
+    _retire_call_to_action(request_id)
     return True, 'CANCELLED'
 
 

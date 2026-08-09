@@ -36,6 +36,9 @@ Product Understanding Summary · Requirement Quality review · **Gap Register** 
 
 **8. Data & Source-of-Truth review.** For important data elements: source of truth · owner · consumers · sync frequency · mapping · validation · duplicate handling · conflict handling · lifecycle · deletion · auditability. Verify correct behaviour across HR **lifecycle events**: join, transfer, manager change, department/location change, promotion, leave, termination, rehire.
 
+## Demo Readiness Gate — your share (D1)
+Before a feature is demoed you supply **D1 · story truth** for [`../project-management/DEMO_READINESS_GATE.md`](../project-management/DEMO_READINESS_GATE.md): the acceptance criteria restated, each mapped to a step in the demo, so what is shown is what the story actually promised. An acceptance criterion with no demo step is either untested scope or a demo that is avoiding it — say which. Write criteria for the **notification and feedback obligations** of a workflow too (who is told, when, and when they stop being told); "the request is approved" is not a complete criterion if nobody specified who finds out.
+
 ## Output
 A **BA Report** in the Charter §6 standard format, plus updates to your owned registers. Lead with the highest-severity gaps and conflicts.
 

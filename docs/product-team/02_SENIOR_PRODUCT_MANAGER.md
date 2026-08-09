@@ -19,6 +19,8 @@ The **Product Health Scorecard**, the **Maturity Assessment**, the **Decision Lo
 
 **Documentation you keep current (Charter §5b).** `../project-management/BACKLOG.md` (the backlog itself — epics, stories, sequencing), `deliverables/PRODUCT_ROADMAP_GOALS_EPICS_STORIES.md`, `deliverables/SPM_KICKOFF.md`, and the product role files in this directory. You also **approve** `../BUSINESS_DOCUMENTATION.md`. At every gate decision, verify the backlog's status markers match reality before you judge progress from them — a gate decided on stale markers is a guess. Do not delegate this to a "documentation pass" at the end of a phase.
 
+**The Demo Readiness Gate is yours** ([`../project-management/DEMO_READINESS_GATE.md`](../project-management/DEMO_READINESS_GATE.md)). You own the GO/NO-GO verdict on whether a feature is shown to the stakeholder; the Delivery Manager runs the checklist and the specialists supply the evidence (D1 BA · D2/D3/D7 UAT · D4 UX · D5 Architect · D6 Delivery). You do not demo on assurances — you demo on evidence, and **nobody signs off their own build**. Rules you enforce personally: demo it the way a user meets it, not the way it was built; show the unhappy path in the same session as the happy one; any unchecked box is NO-GO; and if a known defect is being carried in, you say so at the start rather than letting the stakeholder find it.
+
 ## How you run the cycle
 1. **Intake & task.** Read what's available. Split the work and task the right specialists (BA for gaps/traceability, UX for experience, UAT for validation, Delivery for roadmap/readiness, Strategist for ideation/priorities). Give each a clear, bounded ask.
 2. **Receive & review each report** against the review checklist below.

@@ -9,7 +9,11 @@
 > the markdown below is the only surviving record of this backlog.
 >
 > **EP1–EP27 are completed and deployed** to `main`; **EP28–EP34** (architecture-review backlog)
-> are partially delivered — see the Status column and per-story markers below.
+> are partially delivered — see the Status column and per-story markers below. **EP38 onwards** is
+> product-roadmap work, promoted into this backlog from
+> [`../product-team/deliverables/PRODUCT_ROADMAP_GOALS_EPICS_STORIES.md`](../product-team/deliverables/PRODUCT_ROADMAP_GOALS_EPICS_STORIES.md)
+> as each epic is scheduled. EP35–EP37 and EP39–EP41 are still **proposals in the roadmap** and are
+> deliberately **not** here yet.
 > Legend: ✅ Done · 🟡 In progress · ⬜ Planned.
 
 ---
@@ -52,9 +56,16 @@
 | EP32 | Testing & CI Hardening | KAN-168 · KAN-169 · KAN-170 · KAN-171 | 🟡 In progress |
 | EP33 | Frontend Modernization | KAN-172 · KAN-173 · KAN-174 · KAN-175 · KAN-176 · KAN-177 | ⬜ Planned · ⏸ **S5** (shares code with the escaping sweep; a11y applied as a design standard meanwhile — pending Q5) |
 | EP34 | Architecture & Structure | KAN-178 · KAN-179 · KAN-180 · KAN-181 · KAN-182 | ⬜ Planned |
+| EP38 | Employee Lifecycle Workflows | KAN-187 · KAN-183 · KAN-184 · KAN-185 · KAN-186 | 🟡 In progress · **first roadmap growth epic in the backlog** (BG4) — build stage **S3** (D-004); ✅ KAN-187 (audit), 🟡 KAN-185 (transfer); KAN-186 is **Later** |
 
 > **EP28–EP34** are sourced from the architecture review in [`docs/ARCHITECTURE_REVIEW.md`](../ARCHITECTURE_REVIEW.md)
 > (finding IDs `Fn` are referenced per story). Unlike EP1–EP27, these are **partially delivered**: ✅ KAN-152 · KAN-154 · KAN-157 · KAN-165 · KAN-169 done, 🟡 KAN-150 partial; the rest are ⬜ planned.
+>
+> **EP38** is the first **product-roadmap growth epic** promoted into this backlog — business goal **BG4,
+> "Complete the people-ops lifecycle."** It is *not* architecture-review work and carries no `Fn` finding; its
+> source is the roadmap's BG4 section. **The numbering is non-contiguous on purpose:** EP35–EP37 and EP39–EP41
+> keep their roadmap numbers and stay proposals until they are scheduled, so the backlog no longer ends at EP34
+> and will not renumber when they arrive.
 
 ---
 
@@ -491,7 +502,7 @@ over-fetching the directory. Sourced from F6, F8, F22, F23, F24.
 | Story ID | User Story | Acceptance Criteria | Priority |
 |----------|-----------|---------------------|----------|
 | ✅ KAN-154 | As a **user**, I want dashboard/directory/analytics queries to use an index on `employees.company_id` so they don't seq-scan the whole table. (F6) | Composite `(company_id, employment_status)` index added (supersedes low-value `idx_employees_status`); `EXPLAIN ANALYZE` shows index usage on the directory + dashboard queries. | ✅ Done (`database/migrations/07_perf_indexes.sql`) |
-| ⬜ KAN-155 | As the **system**, I want composite writes to be atomic so a mid-loop failure cannot leave partial data. (F8) | A `transaction()` context manager (single commit/rollback) is added and used by vacation-type create/edit and org-change apply; per-row-loop commits removed; failure rolls back the whole unit; read paths no longer sit idle-in-transaction. | Must Have |
+| ✅ KAN-155 | As the **system**, I want composite writes to be atomic so a mid-loop failure cannot leave partial data. (F8) | A `transaction()` context manager (single commit/rollback) is added and used by vacation-type create/edit and org-change apply; per-row-loop commits removed; failure rolls back the whole unit; read paths no longer sit idle-in-transaction. | ✅ Done (ADR-006 — `app/db.py` `transaction()`; connections now `autocommit=True` so reads never sit idle-in-transaction and `execute()` no longer commits inside a block; wrapped: vacation-type create/edit, org-change `save_workflow` / `create_request` / `apply_change` / every `decide()` outcome incl. the final apply + close-out (TD-7). Evidence: pytest 4,524 pass · browser 77/77 · vacation 39/39 · `tests/test_transactions.py` (12, incl. a real-Postgres rollback tier). **Not** in scope, reported on: employee registration, role reassignment, company create, CSV import) |
 | ⬜ KAN-156 | As a **user**, I want list/analytics pages to avoid N+1 queries so they stay fast as data grows. (F22) | Analytics overview replaces the per-feature COUNT loop with one `GROUP BY route`; vacation page computes used-days for all types in one `GROUP BY`; team-pending replaces the per-row correlated subselect with a single windowed/join query. | Should Have |
 | ✅ KAN-157 | As the **system**, I want indexes on the org/vacation foreign keys that are filtered/joined so those scans use an index. (F23) | `(company_id)` indexes on `business_units`/`locations`/`functional_units`; `idx` on `vacation_requests(vacation_type_id)`; confirmed via `EXPLAIN`. | ✅ Done (migration 07) |
 | ⬜ KAN-158 | As a **user**, I want the employee directory paginated with a light list projection so a large company doesn't load everyone (with full skills/certs) at once. (F24) | Directory API paginates; a lightweight list query is separated from the detail query; skills/cert `JSON_AGG` only run for the detail view; serialization moved toward psycopg2 type adapters. | Should Have |
@@ -569,3 +580,125 @@ layer, pinned dependencies, and a guard-decorator audit. Sourced from F13, F14, 
 | ⬜ KAN-180 | As a **developer**, I want pinned dependencies + a lockfile so builds are reproducible. (F15) | `requirements.txt` pins exact versions; a lockfile (`pip-compile`/`uv`) is committed; CI installs from the lock. | Should Have |
 | ⬜ KAN-181 | As a **developer**, I want `helpers.py` split and business logic out of routes so modules are cohesive and testable. (F29) | `helpers.py` split into `services/{employees,org,vacation}` + `util/uploads`; `admin.py` split by sub-area; routes act as thin controllers. | Could Have |
 | ⬜ KAN-182 | As a **maintainer**, I want a guard-decorator audit so authorization is consistent and documented. (F30) | Each `@require_roles` route reviewed; genuine feature pages converted to `@require_feature_access`; admin/config gates that stay role-based are documented (per `CLAUDE.md`, not blindly converted). | Could Have |
+
+---
+
+# Product Roadmap Backlog (EP38+)
+
+> Growth epics promoted from the SPM roadmap
+> [`../product-team/deliverables/PRODUCT_ROADMAP_GOALS_EPICS_STORIES.md`](../product-team/deliverables/PRODUCT_ROADMAP_GOALS_EPICS_STORIES.md)
+> once they are scheduled. They are **not** architecture-review work and carry no `Fn` finding.
+> Under **D-004** these build in stage **S3** (build the functional product), ahead of the S5 security sweep.
+> An epic keeps its roadmap number, so this section is intentionally non-contiguous.
+
+## EP38 — Employee Lifecycle Workflows  —  ⬜ Planned
+**ID:** KAN-183 · **Label:** `lifecycle` `hr-process` `onboarding` `offboarding` `gdpr` `stage-S3`
+**Source:** roadmap **BG4 — Complete the People-Ops Lifecycle**, epic EP38 (`EP38-S1`…`S4`).
+**Description:** Make the portal handle the whole employment lifecycle — **join → transfer → offboard →
+rehire** — not just registration and position change. Charter §1 lists these as lifecycle events the data
+model must handle correctly; today the product can *create* an employee and *move* one, but has no
+first-class onboarding, offboarding, transfer or rehire workflow.
+
+> **Detailed acceptance criteria, edge cases and the GDPR retention/erasure rules live in
+> [`../product-team/deliverables/EP38_REQUIREMENTS_AND_ACCEPTANCE_CRITERIA.md`](../product-team/deliverables/EP38_REQUIREMENTS_AND_ACCEPTANCE_CRITERIA.md)**
+> (Business Analyst — in authoring). The criteria in the table below are the **backlog-level summary** and are
+> deliberately shorter; where the two differ, the BA's file is authoritative for detail and this table for scope.
+
+> **Build order (roadmap §E, S3):** **KAN-184 → KAN-185 → KAN-183**. Offboarding is the Must and closes a real
+> compliance gap; transfer reuses an engine that already exists; onboarding is the largest new surface.
+> **KAN-186 (rehire) is "Later"** in the roadmap and is **not in this cycle** — it is listed here for traceability,
+> not for scheduling. Do not start it without an explicit SPM decision.
+
+**Dependencies — these gate delivery, they are not advisories:**
+
+| # | Dependency | Gates | Why it is real |
+|---|---|---|---|
+| D1 | **KAN-155** — atomic writes / `transaction()` context manager (EP29, S2 enabler) | **KAN-184, KAN-185** — hard prerequisite | Both close out multi-table units of work (status + exit date + user deactivation + checklist close; or org assignment swap + manager re-point). Without a single commit/rollback boundary, a mid-sequence failure leaves a half-offboarded employee — access revoked but still ACTIVE, or moved but with no manager. **Do not start KAN-184/KAN-185 before KAN-155 lands.** |
+| D2 | **KAN-166** — migration tool with version tracking (EP31, S2 enabler) | **KAN-183, KAN-184** | Both add new tables (checklist templates/tasks, offboarding cases). The `org_change_*` tables already exist only in migration 06 and not in the baseline — that drift is the exact failure KAN-166 exists to stop, and two more table sets make it worse. |
+| D3 | **There is no audit infrastructure in the schema today.** `database/schema.sql` has 46 tables and **not one audit table**; the only decision trail is `org_change_approvals`, which is per-step state for that one workflow, not a general audit log. | **KAN-184** | The roadmap's "full audit entry" for offboarding is therefore a **new subsystem** — a table, a write path, a retention policy and a read surface — **not a column added to `employees`**. It is currently unestimated and unowned. **Needs an SPM/Architect decision before KAN-184 is Ready** (see Open items). |
+| D4 | `employees.employment_status` and `employees.exit_date` **already exist** (`database/schema.sql`, `employment_status` constrained to ACTIVE/INACTIVE/RESIGNED/TERMINATED) — but **no route writes either one.** `exit_date` appears nowhere in `app/`; the only `UPDATE employees` in the codebase sets `gender`. | **KAN-184** | Offboarding will be the **first** code ever to produce a non-ACTIVE employee. Every `WHERE employment_status='ACTIVE'` filter across dashboard, directory, org tree, search index, notifications and manager resolution is consequently **untested against real non-ACTIVE rows**. Treat "what disappears, and what must not" as in-scope test work, including an offboarded **manager** whose reports would otherwise dangle. |
+| D5 | `users.is_active` exists and is toggled manually from the admin panel | **KAN-184** | Half of "revoke portal access" exists, but as an unrelated manual action. KAN-184 must drive it from the workflow rather than rely on an admin remembering. |
+
+| Story ID | User Story | Acceptance Criteria | Priority |
+|----------|-----------|---------------------|----------|
+| ✅ KAN-187 | As a **compliance owner**, I want one immutable, company-scoped audit trail so any change to a person's record can be explained after the fact. (D3 — platform capability, prerequisite for KAN-184) | `audit_log` table + `app/services/audit_service.py`; append-only enforced by a DB trigger on UPDATE (DELETE deliberately left open for retention purge — TD-13); JSONB **field-level diffs only, never whole rows**; subject recorded as employee id + employee number, **never name**, so a row survives erasure; mandatory non-null `company_id` taken from the affected entity; closed action enumeration; mandatory reason; correlation id grouping one unit of work; outcome + error code; `retention_class`. `record()` joins the **caller's** open `transaction()` (KAN-155) and never opens its own — the audit row commits with the change and vanishes with a rollback. Reversible migration `08_audit_log(_down).sql` + regenerated `schema.sql`; `audit_log` feature code with read-only defaults for PORTAL_ADMIN + HR_ADMIN. | Must Have · P1 — ✅ **Done** (read UI is Wave 3, not this story) |
+| ⬜ KAN-183 | As **HR**, I want an onboarding checklist workflow for a new hire so nothing is missed before day one. (EP38-S1) | Company-configurable task template (task, assignee by role or named person, due date relative to `join_date`); a checklist is instantiated when an employee is registered, and links back to that employee; each task carries status + who completed it and when; HR can see outstanding tasks per new hire and across the company before day one; new tables (KAN-166); company-scoped and gated by `@require_feature_access`. | Should Have · P2 |
+| ⬜ KAN-184 | As **HR**, I want an offboarding workflow (access removal, exit date, asset return) so departures are clean and auditable. (EP38-S2) | Offboarding case sets `employees.employment_status` (RESIGNED/TERMINATED) **and** `exit_date`, and deactivates the portal user (`users.is_active=false`) — no route writes any of these today; asset-return / access-removal checklist completed before the case can close; the whole close-out is **one atomic write** (KAN-155); every step written to an **audit trail that does not exist yet** (D3); company-scoped and gated by `@require_feature_access` per `CLAUDE.md`; non-ACTIVE employees verified to drop out of directory, dashboard, org tree, search and manager resolution — reports of an offboarded manager must not be orphaned; GDPR retention/erasure per the BA's criteria file. | Must Have · P2 |
+| 🟡 KAN-185 | As a **manager/HR**, I want a transfer flow (BU / functional unit / location / manager) reusing the org-change engine so moves are consistent. (EP38-S3) | Transfers are raised as `org_change` requests and run through the **existing sequential multi-level approval engine** (`app/services/org_change_service.py`) — reused, not re-implemented; **no bypass path**; the KAN-139 rule stands (an employee can never initiate their own move); nothing is applied until the final level approves and any rejection applies nothing; company-scoped; the apply step is atomic (KAN-155). | Should Have · P2 — 🟡 **In progress**. **Done:** the shared *Request Position Change* dialog extracted to `templates/org_change/_move_modal.html` (one component, one endpoint, one engine — no second write path); submission guards on the single creation path (no-op move, pending-move conflict, non-ACTIVE subject or manager, reporting cycle, cross-tenant unit/manager UUIDs); prefill now returns the approval chain, the "Currently:" placement and the direct-report count; **both entry points wired** — employee profile and the directory row `⋯` menu — plus the org-tree legend's keyboard-equivalent line (WCAG 2.1.1 / 2.5.7). Evidence: pytest 4,636 · browser 93/93 · vacation 39/39 · `tests/test_transfer_entry_point.py` (59). Delivery also uncovered and fixed **D-185-1**, a live data-loss defect in `_apply_change` (see below). **Outstanding: `AC-185-07` effective-dating is BLOCKED** — `org_change_requests` has no column to carry an effective date and `create_request()` no parameter for one, so the field is deliberately not rendered rather than silently discarding input. Needs the Architect's schema call (CFL-4) before KAN-185 can close. |
+| ⬜ KAN-186 | As **HR**, I want rehire to restore/relink a prior employee record so history isn't lost. (EP38-S4) | Registration detects an existing prior record for the same person and offers relink instead of creating a duplicate; the record is re-activated with a **new employment period distinguishable from the old** (prior `exit_date` preserved, not overwritten); prior org, manager, skills and certification history retained; the audit trail spans both periods. | Could Have · P3 — ⏸ **Later** (roadmap §E "Later"; **not this cycle**) |
+
+**Defects found and fixed during EP38 delivery:**
+
+| # | Defect | Found by | Fix |
+|---|---|---|---|
+| D-185-1 | **Data loss on apply.** `_apply_change()` inserted the raw proposal, and a request stores only the fields that changed. Approving a business-unit-only move therefore **silently erased the employee's location and functional unit**. Pre-existing on the drag-and-drop path, but latent there because the drop prefilled every field; KAN-185's "— No change —" defaults made partial proposals routine and turned it into a probable failure. | Driving the **approval chain** in a browser — not by any test. All 4,628 tests passed with the bug present, because every existing apply test passed a fully-populated proposal. | The new assignment row is now the outgoing row **overlaid** with what changed (`app/services/org_change_service.py`). Regression coverage: `TestApplyCarriesUnchangedFieldsForward` — BU-only, location-only, manager-only, full proposal, and no-prior-assignment. |
+| DEF-001 | **An approval nobody could find.** A position change awaiting your decision never reached the notification bell's approvals area — `loadBellList()` fetched `/api/vacation/team-pending` only, and the badge counted vacation only. The bell displayed **"No pending approvals ✓" while an approval was waiting**, and the request appeared only as read-only text in *My Notifications*. `/api/org-change/pending-count` had existed since EP27 with **zero callers** — the plumbing was built and never connected. | The **stakeholder**, during a live demo, asking why the bell showed nothing. Not by any test: UAT asserted the bell opened, never what was in it. | Bell now counts and lists position changes in their own **Position Changes** section, feature-gated (`has_feature_access('org_change')`), with **✓ Approve** as a quick action and **✗ Reject** deep-linking to `/org-change?review=<id>&action=reject` so a reason is recorded. UAT §18 covers badge, listing, controls and deep link. |
+| DEF-002 | **Every notification rendered as a rejection.** The bell's icon was `event_type === 'VACATION_APPROVED' ? '✅' : '❌'` — one event got a tick and **every other event on the system got a red ❌**, including "was fully approved and applied" and requests not yet decided. The notification card was also success-green for all events. | The **stakeholder**, live: *"why do I see a cross before I have decided?"* | Explicit `NOTIF_ICON` map keyed by event type — decided outcomes ✅/❌/🚫, in-flight ⏳, receipts 📨, unknown falls back to a neutral 🔔 **never to ❌**. Card background neutralised. New `ORG_CHANGE_SUBMITTED` event separates the requester's receipt from the approvers' call to action. UAT §18 asserts ⏳ on an undecided request and ❌ on a real rejection. |
+| DEF-003 | **Dead calls to action never left the bell.** "Awaiting your approval" survived after the request was decided, for every approver who had not personally acted — `user_notifications` had no link back to the entity, so nothing could retire it. | Same demo session, reviewing the bell across four roles. | Migration `09_notification_related_entity.sql` adds `related_type` / `related_id` (+ partial index); `notification_service.resolve_related()` retires the call to action on **reject, level advance, final approval and cancel**, before the next announcement so it cannot sweep away the notification it just wrote. Covered by three engine tests and UAT §18. |
+
+**Demo Readiness Gate record — DEF-001/2/3 fix — 9 Aug 2026** (first run of
+[`DEMO_READINESS_GATE.md`](DEMO_READINESS_GATE.md)):
+
+```
+Demo scope     : bell carries position-change approvals; approval AND rejection paths
+Data / env     : seeded dev DB, localhost:8000, Chromium
+                 concurrent writers: YES — one unrelated PENDING request (Siim Kallas,
+                 raised by Mihkel Kask 09:04) from another session. Uncontended subjects
+                 chosen (Marek Pärn, Joana Cruz) and the stray request named aloud up front.
+D1 Story truth        : BA — DEF-001/2/3 each mapped to a demo step
+D2 Every actor        : UAT — requester, level 1, level 2, a second level-1 approver who
+                        never acts, and the subject
+D3 Both outcomes      : UAT — Part A approved end to end + applied; Part B rejected from the
+                        bell, state proven unchanged after
+D4 Feedback surfaces  : UX — 10/10 blind-spot list; badge, actionable item, icons,
+                        retirement, subject, requester, other approver, deep link
+D5 Access & tenancy   : Architect — bell section gated by has_feature_access('org_change');
+                        /api/org-change/pending is company-scoped and per-step filtered
+D6 State & rehearsal  : Delivery — rehearsed headless twice, both 18/18; re-runnable
+                        (target unit chosen at run time, never hardcoded)
+D7 Automated evidence : UAT — pytest 4,636 · browser 93/93 · vacation 39/39; new UAT §18
+                        asserts bell CONTENT, and 3 engine tests assert the retire ordering
+D8 Documentation      : owners — TECHNICAL_DOCUMENTATION §19.1/19.1a, CLAUDE.md, charter,
+                        persona files, this backlog, all in the same commit
+D9 Demo script        : SPM — scratchpad bell_flow.py, narrated
+Known defects carried into the demo: none. Open policy question (item 5 below) stated, not fixed.
+VERDICT (SPM): GO — live run 18/18
+```
+
+> **Process note:** DEF-001/2/3 were all found by the stakeholder during a demo, with pytest, the browser
+> suite and the vacation suite **all green**. The engine was correct; the surface a user needs to *find*
+> the work was neither built nor asserted. That is what produced
+> [`DEMO_READINESS_GATE.md`](DEMO_READINESS_GATE.md) — in particular **D4**, the feedback-surface
+> blind-spot list, and **D7**, which now requires that the suites actually assert the behaviour being
+> demoed rather than merely passing. This is also the third and fourth KAN-185 defect found only by
+> driving a real browser (the earlier two: the `_apply_change` data loss above, and an HTML-escaped
+> `onclick` that rendered a dead button while a substring assertion passed).
+
+**Open items for the product owner / SPM (recorded, not resolved here):**
+
+1. ~~**The audit subsystem (D3) has no epic, no story and no owner.**~~ **Resolved:** tracked as **KAN-187**,
+   a platform capability sequenced **ahead of** KAN-184 (per the Architect's ADR-009 and his §12 recommendation
+   that it be its own story so EP35/EP39 do not each invent an audit trail). Delivered — table, service,
+   reversible migration and tests. The **read surface / audit viewer is deliberately not in KAN-187**; it is
+   Wave 3 work and still needs an SPM decision (OQ-1: per-employee timeline on the profile, a company-wide
+   viewer, or both).
+2. **The roadmap does not say what "asset return" is** (EP38-S2). There is no asset or equipment entity in the
+   schema. Either it is a free-text checklist item under KAN-183/184, or it is an asset register — a materially
+   larger scope. BA to pin down; SPM to confirm the smaller reading.
+3. **"Promote" appears in the EP38 epic title in the roadmap but has no story.** Either it is covered by
+   KAN-185 as a transfer variant, or it is missing. Flagged for the roadmap owner.
+4. **Transfer vs. the existing position-change flow (EP27) needs a boundary.** EP27 already moves BU / FU /
+   location / manager by drag-and-drop through the same engine. KAN-185 must be scoped as *what EP27 lacks*
+   (e.g. an HR-initiated, non-drag entry point, effective-dating) rather than a second way to do the same thing.
+5. **Segregation of duties: one person can satisfy every level of a multi-level chain.** ⚠ **Needs a product
+   decision — not a defect until it has one.** In the seeded Acme Corp configuration, level 1 is the
+   `HR_ADMIN` *role* and level 2 is a *named* approver who also holds `HR_ADMIN`. Nothing in
+   `org_change_service.decide()` prevents the same user deciding level 1 and then level 2, so a chain the
+   company configured as two-level control operates as one-person control. Observed live on 9 Aug 2026: the
+   level-2 approver received the level-1 "awaiting your approval" notification, correctly, because she holds
+   the role. The options, for the SPM/business to choose between:
+   **(a)** block a user from deciding more than one level of the same request (a hard rule in the engine);
+   **(b)** warn but allow, and record it in the audit trail (KAN-187) as a self-approval;
+   **(c)** accept it as configuration — the company chose overlapping approvers and may have meant to.
+   Note this is a **control** question, not a UI one; whichever way it goes, the approval chain admin page
+   should show the overlap when a company configures it. Also relevant to KAN-184 offboarding.

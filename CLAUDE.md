@@ -26,6 +26,32 @@ the backlog, or any project-management documentation:
    role's documents current as part of the work — see Team Charter §5b for the owner-per-file map.
    Documentation updates land in the same commit as the change they describe.
 
+## DEMO READINESS GATE — run before demoing ANYTHING to the user
+
+**Before showing the user any feature — a flow test, a walkthrough, a "here's how it works" —
+run the Demo Readiness Gate in
+[`docs/project-management/DEMO_READINESS_GATE.md`](docs/project-management/DEMO_READINESS_GATE.md)
+and record the verdict.** It exists because on 9 Aug 2026 a demo was rehearsed only along the path
+that had been built, and the stakeholder's first two questions — "where is the rejection?" and "why
+does the bell not show this?" — both landed on real defects with every automated suite green.
+
+The rules, in short:
+
+1. **Demo the feature the way a user meets it, not the way it was built.** Start where they start.
+2. **Every actor, both outcomes.** Walk it as the initiator, every approval level, the subject, and
+   somebody who must NOT see it. Show the rejection/cancel/guard path, not only the happy path.
+3. **Check the feedback surfaces** — notification bell (does the item appear *with its decision
+   controls*?), badge count, icons, empty states, and **retirement** once decided, for **every**
+   eligible approver. This is D4's blind-spot list; it is where all three 9 Aug defects lived.
+4. **Green suites are not a rehearsal.** Also confirm the suites actually assert the behaviour being
+   demoed — asserting that the bell *opens* proved nothing about what was inside it.
+5. **Any unchecked box is NO-GO.** If a known defect is carried into a demo anyway, say so out loud
+   at the start. Discovering it live in front of the user is a process failure.
+6. **Name concurrent writers.** If anything else may be writing to the demo database, pick
+   uncontended demo data and say so first.
+
+The gate is owned by the SPM and delegated per persona (D1–D9) — see the table in the gate document.
+
 ## FLOW TESTS — How to run any "flow test" the user asks for
 
 **⚠️ NON-NEGOTIABLE. This applies the moment the user's request contains the words "flow test" in
@@ -60,11 +86,14 @@ before confirming, so nothing silently breaks. This is in addition to `pytest`. 
 
 1. Ensure the app is running on `http://localhost:8000` (`python run.py`) against the seeded dev DB.
 2. Run both headless browser regression suites and confirm **0 failures**:
-   - `python tests/ui/test_browser.py` — 77 checks across login, admin, org tree, search, vacation
-     calendar, bell, dark mode, directory, Portal-Admin scoping, restricted access, mobile, redirects.
+   - `python tests/ui/test_browser.py` — 93 checks across login, admin, org tree, search, vacation
+     calendar, bell, dark mode, directory, Portal-Admin scoping, restricted access, mobile, redirects,
+     the Transfer… entry point (KAN-185), and **bell content** — that an approval awaiting you is
+     actionable there, wears the right icon, and leaves once decided (DEF-001/2/3).
    - `python tests/ui/test_vacation_workflow.py` — 39 checks: the full submit → approve → reject →
-     history → dashboard vacation workflow.
-3. Report the pass counts (e.g. "browser 77/77, vacation 39/39") alongside the `pytest` result.
+     history → dashboard vacation workflow. It resets the leave it created on start-up, so it is
+     safe to re-run — do not "fix" an `Exceeds annual limit` failure by relaxing the limit.
+3. Report the pass counts (e.g. "browser 93/93, vacation 39/39") alongside the `pytest` result.
 4. If a regression suite fails, **investigate whether it's a real regression or a stale assertion** —
    drive the specific flow in a browser and check console/page errors before deciding. Fix real
    regressions; correct genuinely stale assertions (and say which). Never delete a check to go green.

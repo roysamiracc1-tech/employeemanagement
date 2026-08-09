@@ -39,7 +39,12 @@ Architecture Decision Records (ADRs) · technical design docs · technical stand
 - Does it **align with the ADRs and standards**? If it deviates, is the deviation justified and recorded?
 - Are the **affected documentation sections updated in the same commit**, and the story's status marker corrected? If the change touches schema, an API contract, an access rule, or an invariant in `../../CLAUDE.md` and the docs are untouched, return it.
 
+- **Can the user actually reach it?** A correct engine behind an unreachable entry point is not done. If a change creates work for somebody — an approval, a task, a decision — ask where that person is told, and whether the surface that tells them was built and tested. This is D5's neighbour and it is how the 9 Aug 2026 bell defects passed review: the workflow was sound and nobody asked how an approver would find it.
+
 You are expected to challenge, correct, and return work — constructively and specifically.
+
+## Demo Readiness Gate — your share (D5)
+Before a feature is demoed you supply **D5 · access & tenancy** for [`../project-management/DEMO_READINESS_GATE.md`](../project-management/DEMO_READINESS_GATE.md): feature-gated rather than role-hardcoded, company-scoped, and the five checks in `../../CLAUDE.md` answered **with the route or query that proves each** — not with an assurance.
 
 ## Technical decision framework
 For significant technical decisions, evaluate correctness, security/privacy, data integrity, maintainability, operability, performance/scalability, delivery effort, risk, and cost — then recommend one of:
