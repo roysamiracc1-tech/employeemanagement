@@ -2648,3 +2648,684 @@ Added to §13.5, from UX-A1-C4:
   let somebody discover it.
 
 *Wave 5 complete. Backlog and roadmap updated in the same pass.*
+
+---
+
+> **§17 above is SUPERSEDED by §19 below** (Amendment A2 closed OQ-5 and added five follow-ups). Left standing
+> per the rule this document has followed throughout: supersede visibly, never edit the trail.
+
+---
+
+# 📌 AMENDMENT A2 — THE PRODUCT OWNER'S SECOND ANSWER — 2026-08-09
+
+> **Authoritative. Outranks A1, §14 and §16 where they conflict.** Source: his reply of 2026-08-09, verbatim in
+> `EP42_OWNER_ANSWERS_A2.md` §1.
+>
+> **Headline: OQ-5 closes, the job-family model is confirmed unchanged, and one genuinely new capability arrives
+> — an annual hike cycle. I am putting that capability in a sibling epic, EP43, and I argue it in §18.4.**
+
+## 18. Amendment A2
+
+### 18.1 OQ-5 — CLOSED. Base salary only.
+
+*"base salalary only at this point"*
+
+**Ruled: base salary only. OQ-5 comes off the open list.** No bonus, commission, equity, allowances or variable
+pay in the record, and the step increment and pay point apply to **base**.
+
+**But "at this point" is doing work, and I am converting the question into a constraint rather than deleting
+it.** He is scoping this cycle, not ruling out total compensation. So OQ-5 closes as a *build* decision and
+becomes a **standing extensibility rule** with three testable parts and **zero build cost**:
+
+1. **Nothing in EP42 may make `annual_base_fte` mean "total".** The column, the API field, the UI label and the
+   documentation all say **base**, so a later `annual_total_fte` sits **beside** it rather than redefining it.
+2. **The pay point is a base pay point** and is named so everywhere — schema, screen, export.
+3. **No code assumes a compensation record has exactly one amount.**
+
+**Do not build `compensation_components` now.** The Architect's §10.1 already records its shape; a recorded shape
+is the whole point of that register and it is sufficient. Over-building for a question he deferred would be the
+scope creep I have pushed back on four times.
+
+### 18.2 Job family — RATIFIED AS DESIGNED. Change nothing.
+
+His worked example maps onto the existing model **exactly**, and I have checked it rather than assuming:
+
+```
+job_families:  "Full Stack Software Engineering"        (company-scoped)
+  job_levels:  ordinal 1 → title "Intern Full Stack Software Engineer"
+               ordinal 2 → title "Junior Software Fullstack Engineer"
+```
+
+**Two verifications, both answered here so the Architect confirms rather than investigates:**
+
+**(a) Is a "position" a separate entity from a level's title? Ruled: NO — the title lives on the level.**
+His sentence — *"there is position created Junior Software Fullstack Engineering… will belong to Job family…
+with Level defined 2"* — describes the act of defining a role and mapping it to `(family, level)`. That is
+precisely what the level-carries-title model does. The only case it cannot express is **two distinct positions at
+the same (family, level)** — "Junior Full Stack Engineer" and "Junior Full Stack Engineer (Platform)" — and his
+example does not require it.
+
+I am refusing to generalise pre-emptively, and the reasons are not tidiness:
+- Charter §9.4, problem before feature. There is one worked example and the model handles it.
+- A positions table is not one table. It brings its own CRUD, its own permissions, a backfill, and — the real
+  cost — **another dimension on the comparison group key**: are two positions at one level one comparison group
+  or two? That question has no obviously right answer and it would have to be answered before KAN-200.
+- **It is additive later.** `job_positions(family, level, title)` with the level's title as the default single
+  row changes the meaning of no existing column. Recorded in the deferred-designs register alongside FX and
+  total comp.
+
+**The tell, handed to Delivery as a watch item:** if a tenant asks for two titles at one level during
+onboarding, that is the trigger to build it — not a hypothesis, an observation.
+
+**(b) Are levels family-scoped rather than company-global? Ruled: yes, as designed, unchanged.** His numbering
+is family-relative (Intern = 1, Junior = 2 *within* Full Stack Software Engineering) and ADR-017 already makes a
+level ordinal **within a family**. The comparison group key `(company, job_family, job_level, pay_market)`
+carries family for exactly this reason — level 3 in Engineering is not level 3 in Finance. Self-consistent;
+nothing to change.
+
+**Architect's task is a one-line confirmation against the schema, not an investigation.**
+
+### 18.3 Expectations org-wide first, then alignment — confirms W1's order
+
+*"need to define the basic expectation for all postions and for all defined levels in organsiation then need to
+align all employees for each role to it's level"*
+
+**Ratified, no change: KAN-190 (ladder + expectations) → KAN-191 (align every employee).** Two things it adds:
+
+- **"for all positions and for all defined levels" makes completeness a launch expectation, not a nice-to-have.**
+  UX's honest `Not described yet` state stays — a blank is worse than an admission — but **KAN-209's review gate
+  must report ladder-description completeness** ("28 of 34 steps described") alongside the fitted-step review.
+  That is a one-line addition to a screen that already exists, and it is the only instrument anyone will have
+  for R-18 (a ladder that ships with content nobody can use).
+- **It confirms A1's transparency requirement a second time** — which matters enormously for §18.6, because it
+  is the reason level *disclosure* is a narrow exception rather than a reversal.
+
+### 18.4 The annual hike cycle — and my judgement on where it goes
+
+> **Ruling: the hike cycle is a SIBLING EPIC, EP43, sequenced after EP42. But the part of it that protects
+> EP42's own integrity — effective-dated pay points and ladder re-basing — stays INSIDE EP42.**
+
+#### 18.4.1 The split, and why it is not tidiness
+
+The instinct is to make this EP42 W5, because it shares the compensation record, the approval chain, the audit
+vocabulary and the pay-point model. I considered that and rejected it, on delivery risk and coherence.
+
+**Against W5 — three arguments, in order of weight:**
+
+1. **EP42 is already at the outer limit of what I would run as one epic, and I would rather say that than let it
+   grow by accretion.** 23 stories, 175 tasks, a 71-day critical path, ~14–16 calendar weeks — and it has been
+   **amended twice in a single day**. Adding a recurring annual business process with a performance input would
+   take it to ~28 stories and past the point where I could defend it as one commitment. An epic that long has no
+   internal release point anyone outside the team recognises, and the longer it runs the more certain it is to be
+   re-scoped mid-flight. That is the delivery risk, and this epic has already demonstrated it.
+2. **It is a different shape of thing.** EP42 is a data model and a check: hold a salary, place people on a
+   ladder, verify correspondence. The hike cycle is a **recurring business process** — a calendar, a budget, a
+   per-employee differentiation round, a bulk approval and a bulk apply. In shape it is closer to EP38's
+   lifecycle workflows than to anything in EP42. Bundling a process into a data epic makes both harder to reason
+   about and makes the epic's exit criteria incoherent.
+3. **The split keeps §14.5 true.** EP42's boundary — *"records that a step change happened at a review; does not
+   build the review"* — stays intact. **EP43 then owns its own, explicit, narrow boundary decision** about the
+   performance input (§18.5). Bolting the hike into EP42 would have forced me to reopen §14.5 and leave the
+   boundary ambiguous across 28 stories, which is exactly how R-17 plays out.
+
+**For W5 — the one real argument, and how I have answered it.** §5a is a genuine functional coupling: without
+re-basing, the equity check degrades. If EP42 ships and EP43 never does, EP42 rots.
+
+**So I have separated the capability from the process.** Two things were tangled together:
+
+| | Goes where | Why |
+|---|---|---|
+| **Effective-dated pay points + a ladder re-base action** | **EP42, W2** — new story **KAN-210**, plus effective-dating built into **KAN-206** from the start | This is what protects EP42's own integrity, and it is small. A company can re-base **manually** the day they grant a hike, even with no cycle tooling at all — a workaround that genuinely works |
+| **The annual cycle** — the policy, the three inputs, per-employee differentiation, the performance modifier, the budget, the approval round, the bulk apply | **EP43** | The large, process-shaped, boundary-sensitive part |
+
+With that split, **EP42 shipping without EP43 is safe rather than degrading.** That was the only thing making W5
+look necessary, and it is now handled inside EP42 for the cost of one small story.
+
+#### 18.4.2 EP43 — Annual Compensation Review Cycle
+
+Five stories, outline depth — it is entering **S1**, not S3, and I am not specifying it to build level in an
+amendment. Under **BG7**, sequenced **after EP42 W4**.
+
+| Story | Scope |
+|---|---|
+| **KAN-211** | The **cycle** itself: per company, per year, a named cycle with an effective date and a lifecycle (`DRAFT → OPEN → APPROVED → APPLIED → CLOSED`) |
+| **KAN-212** | The **three inputs he named**: market movement (**per pay market** — Stockholm's market is not Tallinn's), company affordability, and the **per-employee performance modifier** (§18.5) |
+| **KAN-213** | **Per-employee proposals and the manager worksheet** — differentiate within the guideline, with a running total against the budget |
+| **KAN-214** | **Cycle approval and bulk apply** — one approval for the cycle, then N compensation records written atomically on the effective date |
+| **KAN-215** | **Close-out, audit, and re-basing the ladder** by the market component, using **KAN-210**'s capability |
+
+**Three invariants EP43 inherits and may not weaken**, stated now so they are not rediscovered:
+- **No pay change is applied without an approval a human gave.** A cycle cannot route 500 individual requests
+  through the per-request chain — that is absurd — so it needs a **cycle-level approval**. That is a legitimate
+  different shape, but **KAN-198's four-eyes rule applies to the cycle as a whole**: two different people, and
+  the initiator may not approve.
+- **Money never reaches `audit_log`** (D5.6 / amendment A-2). A cycle writing 500 compensation records writes
+  **one** correlated audit set with counts, not 500 amounts.
+- **The budget is a warning, not a block.** Show the running total; require a reason to exceed. Blocking means
+  the differentiation happens in a spreadsheet, which is the problem this product exists to end.
+
+#### 18.4.3 "for each" — my reading, and the default the team builds against
+
+His sentence is compressed: *"for each year company defines its own hike percentage for each based on market
+situation and their own income and performance of the employee."*
+
+**Ruled default:** a **company guideline percentage per cycle, per pay market** (funded by market movement and
+company income), **differentiated per employee** by the performance modifier, **within the budget the guideline
+implies**. Guideline 4% → budget is 4% of total base → managers distribute — one person 2%, another 7%, the total
+lands near 4%. Flagged to him as **A2-1**; nothing waits.
+
+#### 18.4.4 §5a — re-basing. **And a correction to the brief's arithmetic.**
+
+**The brief says an un-re-based hike makes the check "silently wrong". Under the nearest-step rule I ruled in
+§16.2, it is not silent — it is loud, and it fails in the first cycle rather than the third.**
+
+Checked, not asserted. Increment 5%, pay points static, a 4% hike:
+
+| | Distance to their own step's point | Distance to the **next** step's point | Result |
+|---|---|---|---|
+| After a 4% hike | **4.00%** | **0.95%** | **Nearer to the next step → every employee flags `PAY_ABOVE_STEP`** |
+
+The threshold is **half the increment**: any hike above 2.5% (on a 5% ladder) flags the **entire workforce** in
+one cycle. Below it, nothing flags and the drift accumulates until it crosses.
+
+**Why this matters, and it cuts two ways.** It makes re-basing **more** urgent, not less — a single ordinary
+hike renders the equity register unusable overnight. But it also means **we will not ship something that quietly
+lies**: the failure announces itself immediately, to everybody, which is the better of the two bad outcomes and
+is a point in favour of §16.2's nearest-step rule that I had not seen when I ruled it. **Risk reclassified from
+"silently wrong" to "unusable until re-based".** Logged as **CFL-42-54**.
+
+**The requirements, first-class in EP42:**
+- **Pay points are effective-dated from the start** — in **KAN-206**, half-open, ADR-020's convention.
+  Retrofitting effective-dating is a rewrite; adding it now is a column.
+- **KAN-210: a re-base action** — raise all pay points for a family or a pay market by X%, effective D, with a
+  reason, in one audited transaction.
+- **A finding is always evaluated against the pay point in effect on its evaluation date**, and the evaluation
+  date is stored, so **a 2026 finding is still explicable in 2028**.
+- **A staleness warning:** where the newest pay point for a level is older than the company's configured cycle
+  period (default 18 months), the register says so — *"these pay points have not been re-based since March 2026;
+  findings may reflect market drift rather than pay decisions."* Cheap, and it is the guard against the whole
+  class of problem.
+
+### 18.5 §5b — the performance boundary, re-drawn, and I am not going to soften it
+
+A2 makes **employee performance an input to pay**. §14.5 ruled that EP42 *"records that a step change happened at
+a review; it does not build the review."* The honest position:
+
+> **§14.5 stands unchanged for EP42. EP43 deliberately and narrowly crosses one line, and I am saying so plainly
+> rather than describing a performance rating as a "modifier" and hoping nobody notices.**
+
+**Because that is what it is.** A per-employee ordinal band, entered by a manager, that determines their pay
+outcome **is a performance rating**. Calling it something else would be exactly the failure amendment A-2 and
+standing rule 6 exist to prevent — *a label is a claim*. So: **EP43 introduces a performance rating as a pay
+input.** That is a real widening of scope beyond anything in EP42, and the owner should be told in those words.
+
+**The shape — ruled:** a **company-defined ordinal band** (e.g. below / meets / exceeds / outstanding), each
+mapping to a **configured multiplier** on the guideline. Not a free numeric — that is a rating dressed as
+arithmetic and it invites the calibration conversation immediately. A band keeps the **policy** (what "exceeds"
+is worth) at company level where it belongs, and the **judgement** at manager level where it belongs, and it
+makes the budget computable.
+
+**What stays out — the line, drawn explicitly:** goals, objectives and OKRs · the review cycle itself ·
+calibration and moderation · rating distributions or forced curves · scoring rubrics · 360 or peer input ·
+competency assessment · a rating **history** surface — one rating per employee per cycle, and no
+"performance over time" view, because that view is the drift.
+
+**Four constraints on the rating, and they are testable:**
+1. **Single-purpose.** Written in a cycle, read by that cycle, used for nothing else. Not on the profile, not in
+   the directory, not in the org tree, not exported, not readable by any other feature. Enforced the way pay is
+   — a scoped service, a feature gate and a negative-visibility suite.
+2. **Not shown to the employee by default.** It is a manager's input to a pay proposal, not a communicated
+   verdict; communicating a rating is a conversation, not a screen. Flagged as a follow-up (**A2-2**).
+3. **UX's §25 ban list and its nine pre-refused requests apply to this surface first**, and I expect them to be
+   tested here before anywhere else.
+4. **It is EP43's boundary to hold, in EP43's own ADR** — not an appendix to ADR-025.
+
+**And the narrative link he made, which should be explicit in the flow rather than implied:** *"The expectation
+from the employee is if they satisfy in next level the compensation review based on that."* **Meeting the next
+level's expectations is what justifies the compensation review.** So KAN-207's roadmap and KAN-192's step-change
+pay proposal must be visibly connected — the proposal cites the roadmap it fulfils. That is a UX requirement,
+and it costs nothing.
+
+### 18.6 §6 — the job level may be hidden from the employee
+
+*"Though role is transparent to the employee for employer but Job level may not be disclosed according to
+company policy."*
+
+**This is not a reversal — he asked for level-expectation transparency twice, in both answers.** It is a
+per-company switch over one specific field, and it lands on the screens UX built in Wave 4.
+
+**The rules, ruled:**
+
+| Element | Visible to the employee |
+|---|---|
+| Their role / job title | **Always.** Never configurable |
+| The ladder — families, levels, every level's expectations | **Always.** This is the transparency he asked for twice, and it is not what the switch governs |
+| **Which level/step *they* currently occupy** | **Company-configurable** |
+| Their roadmap | **Always visible — but rendered without level numbers when disclosure is off** (see below) |
+
+**(a) The default is ON (disclosed) — and the tenant is *asked* during first-run setup.** Neither default alone
+is right: defaulting off silently under-delivers the outcome he asked for twice; defaulting on could breach a
+tenant's policy on day one. So the ladder configurator's first-run flow **asks**, making it a deliberate choice
+rather than a default nobody noticed. Consistent with the standing rule — consequences shown where the choice is
+made.
+
+**(b) With disclosure off, the roadmap survives — as expectations, without numbers.** Of A2's three options I
+rule **(b)**:
+- **(a) hide the roadmap too** is wrong: it discards the substance to hide a label. The expectations *are* the
+  transparency; the level is the name for it.
+- **(c) hide the number only** is naive. Hiding *"you are at 2.3"* while showing *"your next step is 2.4"*
+  discloses the level. A half-measure that leaves every reference intact will be discovered.
+- **(b)** is coherent: with disclosure off, the employee's own view carries **no level or step number and no
+  "you are here" position indicator anywhere**, and the roadmap reads *"to move up, here is what is expected of
+  you."* Same content, no numbers. The ladder stays fully browsable.
+
+**(c) And the honest limitation, which must be on the configuration screen and in the documentation.** An
+employee who can browse the ladder and read their own roadmap can very often **infer** their level by matching
+the expectations. So this setting delivers **policy compliance, not secrecy** — and it is therefore labelled
+**"Do not display the employee's level"**, never *"hide"*. The configurator says so in words:
+*"Employees can still read the ladder and their own expectations, so this prevents display, not inference."*
+A tenant who believes they have bought secrecy will be wrong, and they should learn that from us on the
+configuration screen rather than from an employee in a meeting. Standing rule 6.
+
+**(d) Can the level be hidden from the *manager*? No.** Flatly. The manager authors the roadmap, which targets
+the next step; a manager who cannot see the current step cannot do the job A1 assigns them. **The switch governs
+the employee's view of their own level and nothing else** — not the manager, not HR, not the register, not
+reporting, not the audit trail.
+
+**(e) The odd case, named so UX handles it rather than discovers it.** An employee who is *also* a manager will
+see their **reports'** steps and not **their own**. That is the correct output of two orthogonal rules —
+CFL-42-39 (another person's step is scoped as their pay is) and this one (your own may be withheld from you) —
+and it will look like a bug unless the copy explains it. **CFL-42-57.**
+
+**(f) My Pay follows the switch.** OQ-BA-12's default — the employee sees their own step's pay point — is now
+**conditional**: with disclosure off, My Pay shows the salary and **no step reference at all**, because a step
+pay point names the step.
+
+### 18.7 What A2 invalidates
+
+| # | What | Status |
+|---|---|---|
+| 1 | **OQ-5** | **CLOSED** — base only; converted to the extensibility rule in §18.1 and removed from the owner's page |
+| 2 | **§14.5's performance boundary** | **Stands for EP42, unchanged.** EP43 crosses it deliberately and narrowly (§18.5). Not invalidated — extended, with the extension quarantined in another epic |
+| 3 | **UX Wave 4: `/ladder` in main nav, and the `Your level and next step` card** | **Not invalidated — gains a second rendering mode.** The card becomes `Your next step` with no position indicator when disclosure is off. §22–§26 need the disclosure-off variant throughout |
+| 4 | **OQ-BA-12** (employee sees their own step pay point) | **Now conditional** on the disclosure switch |
+| 5 | **UX-A1-Q3** (employee sees what a step requires but not what it is worth) | **Partly overtaken.** It only applies where disclosure is **on**; where it is off the question does not arise. Re-framed on the owner's page |
+| 6 | **KAN-206** | **Amended** — pay points are **effective-dated from the start** |
+| 7 | **A2 §5a's own premise** that un-re-based drift is *silent* | **Corrected — it is loud** (§18.4.4, CFL-42-54). Risk reclassified |
+| 8 | The job-family model, the comparison group key, D3, §16.2's nearest-step rule, the build order for W0/W1/W3/W4, every ruling in §12 and §16 | **Unaffected.** A2 confirmed D3 rather than changing it |
+
+**Conflict register — four additions:**
+
+| ID | Conflict | Sev | Ruling |
+|---|---|---|---|
+| **CFL-42-54** | **A2 §5a states un-re-based hike drift is "silently wrong". Under the nearest-step rule it is loud** — any hike above half the increment flags the whole workforce in one cycle (4% hike vs 2.5% half-increment: 4.00% from own point, 0.95% from the next). | Medium | **Brief corrected.** Re-basing becomes *more* urgent; the failure mode is "unusable until re-based", not "silently wrong". **KAN-210 + effective-dated pay points in KAN-206.** A point in favour of §16.2 that I had not seen. |
+| **CFL-42-55** | **A2 §6 (the level may be hidden) vs UX Wave 4**, which made `/ladder` main-nav for everyone and built a card whose premise is naming the employee's step. | **High** | **Ruled §18.6:** option (b), default ON with a first-run prompt, honest labelling ("do not display", never "hide"), manager always sees it. |
+| **CFL-42-56** | **A2 §5b (performance is an input to pay) vs §14.5** (EP42 does not build the review). | **High** | **Ruled §18.5:** §14.5 stands for EP42; **EP43 crosses the line deliberately and narrowly**, and it is called a performance rating rather than dressed up as a modifier. |
+| **CFL-42-57** | An employee who is also a manager sees their reports' steps but **not their own** when disclosure is off. | Low | **Correct output of two orthogonal rules.** UX owns the copy so it does not read as a bug. |
+
+### 18.8 Stories, waves and the corrected build order
+
+**EP42 gains one story and becomes 23. EP43 is new, with five.**
+
+| Story | Change |
+|---|---|
+| **KAN-206** | **+ pay points are effective-dated from the start** (half-open, ADR-020). Retrofitting is a rewrite; adding it now is a column. **+** the staleness warning threshold is a company setting |
+| **KAN-210** *(new, EP42 W2)* | **Ladder re-basing** — raise all pay points for a family or pay market by X%, effective D, reason, one audited transaction. **+** findings evaluate against the pay point in effect on the evaluation date, and store that date. **+** the staleness warning in the register. **Must · P1** — it is what makes EP42 safe to ship without EP43 |
+| **KAN-207** | **+ a disclosure-off rendering** — expectations with no level or step number and no position indicator. **+** the proposal that follows a step change **cites the roadmap it fulfils** (§18.5's narrative link) |
+| **KAN-190** | **+** the first-run flow **asks** whether employee level disclosure is on, and states plainly that it prevents display, not inference |
+| **KAN-194** | **+** the disclosure switch in the visibility model; My Pay drops every step reference when it is off; **the switch never applies to the manager, HR, the register or reporting** |
+| **KAN-209** | **+** the review gate reports **ladder-description completeness** alongside fitted steps (§18.3) |
+| **KAN-200/201** | **+** findings carry their evaluation date; the register shows the staleness warning |
+
+```
+EP42 — 23 stories
+W0  S2   KAN-203(P0) ∥ KAN-204 ∥ KAN-208 ∥ KAN-188 ∥ KAN-189
+W1  S3   KAN-190 → KAN-191 → KAN-207
+W2  S3   KAN-199 → KAN-206 → KAN-210 → KAN-193 → KAN-194 → KAN-195 → KAN-209
+W3  S3   KAN-196 → KAN-197 → KAN-198 → KAN-192
+W4  S3   KAN-200 → KAN-201 → KAN-205 → KAN-202
+
+EP43 — 5 stories, after EP42 W4
+         KAN-211 → KAN-212 → KAN-213 → KAN-214 → KAN-215
+```
+
+**If S3 runs long, EP43 is the natural descope** — and I want that said now rather than negotiated later. A
+company can run one hike cycle manually: re-base the ladder with KAN-210, adjust salaries with KAN-195's import,
+and approve through the existing chain. It is laborious and it works. **EP42 has no such fallback**, which is
+why the split puts the un-descopable half inside it.
+
+## 19. For the product owner — replaces §17
+
+*Everything still needing your answer, one page. **All of it has a default the team is building against today, so
+nothing here is blocking.** OQ-1, OQ-3, gender and OQ-5 are now closed.*
+
+**First, one decision you should see rather than discover:**
+
+> **The annual hike cycle you described is going into a separate epic, EP43, delivered after EP42.** EP42 is
+> already 23 stories and around 14–16 weeks and has been amended twice in a day; adding a recurring annual
+> process with a performance input would take it past the size I can defend as one commitment. **The part that
+> protects EP42 from rotting — moving the ladder's pay rates when you grant a hike — stays inside EP42**, so
+> EP42 is safe to ship whether or not EP43 follows immediately. If the schedule tightens, EP43 is the thing that
+> moves; the first hike can be run with the tools EP42 gives you, laboriously.
+
+| # | Question | Default being built | Cost if late |
+|---|---|---|---|
+| **1. A2-1** | **How much of the hike cycle is the system's job?** | **Store the policy, propose per employee, approve through the chain, apply on an effective date.** Not budget modelling, not forecasting, not letters. A company guideline % **per pay market** (Stockholm's market is not Tallinn's), differentiated per employee, with the budget as a **warning, not a block**. | Medium — it sizes EP43 |
+| **2. A2-2** | **Where does "performance of the employee" come from?** There is no performance module, and we are not building one. **We would store a company-defined band (below / meets / exceeds / …), entered by the manager at the moment of the pay proposal.** **Said plainly: that is a performance rating, and it is the one line EP43 deliberately crosses.** Everything else stays out — no goals, no calibration, no curves, no rating history, and the value is used for the pay calculation and nothing else. | **As described**, and **not shown to the employee** by default — communicating a rating is a conversation, not a screen. | Medium |
+| **3. A2-3** | **Does the annual cycle move the ladder's pay rates too?** **This is a recommendation, not a preference.** If you grant 4% and the ladder stands still, **the pay-fairness check flags your entire workforce in the first cycle** — we checked the arithmetic. | **Yes, it must.** Built into EP42 so it works even before EP43 exists. | High if omitted — the check becomes unusable |
+| **4. A2-4** | **With the job level hidden, what does the employee see?** | **The ladder and every level's expectations stay fully visible** — that is the transparency you asked for twice. **Their own level number is not displayed**, and their roadmap reads as expectations without naming a step. **Honest caveat we will put on the setting itself: they can still work it out by matching the expectations. This prevents display, not inference.** Default is **disclosed**, and we **ask** you during setup rather than assuming. The level is **never** hidden from the manager — they write the roadmap. | Low |
+| **5. A2-5** | **Is a "position" a separate thing from a level's title?** | **No** — the title lives on the level, which expresses your Full Stack Software Engineering example exactly. We can add it later if a company needs two job titles at one level; we are not building it on a hypothesis. | Very low |
+| **6. UX-A1-Q3** | **Where the level *is* disclosed:** an employee can read what their step *requires* but not what it is *worth*, and the pay proposal after a step change is invisible to them. Your rationale was *"when an employee takes additional responsibility the pay should be adjusted"*, so the transparency is one-sided. | **They see their own step's pay point and their own pending proposal** — not the whole ladder's economics. It is the reversible middle. | Low |
+| **7. OQ-BA-13** | You said the roadmap is **"mutually decided"**. Does the employee **agree** or **acknowledge**? The button says *"Confirm we discussed this"*, never *Accept*. | **Acknowledge.** Recording "read" honestly beats recording "agreed" falsely. It is your word, so we are checking. | Low |
+| **8. OQ-9** | **Two different people on any pay approval**, the initiator may not approve, and **no SYSTEM_ADMIN bypass.** Note **no tenant has a configured approval chain today**, so without a seeded two-level default this control binds nobody. | **All three, plus a seeded HR_ADMIN → PORTAL_ADMIN chain.** | Low to change, high to omit |
+| **9. OQ-2 · OQ-7** | **Who sees a salary by default** (manager: direct reports only; department/location heads: nobody; employees: their own) and **is compensation OFF for every company until you switch it on**. | **As stated · yes, off.** Both are seed values, changeable in one click. | Very low |
+| **10. OQ-8** | **Works councils** — are any target customers subject to consultation on pay or job classification? Your seed data spans Germany and four Nordic countries. | **Assume yes for Germany and the Nordics.** | Not a build blocker; **a launch blocker** |
+| **11. OQ-4 · OQ-6 · OQ-A1-1/2/3** | Five one-line confirmations: the example ladder was illustrative · one currency per pay market · we flag when pay does not match the step · advancing a step **proposes** a pay change rather than applying it · **EP42 records that a step change happened at a review; it does not build the review.** | **All as stated.** | Very low each |
+
+**Two things that are not questions:** the first real pay figure entered — even one, even by us — triggers the
+security phase before anything else ships; and until real login exists, the pay visibility model is correct in
+code and **unenforceable in practice**, which every compensation demo will say at the start.
+
+## 20. Wave 6 — the A2 amendment round
+
+### 20.1 Business Analyst
+1. **Close OQ-5** and convert it to §18.1's three-part extensibility rule as **testable criteria** — "base" in the column, the API field, the label and the docs; nothing assumes one amount.
+2. **KAN-210** — new criteria: the re-base action, effective-dated pay points, findings evaluated against the point in effect on the evaluation date, the staleness warning. Amend **AC-206-*** for effective dating.
+3. **The disclosure switch** — amend **AC-194-***, **AC-207-*** and **AC-190-***: default on, first-run prompt, disclosure-off rendering, **never applies to the manager/HR/register/reporting**, My Pay drops step references. Add the **CFL-42-57** manager-who-is-also-an-employee case.
+4. **AC-209-*** — ladder-description completeness on the review gate (§18.3).
+5. **AC-207-*** — the proposal cites the roadmap it fulfils (§18.5's narrative link).
+6. **EP43 outline criteria only** — KAN-211…215 at backlog-summary depth. **Do not write 200 ACs for an epic entering S1.** Do write the three inherited invariants (§18.4.2) as criteria, because those are the ones that get lost.
+7. Confirm **CFL-42-54**'s corrected arithmetic in your own words; I would rather two people had checked it.
+
+### 20.2 Senior Architect
+1. **One-line confirmation** (§18.2): the current model expresses his family/level/position example without strain, and levels are family-scoped. **Confirm; do not investigate, and do not add a positions table.** Record `job_positions` in the deferred-designs register with the "two titles at one level" trigger.
+2. **KAN-206 amended: effective-dated pay points**, half-open, ADR-020's convention — **from the start**, because retrofitting is a rewrite. Then **KAN-210**'s bulk re-base as one transaction.
+3. **ADR-024 amended**: `step_pay_point()` takes an **as-at date**. Every caller — the engine, the step-change proposal, My Pay — passes one. This is the change most likely to be missed by a caller.
+4. **The disclosure switch**: where it resolves. It is a **display rule on one field for one audience**, not a feature gate — do not reach for a fifth feature code. Confirm it cannot leak through an API payload (the negative-visibility rule applies to it).
+5. **OQ-5's extensibility rule** — confirm `annual_base_fte` and the pay point are named "base" everywhere, and that §10.1's `compensation_components` shape is still purely additive.
+6. **EP43: an architecture sketch only** — where the cycle sits, how a cycle-level approval satisfies KAN-198's four-eyes, and how a 500-employee apply writes **one** correlated audit set rather than 500 amounts. **No ADRs for EP43 yet.**
+
+### 20.3 UX / Product Designer
+1. **The disclosure-off rendering, throughout §22–§26.** `Your level and next step` → `Your next step`, no position indicator, no numbers, same substance. **This is the largest single item in this round.**
+2. **The first-run prompt** in the ladder configurator, with the honest sentence: *"Employees can still read the ladder and their own expectations, so this prevents display, not inference."* You have the standing rule for this; it is the same discipline as `Confirm we discussed this`.
+3. **CFL-42-57's copy** — the manager who sees their reports' steps and not their own. It will look like a bug; make it not look like one.
+4. **The narrative link** (§18.5): the pay proposal after a step change **cites the roadmap it fulfils**. One line, high value — it is the owner's own logic made visible.
+5. **KAN-210's re-base screen** — a bulk action that moves every pay rate in a ladder. It needs a preview of what it does to existing findings, and a confirmation proportionate to its blast radius.
+6. **EP43: no design yet.** But **your §25 ban list and the nine pre-refused requests will be tested on the performance-rating surface first**, so re-read them with that surface in mind and tell me if any need strengthening before EP43 starts.
+
+### 20.4 UAT Lead
+1. **The re-basing arithmetic** — hand-computed, and please **independently reproduce CFL-42-54**: with a 5% increment, show that hikes at 2.4% and 2.5% fall either side of the flag boundary, and that a 4% un-re-based hike flags **every** employee. That number is now load-bearing in an argument to the owner.
+2. **As-at-date fixtures**: a finding raised in 2026 against a pay point later re-based must still explain itself in 2028. This is the regression that would otherwise be found by a customer.
+3. **The disclosure switch — a negative-visibility suite of its own.** With disclosure off, no level or step number appears **in the payload**, on any employee-facing surface, including My Pay and the roadmap. And assert it is **still visible** to the manager, HR, the register and reporting — a switch that over-applies is as much a defect as one that leaks.
+4. **CFL-42-57** as a named case.
+5. **Ladder-description completeness** on the review gate.
+6. **EP43: no cases yet**, but flag now which of your 21 attacks apply to a performance rating — I expect it to be most of them.
+
+---
+
+> **§19 above is SUPERSEDED by §21.7 below.** Amendment A3 closed three more questions and added two.
+
+---
+
+# 📌 AMENDMENT A3 — 2026-08-09 — folded into the A2 pass
+
+> **Authoritative. Outranks A1, A2, §14, §16 and §18.** Source: `EP42_OWNER_ANSWERS_A3.md`.
+>
+> **The headline: he has authorised a performance module, which overturns my §14.5.** Everything else in A3
+> tightens or confirms. §21.2 sizes the two readings and puts the choice back to him, because the two are a
+> quarter apart in delivery time and he is entitled to choose with that visible.
+
+## 21. Amendment A3
+
+### 21.1 A3-1 — the hike policy is employer-configured, and nothing ships predetermined
+
+*"This will configuarable in Admin page by the employer and cannot be predeterined."*
+
+**Ratified, and I am extending it one step further than he asked.** The hike policy is **data, authored per
+company per cycle, on an admin surface**. The product ships **no hike percentage, no band set, no multipliers and
+no formula** — the same discipline already applied to `step_count` (per level, per company, **no default**), and
+for a stronger reason: a shipped default is a de-facto product recommendation about somebody's pay.
+
+**The extension: the product must not *suggest* a value either.** No "typical is 3–5%" helper text, no
+market-data placeholder, no pre-filled example. A suggestion is a recommendation we have no basis for, and it is
+the same principle as D7.6's *"never derive, estimate or impute a salary"*. A company that has not authored a
+policy **cannot open a cycle** — the admin page requires the values rather than defaulting them.
+
+**What A3-1 does not settle, and my ruling stands unchanged:** whether the system merely stores the policy or
+runs the cycle from it. **A2's default holds — store the policy, propose per employee, approve through the
+existing chain, apply on an effective date. Not budget modelling, not forecasting, not letter generation.**
+A3-1 constrains where the numbers come from, not what happens next.
+
+### 21.2 A3-2 — the performance module. **§14.5 is superseded by owner decision, and here is the sizing.**
+
+*"Introduce performance input module with all it's requirement implement this first if required if this the
+blocker."*
+
+#### 21.2.1 §14.5 — superseded, and it did its job
+
+**§14.5 ruled:** *"EP42 records that a step change happened at a review. It does not build the review."*
+**Status: SUPERSEDED BY OWNER DECISION.** Recorded, not quietly dropped.
+
+Worth being clear about what happened, because it is the outcome a boundary is *supposed* to produce. §14.5's
+reasoning was **scope protection** — it stopped performance management arriving by accident, inside an amendment,
+as a side-effect of a sentence about review timing. It did not, and should not, stop the owner choosing that
+scope **on purpose, with the cost in front of him**. The boundary held until he spent it deliberately. That is
+the system working, not the ruling failing.
+
+#### 21.2.2 The two readings, sized honestly
+
+He said *"performance **input** module"* — which leans (a) — and *"with all it's requirement"* — which leans
+toward specifying whichever is chosen thoroughly. **The ambiguity is real and I am not resolving it by
+assumption in either direction.**
+
+| | **(a) Performance input — minimal** | **(b) Performance management — full** |
+|---|---|---|
+| **What it is** | A manager-entered band per employee per cycle, existing **only** to feed the hike calculation | Review cycles · goals and objectives · self-assessment · manager assessment · calibration and moderation · ratings history · the review workflow itself · reporting |
+| **Stories** | **2** — the policy (bands and multipliers), and the per-employee entry with its scoping | **≈ 20–25** |
+| **Where it lives** | **Inside EP43**, as a delineated pair of stories | **Its own epic, EP44**, with its own waves |
+| **Delivery** | **≈ 2–3 weeks**, and **no delay to EP43** | **≈ 12–16 weeks**, and under his own re-sequencing instruction it goes **first**, so the hike cycle moves out by **roughly a quarter** |
+| **Compliance surface** | One band per person per cycle, single-purpose | Ratings history, calibration, distributions — squarely works-council territory, and one increment away from the Charter §1 gate |
+| **Does it deliver what he asked for?** | **Yes** — pay differentiated by performance | It delivers a way to *produce* the rating in-product, which is a **different problem he has not asked to solve** |
+
+#### 21.2.3 **My recommendation: (a). Confidence High.**
+
+Six reasons, in order of weight:
+
+1. **His own sentence is conditional, and it is the tell.** *"implement this first **if required if this the
+   blocker**."* He is not commissioning a product line; he is saying *if performance input blocks the hike, do it
+   first*. Under (a) nothing is blocked for more than a fortnight. **Under (b), performance management
+   *becomes* the blocker he was trying to route around.**
+2. **The noun is "input".** He named it by its function — an input to something else. And the context is
+   decisive: he wrote it answering *"where does the employee-performance input come from?"*, a plumbing question
+   about the hike calculation.
+3. **"with all it's requirement" is a quality instruction, not a scope instruction.** He has asked for thorough
+   specification repeatedly, from his very first message (*"detailed requirement to the level of software
+   engineer"*). It reads as *specify it properly*, not *make it big*.
+4. **Nobody has asked to run a performance review in this product.** There is no user story for it, no data, no
+   existing process to replace. (b) is the classic HR-suite failure: build the module, no tenant runs a cycle in
+   it, the ratings are empty, and the hike differentiation happens in a spreadsheet anyway. **Adoption beats
+   feature count**, and (b) has no adoption story.
+5. **Time-to-value.** (b) delays every one of the seven original asks by a quarter to deliver a capability
+   adjacent to the request.
+6. **The compliance surface scales sharply.** (a) is one band per person per cycle. (b) brings ratings history,
+   calibration and distributions — and the moment anyone adds a suggested rating or a ranking, the Charter §1
+   gate engages in full.
+
+**And (a) is shaped so (b) is an extension, not a rewrite** — the same pattern used for total compensation, FX
+and the positions table. The band and multiplier tables are the natural inputs to a future review cycle.
+
+**But he chooses.** §21.7 puts it to him in one row, with the quarter-long cost stated plainly. **The team builds
+(a) meanwhile**, and if he picks (b) nothing built under (a) is wasted.
+
+#### 21.2.4 The four consequences, worked through — they apply either way
+
+**1. Epic structure — and yes, this is now a programme, not an epic.** Stated plainly because the coordinator
+asked: **BG7 is a multi-epic programme and the roadmap should show it as one.**
+
+| | Stories | Shape |
+|---|---|---|
+| **EP42** — Compensation, Job Architecture & Pay Equity | **23** | Unchanged. A data model and a check |
+| **EP43** — Annual Compensation Review Cycle | **7** (5 + 2 performance-input under (a)) | A recurring business process |
+| **EP44** — Performance Management | **unscoped** | **Named, not entered.** Only exists if he picks (b) |
+
+**BG7 total under (a): 30 stories, ~5 months.** Under (b): ~52 stories, ~8–9 months. The A2 split has held up —
+if the hike cycle had gone in as EP42 W5, performance input would now be arriving inside a 30-story epic, and I
+would be re-cutting it under pressure instead of adding two stories to a sibling.
+
+**2. UX's §25 boundary — rewritten, not deleted, and it matters more now.** Its intent survives and sharpens:
+
+> **Performance is a deliberate, separately-designed surface. The ladder is still not it.**
+
+Concretely, and these are unchanged rules: the step **expectation** stays a *description of a job*, never
+criteria to be scored · the **roadmap** stays a statement of expectations, **not a checklist, not a goal list,
+not an assessment** · **ADR-025's forbidden-column table stands unchanged** — no rating, score, achievement,
+completion or progress column on `job_step_expectations` or `employee_step_roadmaps` · the performance input
+lives in **its own tables, its own surface and its own feature code**, and never on the ladder or the roadmap ·
+the **nine pre-refused requests survive and several get sharper**, because *"can we tick off roadmap items?"*
+becomes far more likely to be asked once a performance surface exists next door.
+
+**3. GDPR and works councils — OQ-8 is promoted from a launch consideration to a design input.** Performance-
+related pay is squarely works-council territory in Germany and the Nordics, which is where his seed data lives.
+The concrete design consequence, not a note: **the policy must be explicit, versioned, auditable, and
+inspectable without exposing any individual's data** — because a works council may need to review and agree the
+*bands and multipliers* before the cycle operates. That is a requirement on KAN-216, and BA routes it to the DPO
+list alongside DPO-1.
+
+**4. The Charter §1 gate — nothing here crosses it, and I am saying so explicitly so it is not crossed by
+increment.** Nothing in (a) or in EP43 **scores, ranks, or automatically decides** anything about a person: a
+manager enters a band, a company-configured multiplier turns it into a number, and a human approves the result.
+**No automated decision-making, no profiling, no algorithmic ranking.** **The gate engages the moment anyone
+proposes a suggested rating, a ranked list of employees, a forced distribution, or any model output that
+influences pay** — at which point it needs the full EU AI Act high-risk treatment and GDPR Art. 22 human-in-the-
+loop, and it does not enter the backlog until it has them. Standing statement, kept visible.
+
+### 21.3 A3-3 — re-basing: a standing assumption, built against, awaiting confirmation
+
+He did not understand the question; it has been re-put in plain terms and he has been told the recommendation is
+**yes**, with work proceeding on that basis.
+
+**Status: ASSUMPTION — build against it, do not record it as a closed decision.** Assumption register entry:
+
+| Item | Type | Impact if wrong | Validation | Owner |
+|---|---|---|---|---|
+| The annual cycle re-bases the ladder's pay points by the same movement that funds the hike | **Assumption (High confidence, awaiting confirmation)** | If he says no, the equity check is unusable from the first cycle onwards and Check A′ must be re-thought entirely — **KAN-210 stays either way**, because a manual re-base is then the only remedy | A3-3 confirmation | SPM |
+
+**Design consequences, restated because they are easy to lose, plus one refinement from A3:**
+- Re-base with the hike; **pay-point history effective-dated** (KAN-206) so a 2026 finding is explicable in 2028.
+- **Re-basing and the individual hikes are one cycle, not two independently reachable operations.** A cycle that
+  moves salaries without moving pay points must not exist. **Refinement to KAN-210:** the standalone re-base
+  action stays — EP42 must be usable without EP43 — but **inside a cycle it is driven by the cycle**, and the
+  cycle cannot close having done one without the other.
+- **The re-base percentage is employer-set, pre-filled from their own hike percentage, editable.** Consistent
+  with A3-1: a pre-fill derived from the company's own number is not a product default.
+
+### 21.4 A3-4 — level disclosure resolved, **and my §18.6 ruling is corrected**
+
+*"Ok make Position tile or role, Job family and the it's job family sub levels visible"*
+
+**The settled position — the ladder is public, the pin on the ladder is not:**
+
+| Element | Visible to the employee |
+|---|---|
+| Their position title / role | **Always** |
+| Their **job family** | **Always** — new in A3, previously unstated |
+| **Every sub-level in that family, with each level's and step's expectations** | **Always.** This is the ladder, open by default; `/ladder` as a main-nav surface is **confirmed**, and job family is now an explicit part of what it shows |
+| **Where this employee personally sits on it** | **Company-policy switch — the only thing that may be withheld** |
+| Their roadmap | **Always**, written as expectations without naming a position when the switch is off |
+
+**The correction to my own §18.6 — the switch governs the STEP, not the level.** This is a genuinely good catch
+and I had it wrong. **In his own example the title already discloses the level:** *Junior Software Fullstack
+Engineer* **is** level 2 of that family, and he has just said the title is always visible. A switch labelled
+"hide the level" would therefore hide nothing — a false claim, and standing rule 6 forbids exactly that.
+
+- **The switch is `Display the employee's step`, default on, per company** (not per employee).
+- With it off: the employee sees their **role, their family, and every level's expectations**, but **no step
+  number and no "you are here" marker within their level**.
+- **The manager always sees the step** — they author the roadmap and cannot do it blind. The switch never
+  applies to the manager, HR, the register, reporting or the audit trail.
+- **My Pay drops every pay-point reference when the switch is off**, not just the step number: a level's base
+  pay point plus a published increment plus your own salary lets you compute your step. That is CFL-42-39's
+  inference class again, and the surface list must cover it.
+- The honest labelling from §18.6 stands and now applies to the step: **"do not display", never "hide"** — an
+  employee can still often infer their step by matching expectations, and the configuration screen says so.
+
+### 21.5 What A3 changes
+
+| # | What | Status |
+|---|---|---|
+| 1 | **§14.5** — EP42 does not build the review | **SUPERSEDED BY OWNER DECISION.** A performance module is authorised; §21.2 sizes it |
+| 2 | **§18.6** — the disclosure switch governs the *level* | **CORRECTED — it governs the *step*.** The title already discloses the level |
+| 3 | **UX §25** — the performance-management ban list | **REWRITTEN, not deleted.** Intent survives and sharpens (§21.2.4 item 2). ADR-025's forbidden-column table unchanged |
+| 4 | **OQ-8** — works councils | **PROMOTED from launch consideration to design input.** Concrete requirement on KAN-216 |
+| 5 | **A2-Q1, A2-Q2, A2-Q4** | **CLOSED** — employer-configured / performance authorised (sizing still open) / ladder open, placement policy-controlled |
+| 6 | **A2-Q3 (re-basing)** | **Standing assumption**, built against, awaiting confirmation |
+| 7 | **EP43** | **Gains 2 stories** (KAN-216, KAN-217) under recommendation (a). **BG7 becomes a multi-epic programme** |
+| 8 | **EP44 — Performance Management** | **NAMED, unscoped, not entered.** Only exists if he picks (b) |
+| 9 | Everything in §12, §16, §18.1–§18.5, the nearest-step rule, the job-family model, EP42's 23 stories and its build order | **Unaffected** |
+
+**Conflict register — one addition:**
+
+| ID | Conflict | Sev | Ruling |
+|---|---|---|---|
+| **CFL-42-58** | **A2 §6 and §18.6 built a switch to hide the job level, but the job title already discloses it** — *Junior Software Fullstack Engineer* **is** level 2, and the title is always visible. The switch as specified would have hidden nothing while claiming to. | Medium | **Corrected (§21.4): the switch governs the STEP.** Recommend and confirm with him rather than shipping a control that announces what it conceals. |
+
+### 21.6 Story and epic changes
+
+| Story | Change |
+|---|---|
+| **KAN-190** | The first-run prompt now asks about **step** display, not level display. Copy corrected. |
+| **KAN-194** | The switch governs the **step**; **My Pay drops every pay-point reference** when off (not just the step number — inference, CFL-42-39). Never applies to manager / HR / register / reporting. Per company, not per employee. |
+| **KAN-207** | Disclosure-off rendering: role and family **visible**, every level's expectations **visible**, **no step number and no "you are here" marker**. |
+| **KAN-210** | **+** inside a cycle, re-basing is **driven by the cycle** and a cycle cannot close having moved salaries without moving pay points. The standalone action stays, because EP42 must work without EP43. |
+| **KAN-212** | Re-pointed: the performance band is defined in **KAN-216** and entered in **KAN-217**, not duplicated here. |
+| **KAN-216** *(new, EP43)* | **Performance-input policy** — company-defined bands and multipliers on an admin page. **Nothing predetermined and nothing suggested.** **Versioned, auditable and inspectable without exposing individuals' data**, because a works council may need to agree the bands before the cycle runs (OQ-8, now a design input). |
+| **KAN-217** *(new, EP43)* | **Per-employee performance input** — a manager enters a band per employee per cycle. **Single-purpose:** written in a cycle, read by that cycle, used for nothing else; absent from the profile, the directory, the org tree and every export; **no rating-history surface**; row-scoped like pay, with its own negative-visibility suite; **not shown to the employee by default**. |
+
+**Build order:** EP42 unchanged (23 stories, W0–W4). **EP43 becomes 7 stories** —
+`KAN-216 → KAN-217 → KAN-211 → KAN-212 → KAN-213 → KAN-214 → KAN-215`, with the performance-input pair **first**,
+honouring his *"implement this first if this is the blocker"*. **EP44 named, unscoped, conditional on (b).**
+
+### 21.7 For the product owner — replaces §19
+
+*Nothing here blocks; everything has a default being built against. **OQ-5, A2-Q1, A2-Q2 and A2-Q4 are now
+closed.***
+
+**The one decision I need from you, and it is a quarter of delivery time:**
+
+| | Question | What I recommend |
+|---|---|---|
+| **★** | **You asked for a "performance input module". That reads two ways and they are very different sizes.** **(a)** the manager records a performance band for each person each cycle, which feeds the pay calculation and does nothing else — **2 stories, about 2–3 weeks, no delay to the hike cycle.** **(b)** full performance management — review cycles, goals, self-assessment, calibration, ratings history — **about 20–25 stories, 12–16 weeks, and because you said to do it first if it blocks, it would push the hike cycle out by roughly a quarter.** | **(a).** Your own words point there — *"performance **input**"*, and *"if required if this the blocker"*. Nobody has asked to *run* a performance review in this product; what you asked for is pay differentiated by performance, and (a) delivers exactly that. **(b) is a fine product and it is a different one.** We are building (a) now and it is shaped so (b) can extend it later rather than replace it. |
+
+| # | Question | Default being built | Cost if late |
+|---|---|---|---|
+| **1. A3-3** | **When you set the annual hike, should the system also raise the defined salary for every level and step by the same percentage** — so a step 2.0 written as €50,000 becomes €52,000 after a 4% hike? | **Yes**, and we are building it. If not, the fairness check flags your whole workforce from the first cycle — we checked the arithmetic. Recorded as an assumption awaiting your confirmation, not as a decision made for you. | High if the answer is no |
+| **2. A3-4** | **What exactly may be hidden from an employee?** Your job title already tells them their level — *Junior Software Fullstack Engineer* **is** level 2. So a switch that hides "the level" hides nothing. | **The switch hides the STEP (2.3), not the level.** Role, job family and every level's expectations stay visible always. And an honest caveat on the setting itself: they can still often work their step out by matching expectations, so it prevents display, not inference. | Low |
+| **3. OQ-9** | **Two different people on any pay approval**, the initiator may not approve, no SYSTEM_ADMIN bypass. **No tenant has a configured approval chain today**, so without a seeded two-level default this control binds nobody. | All three, plus a seeded HR_ADMIN → PORTAL_ADMIN chain. | Low to change, high to omit |
+| **4. OQ-8** | **Works councils** — are any target customers subject to consultation on pay or job classification? **This got more important**: performance-related pay is squarely works-council territory in Germany and the Nordics, where your seed data is. | Assume yes for Germany and the Nordics. We are designing the policy to be versioned and inspectable so a works council can review it without seeing anyone's data. | Not a build blocker; **a launch blocker** |
+| **5. OQ-2 · OQ-7** | Who sees a salary by default (manager: direct reports only; department/location heads: nobody; employees: their own), and is compensation **off** for every company until you switch it on. | As stated · yes, off. Both seed values, changeable in one click. | Very low |
+| **6. OQ-BA-13 · OQ-4 · OQ-6 · OQ-A1-1/2/3** | Six one-line confirmations: the roadmap is **acknowledged**, not agreed (*"Confirm we discussed this"*) · your example ladder was illustrative · one currency per pay market · we flag when pay does not match the step · advancing a step **proposes** a pay change rather than applying it · EP42 records that a step change happened at a review — **and, now, performance is a separate module rather than part of the ladder.** | All as stated. | Very low each |
+
+**Two things that are not questions:** the first real pay figure entered — even one, even by us — triggers the
+security phase before anything else ships; and until real login exists the pay visibility model is correct in
+code and **unenforceable in practice**, which every compensation demo will say at the start.
+
+### 21.8 Wave 6 tasking — deltas to §20
+
+**All of §20 stands.** These are additions.
+
+- **BA** — §14.5 marked **superseded by owner decision**, not deleted. Criteria for **KAN-216/217** at outline
+  depth, with the **works-council inspectability** requirement on the policy and the **single-purpose**
+  constraint on the input written as testable rules. Correct every "level disclosure" criterion to **step**
+  disclosure (**CFL-42-58**). Route performance data to the DPO list.
+- **Architect** — no ADRs for EP43 yet; **do add one paragraph** on where a performance band sits so it cannot
+  be reached from the ladder or the roadmap. **ADR-025's forbidden-column table is unchanged and now more
+  load-bearing.** Confirm the step-disclosure switch is a display rule on one field, not a fifth feature code.
+- **UX** — **rewrite §25, do not delete it**: *"performance is a deliberate, separately-designed surface, and the
+  ladder is still not it."* Expect *"can we tick off roadmap items?"* to be asked more often once a performance
+  surface exists next door, and pre-refuse it there too. Redesign the disclosure-off view for **step**, not
+  level: role and family visible, every level's expectations visible, **no "you are here" marker**.
+- **UAT** — the negative-visibility suite extends to the performance band (it must be absent from the profile,
+  directory, org tree, exports and every payload outside its cycle). Assert the step-disclosure switch hides the
+  **step** and **not** the role or family, and that **My Pay drops pay-point references** when it is off.
+
+*A3 folded in. EP42 unchanged at 23 stories; EP43 at 7; EP44 named and not entered.*
