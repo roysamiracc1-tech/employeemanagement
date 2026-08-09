@@ -1,5 +1,29 @@
 # EP42 — Compensation, Job Architecture & Pay Equity — Technical Design — 2026-08-09
 
+> ## ⚠️ AMENDED — read §12 before acting on §1–§11
+>
+> **This document was written in Wave 2. Wave 3 (the SPM's reconciliation, `EP42_SPM_SCOPE_AND_DECISIONS.md`
+> §12) and Wave 4 (Amendment A1 — the product owner's answers, §14) have changed parts of it.**
+>
+> **§12 of this file is the amendment. It supersedes specific sections of §1–§11 and says exactly which.**
+> Nothing has been deleted: superseded material is left in place with a marker, because the reasoning trail —
+> *why* we thought the reference value was a group median — is what stops the same reasoning being re-derived
+> in six months.
+>
+> **The three changes that move the most:**
+> 1. **"5%" is not a detection threshold — it is the pay increment between consecutive steps** (A1 §3, SPM
+>    §14.2). The pay-equity reference value stops being a group median and becomes **the step's configured pay
+>    point**. Check A becomes **Check A′**: absolute, per employee, no `n≥3`, no coverage gate. **ADR-023 is
+>    re-cut (§12.6); ADR-024 is new (§12.5).**
+> 2. **A step is a described job, not a number** (SPM §14.3). Entry at `.0`; `step_count` counts increments
+>    **above** entry; per level, per company, **no default**. Two new first-class objects — the **step
+>    expectation** and the per-employee **step roadmap** — and a **fourth feature code, `job_architecture`.**
+>    **ADR-017 is amended (§12.4).**
+> 3. **Wave 3 ratified ADR-016 and sent four items back to me** (SPM §12.1). All four are actioned in §12.2.
+>
+> **Precedence, so there is no ambiguity:** A1 › SPM §14 › SPM §12 › **this §12** › §1–§11 of this file.
+> Where §1–§11 and §12 disagree, **§12 wins**.
+
 > Produced by the **Senior Architect** (`../09_SENIOR_ARCHITECT.md`), Wave 2 of the EP42 cycle. Input:
 > the SPM's Wave 1 scope and decisions (`EP42_SPM_SCOPE_AND_DECISIONS.md`) — **authoritative on product**.
 > Where the shared team brief and the SPM disagree, the SPM wins; his S1 tenancy correction (CFL-42-6) is
@@ -210,6 +234,13 @@ now, and the boundary between them is exactly the boundary between `compensation
 
 ### 3.2 Set 1 — job architecture (migration `11`)
 
+> **⚠️ AMENDED by §12.4.** `job_levels` gains `step_count` (no default, increments **above** entry),
+> `step_increment_pct` and `step_tolerance_pct` with the declarative `tolerance*2 < increment` CHECK;
+> `job_level_step_targets` is **withdrawn** and replaced by `job_step_expectations`; two new tables
+> (`job_step_expectations`, `employee_step_roadmaps`) and `employee_job_assignments` gains `step_no`
+> semantics from `.0`, `review_context`, and the fitted-step columns. See §12.4.
+
+
 ```sql
 CREATE TABLE IF NOT EXISTS job_families (
     id           UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -337,6 +368,12 @@ hottest write in W1. Recorded as **TD-21** so the omission is visible rather tha
 the precedence rule.
 
 ### 3.3 Set 2 — compensation (migration `12`)
+
+> **⚠️ AMENDED by §12.3.** The stored `is_current` boolean is **withdrawn** on every EP42 effective-dated
+> table (SPM CFL-42-16 — "current is computed, never stored"); the GiST exclusion constraint already
+> guarantees what the partial unique index was buying. Annualisation constants move from
+> `company_compensation_settings` to `pay_markets` (SPM OQ-BA-3). See §12.3.
+
 
 ```sql
 CREATE TABLE IF NOT EXISTS employee_compensation (
@@ -553,6 +590,12 @@ CREATE TABLE IF NOT EXISTS org_change_compensation_proposals (
 
 ### 3.5 Set 4 — pay markets and bands (migration `14`)
 
+> **⚠️ AMENDED by §12.3 and §12.5.** This set **splits with the story** (SPM Ruling 32): pay markets are a
+> **hard** prerequisite and move to W2 as KAN-199; `salary_bands` becomes KAN-205 in W4 and is the level's
+> **min/max envelope**, no longer the comparison basis. `pay_markets` gains the annualisation constants.
+> The new `job_level_pay_points` table (§12.5) is the comparison basis.
+
+
 ```sql
 CREATE TABLE IF NOT EXISTS pay_markets (
     id         UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -624,6 +667,11 @@ a message naming the currencies in conflict; the `fx_rates` shape is recorded in
 adding it is additive, not a rewrite. **Confidence High.**
 
 ### 3.6 Set 5 — pay-equity findings (migration `15`)
+
+> **⚠️ SUPERSEDED IN PART by §12.6.** `pay_equity_findings` keeps its lifecycle columns and gains
+> `finding_type` (`PAY_BELOW_STEP` · `PAY_ABOVE_STEP` · `GENDER_GAP`), `step_no` in the key, `reference_value`
+> and `deviation_pct`; the group/coverage columns become **Check B only** and nullable. See §12.6.
+
 
 ```sql
 CREATE TABLE IF NOT EXISTS pay_equity_findings (
@@ -1042,6 +1090,12 @@ with no invalidation logic and no new code. Cost: the one added `LEFT JOIN` on a
 
 ### 4.4 ADR-017 — Job architecture: family → level → step
 
+> **⚠️ AMENDED by §12.4** (A1: entry at `.0`, count = increments above entry, per level with no default,
+> step expectations, the step roadmap, and the fourth feature code `job_architecture`). §4.4(a), (b) and (d)
+> stand; **(c) is withdrawn** — steps are still a count, but the sparse `job_level_step_targets` table is
+> replaced by `job_step_expectations`; **(e) is refined** by SPM CFL-42-18's ratification plus §12.4.5.
+
+
 **Decision: Build `job_architecture_service` over the five tables in §3.2. Levels are ordinal within a family
 and their ordinal is immutable once an assignment exists. Steps are a count on the level, not rows.
 `employees.job_title` is kept, demoted in the UI, and never used as a grouping key again.** Confidence
@@ -1221,6 +1275,12 @@ KAN-194's real deliverable.
 ---
 
 ### 4.6 ADR-019 — Money never reaches `audit_log` (CFL-42-2)
+
+> **⚠️ AMENDED by §12.2(d) and §12.7.** `PROMOTION_APPLIED` is renamed **`LEVEL_CHANGE_APPLIED`** with
+> `direction` in the diff (SPM CFL-42-25); five A1 actions are added; and the mandatory `reason` becomes a
+> **structured category + optional free text** (SPM amendment A-2 / CFL-42-30) because a key-matching guard
+> cannot see inside free text — a guarantee I should not have let stand unqualified.
+
 
 **Decision: Extend `audit_service` with (1) eleven new `ACTIONS`, (2) a `_MONEYISH_KEYS` denylist matched on
 `_`-delimited **tokens**, not substrings, and (3) — the stronger control — a **per-action closed allowlist of
@@ -1427,6 +1487,12 @@ in KAN-189's PR, not KAN-185's, so the schema and the UI land together. Task **T
 
 ### 4.8 ADR-021 — Compensation rides the org-change request; promotion is a `request_type`
 
+> **⚠️ AMENDED by §12.2(d) and §12.7.** `request_type = 'PROMOTION'` is renamed **`'LEVEL_CHANGE'`** with a
+> stored `direction` of `UP` / `DOWN` / `LATERAL` (SPM CFL-42-25). "Promotion" remains the user-facing word
+> when the direction is UP. Also: CFL-42-13's `NOT_ANSWERED_NO_PERMISSION` path, and CFL-42-28's suppression
+> of the bell quick-approve on money-bearing requests.
+
+
 **Decision: Build. `org_change_requests` gains `request_type`, `effective_date` and the two level columns; the
 **money lives in a one-to-one child table**; `org_change_service` gains a `PROMOTION` and a
 `COMPENSATION_REVIEW` path on the **same** engine, the **same** chain and the **same** apply. No second
@@ -1519,6 +1585,13 @@ run **after** the block (§7.3).
 
 ### 4.9 ADR-022 — Four-eyes on money in `decide()` (CFL-42-5, backlog open item #5)
 
+> **⚠️ AMENDED by §12.2(c) and §12.7.** The SPM ratified the SYSTEM_ADMIN narrowing **conditional on a
+> cancel-not-approve administrative remedy** (Ruling 13) — added in §12.2(c). Also: the universal
+> subject≠initiator / subject≠decider rules move to **KAN-203 in W0** (SPM §12.5, two Critical pre-existing
+> defects), initiator≠decider is added, and the control is a **silent no-op on the default chain** unless
+> ≥2 independently satisfiable levels are required at create (CFL-42-11, CFL-42-26, CFL-42-31).
+
+
 **Decision: Build the guard inside `org_change_service.decide()`. Hard refusal for requests carrying a
 compensation or level change; warn-allow-and-audit for placement-only. Not configurable. **Not bypassable by
 SYSTEM_ADMIN.** Confidence **High** on the mechanism; the policy is the SPM's (D4h) and needs OQ-9.
@@ -1588,6 +1661,12 @@ the basis of who happens to hold a role today, and role membership changes betwe
 ---
 
 ### 4.10 ADR-023 — Pay-equity computation: placement, groups, and cost
+
+> **⚠️ SUPERSEDED IN LARGE PART by §12.6.** A1 replaces the statistical reference with an absolute one for
+> the primary check. The `percentile_cont` group query survives **for Check B only**. Placement
+> (event-driven per group, after commit, own transaction, advisory-locked company run) **stands unchanged**
+> and is the part of this ADR that was right. The cost model **improves** — re-run in §12.6.5.
+
 
 **Decision: Build `pay_equity_service`. Evaluation is **event-driven per group, after commit**, plus an
 on-demand company run. Findings are **materialised rows**, not a view. No batch, no scheduler.** Confidence
@@ -1723,6 +1802,10 @@ is required by every `EXCLUDE USING gist` constraint in §3. **DEVOPS task T-190
 migration fails loudly on a fresh database, which is the right failure.
 
 ### 5.2 The three feature codes — all four places, or they do not exist
+
+> **⚠️ AMENDED by §12.4.5. There are FOUR codes, not three** — `job_architecture` is added at `sort_order`
+> **17** (SPM §14.3.2), registered in KAN-190. The three-code table below stands for the three it covers.
+
 
 Existing codes occupy `sort_order` 1–10 and 13 (`audit_log`); 11 and 12 stay reserved for EP38
 onboarding/offboarding (`scripts/setup_db.py:112-113`). **EP42 takes 14, 15, 16.**
@@ -2096,6 +2179,12 @@ Three inference paths exist that no "does the payload contain an amount?" test w
 ---
 
 ## 9. The task breakdown — engineer level
+
+> **⚠️ AMENDED by §12.8.** The 112 tasks below stand except where §12.8 supersedes them. §12.8 adds six
+> stories (KAN-203, KAN-204, KAN-205, KAN-206, KAN-207, KAN-208 — 33 tasks), amends nine existing stories
+> (26 tasks), withdraws four, and **re-cuts the critical path** against the SPM's §14.8 build order.
+> **New totals: 21 stories, 167 tasks, 88–108 dev-days, critical path 67.0 dev-days.**
+
 
 **How to read a row.** *Work · files* is the statement of work and the exact files to create or change.
 *Dep* is the task(s) that must be merged first (`—` means it can start on day one of its story). *Est* is
@@ -2533,6 +2622,11 @@ R-12), not in the CRUD.
 
 ## 11. Technical-readiness verdict
 
+> **⚠️ AMENDED by §12.10.** The verdict is re-issued against A1. RAG stays **🟡 Amber**; the blocker set
+> changes (B-1 KAN-168 is unchanged and now SPM-owned at P0; B-3 is **closed** — the SPM ratified ADR-016);
+> and one new story, **KAN-207**, joins the not-technically-ready list for a reason worth reading.
+
+
 ### 11.1 Is EP42 buildable as scoped?
 
 **Yes — all fifteen stories are buildable at 63–79 dev-days, conditional on three things clearing.** RAG
@@ -2637,3 +2731,1408 @@ nowhere), and gives the epic a visible win before the hard part starts. **Confid
 *Everything above obeys `../../CLAUDE.md`. No task is done until `python -m pytest -q` and the regression flow
 test pass with 0 failures, and no schema, guard or invariant change is approvable without the corresponding
 documentation updated in the same commit.*
+
+---
+---
+
+# 12. Amendment A1 — the technical design, re-cut
+
+> **Wave 4.** Input: `EP42_OWNER_ANSWERS_A1.md` (the product owner, verbatim — authoritative) and
+> `EP42_SPM_SCOPE_AND_DECISIONS.md` **§12** (the Wave 3 reconciliation) and **§14** (the A1 re-rulings).
+> Precedence: **A1 › SPM §14 › SPM §12 › this §12 › §1–§11 above.**
+>
+> **This is an amendment, not a rewrite.** §1–§11 were sound; A1 changes the *reference value*, adds two
+> objects and a feature code, and Wave 3 sent me four additions. Where a section above is superseded it carries
+> an inline marker pointing here, and the original text is left standing so the reasoning survives.
+
+## 12.0 What actually changed for engineering, and what did not
+
+**Three things changed. Everything else in §1–§11 stands.**
+
+| # | Change | Where it lands | Net effect on the build |
+|---|---|---|---|
+| 1 | **The pay-equity reference value is a configured step pay point, not a group median.** "5%" is the **increment between consecutive steps**, compounding. | **ADR-024 (new, §12.5)**; **ADR-023 re-cut (§12.6)**; new table `job_level_pay_points`; `pay_equity_findings` amended | **Simpler and cheaper.** No `percentile_cont`, no group windowing, no `n≥3`, no coverage gate for the primary check. The group machinery survives **for Check B only** |
+| 2 | **A step is a described job, not a number.** Entry at `.0`; `step_count` = increments **above** entry; per level, no default. New objects: **step expectation**, **step roadmap**. New feature code **`job_architecture`**. | **ADR-017 amended (§12.4)**; **ADR-025 (new, §12.4.4)**; two new tables; four-place registration for a fourth code | **Larger.** W1 grows by two stories' worth of surface, and gains a shippable, employee-visible outcome with no money in it |
+| 3 | **Wave 3 ratified ADR-016 and sent four additions.** | **§12.2** | Bounded. All four land inside stories that are already rewriting the code in question |
+
+**What A1 explicitly did NOT change, restated so nobody re-opens it:** ADR-014 (money representation) ·
+ADR-015's append-only, half-open, GiST-non-overlap shape · ADR-016 (ratified in full) · ADR-018 (row scoping
+and the CC-2 boundary) · ADR-019's structural guarantee · ADR-020 (half-open intervals; CFL-4 closed) ·
+ADR-021's child-table decision · ADR-022's four-eyes mechanism · ADR-023's *placement* (event-driven, after
+commit, own transaction, advisory-locked) · the wave model · KAN-194 shipping with KAN-193 · W2 as the minimum
+shippable slice.
+
+**One honest note on my own Wave 2 work.** ADR-023 built a statistical engine because the brief said the
+reference was a group median. A1 shows the reference was never statistical. **The parts of ADR-023 that
+survive are the parts that were about *engineering* — where the computation runs, what transaction it runs
+in, what happens when it fails — and the parts that died were the parts that were about *the product's
+definition of the answer*.** That is the right split, and it is an argument for designing the mechanism
+independently of the policy wherever the policy is still moving. I got that right by accident here; I would
+rather record it as a lesson than as a win.
+
+## 12.1 Re-verification — the new facts I checked before amending
+
+| # | Finding | Evidence | Class |
+|---|---|---|---|
+| **V13** | **`employees.gender` is NULL for 100% of the seeded population**, and there is no admin collection path. Check B has literally nothing to run on today. The column exists with `CHECK (gender IN ('MALE','FEMALE','OTHER'))`. | `psql -d employee -At -c "select coalesce(gender,'NULL'), count(*) from employees group by 1"`; `database/schema.sql:404-429`; DEF-42-3 | **Known** |
+| **V14** | **`app/routes/org_change.py:381` already gates the org-change workflow *configuration* page on `@require_feature_access('org_structure','w')`** while its runtime uses `org_change`. `org_structure` is seeded **HR_ADMIN r+w+d and PORTAL_ADMIN r+w+d**, `DEPARTMENT_HEAD` r, and **no manager role at all** (`scripts/setup_db.py:128-160`). This is the exact audience §14.3.1 wants for ladder configuration, and the precedent CFL-42-20 already relied on. | `app/routes/org_change.py:381,387,408`; `scripts/setup_db.py:123-160` | **Known** |
+| **V15** | **`require_feature_access` denies with `flash()` + `redirect(url_for('dashboard'))`** — a **302 to HTML**, for JSON endpoints too (`app/auth.py:99-109`). Every "returns 403" criterion in EP42 *and* EP38 describes behaviour the decorator does not have. Confirms BA CFL-42-8. | `app/auth.py:99-109` | **Known** |
+| **V16** | **PostgreSQL's `power(numeric, numeric)` is not documented as exact.** For a compounding pay point (`base × (1+i)^n`) computed in SQL, the last cent is not guaranteed reproducible across versions. `numeric` multiplication **is** exact. | PostgreSQL 16 docs, `numeric_power`; V11 (server 16.13) | **Known** — drives ADR-024(d) |
+| **V17** | **`_can_initiate_for` (`app/routes/org_change.py:55-64`) never compares the initiator to the subject**, and `decide()` (`org_change_service.py:222-249`) never compares the decider to `req['employee_id']` or to `req['requested_by_user_id']`. An HR_ADMIN can raise and approve a position change for themselves today, on the seeded default chain. Independently found by the BA and UAT; I confirm it. | `app/routes/org_change.py:62-64`; `app/services/org_change_service.py:235-249` | **Known** — DEF-42-4 / DEF-42-5, KAN-203 |
+| **V18** | **The seeded default chain is one level** (`_DEFAULT_STEPS`, a single `HR_ADMIN` step, `org_change_service.py:24-27`) and **no company has configured a workflow** — `select count(*) from org_change_workflows` → 0. So four-eyes as specified in ADR-022 would be a **silent no-op in every tenant today**: there is no second level to bind. Confirms BA CFL-42-11. | `org_change_service.py:24-27`; `psql -d employee -At -c "select count(*) from org_change_workflows"` | **Known** |
+
+**V18 is the one that would have embarrassed us.** ADR-022 was correct, tested, and would have shipped doing
+nothing. "The control exists" and "the control works" were two different statements and I only wrote the
+first. The fix is CFL-42-11's — **≥2 independently satisfiable levels required at create for money-bearing
+requests, plus a seeded two-level default chain** — and it is now T-198-7/8.
+
+## 12.2 The four items Wave 3 sent back to me — actioned
+
+### (a) ADR-016 gains `feature_access_for(user_id, company_id)` — the non-session resolver
+
+**Ruling 4 / CFL-42-12.** ADR-021(e) requires a create-time check that *every* step of a chain can be
+satisfied by at least one approver holding `compensation:r`. That is a question about **other people's**
+access, and `_load_feature_access()` resolves only `session['roles']`. The BA was right that the primitive
+does not exist; I was right that it does not block KAN-194. **It blocks KAN-196**, and KAN-188 is already
+rewriting that exact query, so it goes there.
+
+```python
+# app/auth.py — new public function, added by KAN-188 (T-188-11)
+
+def feature_access_for(user_id, company_id):
+    """Resolved {feature_code: {r,w,d}} for ANOTHER user, in a named company.
+
+    Same SQL as _load_feature_access() — the tenant switch AND the role grant,
+    with COALESCE(cf.is_enabled, pf.default_enabled) — parameterised on a user id
+    instead of the session. NOT cached on `g` per user; callers that need many
+    users call feature_access_for_users().
+    """
+
+def feature_access_for_users(user_ids, company_id):
+    """The same, for a set of users, in ONE query. This is the shape the chain
+    check actually needs: resolve every candidate approver of every step at once,
+    not N+1 per approver."""
+```
+
+**Three properties that are non-negotiable and must be enforced by test:**
+
+1. **One implementation, three entry points.** `_load_feature_access()`, `feature_access_for()` and
+   `feature_access_for_users()` share **one** SQL builder, `_feature_access_sql(scope)`. Two copies of a
+   permission query is how a bypass arrives: someone fixes one and not the other. **T-188-12 asserts by module
+   inspection that `company_features` and `role_feature_access` appear in exactly one SQL string in `app/`.**
+2. **`SYSTEM_ADMIN` short-circuits identically.** A SYSTEM_ADMIN candidate approver resolves to full access,
+   as in the session path (`auth.py:50-53`). Divergence here would make the chain check disagree with the
+   decorator, which is the worst possible failure: a request refused at create for a chain that would in fact
+   have worked, or accepted for one that would not.
+3. **It is not a back door.** `feature_access_for()` **answers a question; it does not grant anything.** It is
+   callable only from the service layer, never from a route as an authorisation decision about the caller —
+   the caller is always authorised by the decorator. **T-188-12 grep-asserts it is never called from
+   `app/routes/`.**
+
+**Cost.** `feature_access_for_users(ids, company_id)` is one query with `u.id = ANY(%s)`, hitting
+`idx_co_feat_lookup` and the role joins already in the plan. For a 2–4 step chain with a dozen candidate
+approvers: one query, sub-millisecond. The N+1 shape (one call per approver) would be 12 queries per request
+creation and is **forbidden** — `feature_access_for()` singular exists for the one-user case only.
+
+### (b) The repair migration states its reversibility **before** it runs
+
+**Ruling: the migration is reversible, and I am making it reversible rather than declaring it one-way.**
+Migration `10` captures the prior state into a table before it changes anything:
+
+```sql
+-- 10_tenant_feature_switch.sql — BEFORE the repair UPDATE.
+-- The _down migration is worthless without this: it would have no way to know
+-- which rows were FALSE on purpose (reports, skills_intelligence) and which were
+-- FALSE because nothing read them. Capturing 18 rows costs nothing; NOT capturing
+-- them means a rollback re-blacks-out both tenants, which is the same incident
+-- twice — and the second time it is our fault rather than an inherited one.
+CREATE TABLE IF NOT EXISTS company_features_pre_kan188 (
+    company_id UUID        NOT NULL,
+    feature_id UUID        NOT NULL,
+    is_enabled BOOLEAN     NOT NULL,
+    captured_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (company_id, feature_id)
+);
+INSERT INTO company_features_pre_kan188 (company_id, feature_id, is_enabled)
+SELECT company_id, feature_id, is_enabled FROM company_features
+ON CONFLICT (company_id, feature_id) DO NOTHING;   -- idempotent: first run wins
+```
+
+`10_tenant_feature_switch_down.sql` then restores from it and deletes rows that did not exist before:
+
+```sql
+UPDATE company_features cf SET is_enabled = pre.is_enabled
+  FROM company_features_pre_kan188 pre
+ WHERE pre.company_id = cf.company_id AND pre.feature_id = cf.feature_id;
+DELETE FROM company_features cf
+ WHERE NOT EXISTS (SELECT 1 FROM company_features_pre_kan188 pre
+                    WHERE pre.company_id = cf.company_id AND pre.feature_id = cf.feature_id);
+ALTER TABLE portal_features DROP COLUMN IF EXISTS default_enabled;
+-- The capture table is deliberately NOT dropped. It is 18 rows of forensic value
+-- and dropping it would make a second down-then-up cycle lossy.
+```
+
+**`ON CONFLICT DO NOTHING` on the capture is load-bearing:** re-running the up migration after the repair must
+not overwrite the capture with the repaired values. First run wins, and the first run is the only true one.
+
+**T-188-13** proves the round trip: apply → assert the 330-cell matrix is unchanged → reverse → assert the 18
+rows are byte-identical to the fixture captured in T-188-2 → re-apply → assert unchanged again. **The runbook
+records that the capture table must exist before the repair runs**, and that a rollback after `portal_features`
+rows for EP42 have been added is a partial rollback, not a full one (§12.9 TD-25).
+
+### (c) ADR-022 gains a cancel-not-approve remedy — the condition on the SYSTEM_ADMIN narrowing
+
+**Ruling 13.** The SPM said yes to four-eyes binding SYSTEM_ADMIN, conditional on a genuinely stuck chain
+having a visible, audited administrative remedy. **The remedy exists today and needs one change.**
+
+`org_change_service.cancel()` (`:393-410`) already refuses anyone who is neither the requester nor an
+HR_ADMIN/PORTAL_ADMIN/SYSTEM_ADMIN, is `PENDING`-only, **applies nothing**, and retires the call to action.
+It is the right primitive. Three amendments:
+
+1. **`cancel()` writes an audit row.** It currently writes none (V7). New action
+   **`ORG_CHANGE_CANCELLED_BY_ADMIN`**, `retention_class='SECURITY'`, mandatory reason, inside a
+   `transaction()` with the status update. A cancel that leaves no record is not a remedy, it is a disappearance.
+2. **`cancel()` gains a mandatory `reason`** — it takes none today. An unblocking act on a money-bearing
+   request with no recorded reason is exactly the thing the four-eyes rule exists to prevent, wearing a
+   different hat.
+3. **The refusal message from the four-eyes guard names the remedy.** Not *"you already decided level 1"* but
+   *"you already decided level 1 of this request; a change that moves pay or job level needs two different
+   approvers. Cancel this request, fix the approval chain (Settings → Position change approvals), and re-raise
+   it."* A control that blocks without saying what to do instead is how a tenant ends up editing the database.
+
+**Cancel is not approve, and the difference is the whole point:** cancel applies nothing, so the outcome of a
+stuck chain is *no change*, never an unapproved change. **`decide()` gains no SYSTEM_ADMIN escape of any kind.**
+Tasked as **T-198-9**.
+
+### (d) `PROMOTION` → `LEVEL_CHANGE` throughout — ADR-019 and ADR-021 updated
+
+**CFL-42-25.** The SPM rejected both the derived-display-label and the fourth-enum-value options and ruled a
+rename plus a stored direction. **I agree, and the deciding argument is mine to endorse rather than re-argue:
+an audit action that says `PROMOTION_APPLIED` for a demotion is a lie in the durable record, and no display
+layer can fix a durable record.** Changes:
+
+| Where | Was | Now |
+|---|---|---|
+| `org_change_requests.request_type` | `'TRANSFER' \| 'PROMOTION' \| 'COMPENSATION_REVIEW'` | `'TRANSFER' \| **'LEVEL_CHANGE'** \| 'COMPENSATION_REVIEW'` |
+| `org_change_requests` | — | **+ `direction VARCHAR(8) NULL CHECK (direction IN ('UP','DOWN','LATERAL'))`**, `NOT NULL` when `request_type='LEVEL_CHANGE'`, derived server-side by `_infer_request_type()` from the ordinal comparison, **never** from client input |
+| `audit_service.ACTIONS` | `PROMOTION_APPLIED` | **`LEVEL_CHANGE_APPLIED`**, with `direction` on the allowlist |
+| `_ALLOWED_DIFF_KEYS` | `PROMOTION_APPLIED: {job_level_id, step_no, effective_date, has_pay_change, direction, pct_change_band}` | same set, keyed on `LEVEL_CHANGE_APPLIED` |
+| User-facing copy | "Promotion" | **"Promotion" when `direction = 'UP'`**, "Level change" / "Level change (down)" otherwise. R4 asked for a promotion flow, not for an enum literal |
+
+**A cross-family move is `LATERAL`**, not `UP` or `DOWN` — ordinals are only comparable within a family
+(ADR-017a), so comparing a Level 3 Engineer to a Level 2 Accountant is meaningless and must not be attempted.
+`_infer_request_type()` returns `('LEVEL_CHANGE', 'LATERAL')` whenever the family changes, regardless of the
+ordinals. This is one `if` and it is the sort of thing that gets written the wrong way once.
+
+`_infer_request_type()` remains the **only** place inference happens (ADR-021b), and the direction is stored
+so that a later ladder re-ordering cannot retroactively change what a historical request meant. That is the
+same reasoning as ADR-017(b)'s ordinal immutability, and the two guarantees back each other up.
+
+### (e) Also landing in KAN-188 — CFL-42-8, the 302-instead-of-403 defect
+
+Not one of the four, but it is in the same file and the same story and I am not going to make it a separate
+pass. **V15: `require_feature_access` denies with `flash()` + a 302 redirect to an HTML dashboard, for JSON
+endpoints too** (`app/auth.py:99-109`). Every "returns 403" criterion in EP42 — and in EP38 — describes
+behaviour that does not exist, and a `fetch()` that receives a 302 to HTML renders whatever the caller's error
+path does with an HTML body. That is the DEF-002 shape: a failure that displays as something else.
+
+**Fix: content negotiation, not a second decorator.**
+
+```python
+def _deny(feature_code, action):
+    wants_json = (request.path.startswith('/api/')
+                  or request.accept_mimetypes.best == 'application/json'
+                  or request.is_json)
+    if wants_json:
+        return jsonify({'error': 'forbidden', 'feature': feature_code,
+                        'action': action}), 403
+    flash('You do not have access to that page.', 'error')
+    return redirect(url_for('dashboard'))
+```
+
+`request.path.startswith('/api/')` is first because it is the deterministic half — every JSON endpoint in this
+codebase is under `/api/`, and content negotiation on `Accept` alone is at the mercy of the caller. **The
+tenant-disabled branch (ADR-016d) returns `feature_disabled.html` for HTML and a `403` with
+`{'error': 'feature_disabled'}` for JSON** — a distinguishable code, because "you may not" and "your company
+has not bought this" are different things a client may want to render differently. **T-188-14**, and it needs
+a full regression pass because it changes the response of every gated route on the deny path.
+
+## 12.3 Amended tables — `is_current` withdrawn, annualisation constants re-homed
+
+### 12.3.1 `is_current` is computed, never stored — CFL-42-16
+
+**Ruling ratified, and it makes my own design simpler.** The stored boolean is **withdrawn from every EP42
+effective-dated table**: `employee_compensation`, `employee_job_assignments`, `salary_bands` and the new
+`job_level_pay_points`.
+
+**Why it is strictly better, not merely compliant:**
+
+1. **The GiST exclusion constraint already delivers the guarantee.** `excl_ec_no_overlap` guarantees no two
+   active periods overlap **on any date**. At most one row is therefore in force today — which is exactly what
+   `uq_ec_one_current` was buying, for one date only. The partial unique index was the weaker of the two and
+   I was carrying both.
+2. **A stored flag on a future-dated row is wrong until its date, and there is nothing to flip it.** KAN-163
+   does not exist. A future-dated compensation record with `is_current = TRUE` is a lie for up to 180 days; with
+   `is_current = FALSE` it never becomes true. Both are wrong. **A computed predicate has no such state.**
+3. **It removes a class of bug rather than a column.** Two sources of truth for "current" — the flag and the
+   dates — can disagree, and the failure is silent.
+
+**The replacement predicate, used everywhere and defined once:**
+
+```sql
+-- app/services/compensation_service.py — the ONE definition. Reused verbatim.
+-- Half-open [from, to): in force on date d iff from <= d AND (to IS NULL OR to > d).
+_IN_FORCE = "effective_from <= %s AND (effective_to IS NULL OR effective_to > %s)"
+```
+
+`current(...)` passes `CURRENT_DATE`; `as_at(date)` passes any date, which is what KAN-202's timeline needs and
+what a stored flag could never have given. Per **UAT-F-01d**, the same-date append is permitted (the superseded
+row closes to a zero-length interval, which is empty under half-open and so does not violate the exclusion
+constraint) and the reader is `ORDER BY effective_from DESC, created_at DESC LIMIT 1`.
+
+**Schema deltas** (applied to §3.2, §3.3, §3.5 as written):
+
+| Table | Remove | Remove | Keep |
+|---|---|---|---|
+| `employee_compensation` | `is_current BOOLEAN` | `uq_ec_one_current`, `chk_ec_current`, `chk_ec_void_not_current` | `excl_ec_no_overlap` (now the sole guarantee), `chk_ec_interval`, `chk_ec_void` |
+| `employee_job_assignments` | `is_current BOOLEAN` | `uq_eja_one_current`, `chk_eja_current` | `excl_eja_no_overlap` |
+| `salary_bands` | `is_current BOOLEAN` | `uq_sb_one_current`, `chk_sb_current` | `excl_sb_no_overlap` |
+
+**Index consequence, and it needs stating because it is the one real cost.** The partial covering index
+`idx_ec_equity ... WHERE is_current AND status='ACTIVE'` cannot be partial on a computed predicate —
+`CURRENT_DATE` is not `IMMUTABLE`, so it cannot appear in an index. Replacement:
+
+```sql
+CREATE INDEX IF NOT EXISTS idx_ec_in_force
+    ON employee_compensation (company_id, employee_id, effective_from DESC)
+    INCLUDE (effective_to, annual_base_fte, currency, employment_type)
+    WHERE status = 'ACTIVE';
+```
+Still partial on `status` (immutable), still covering, and the `(employee_id, effective_from DESC)` ordering
+makes "the row in force today" a one-row index scan per employee. **The index is now sized by *history*, not by
+headcount** — at 100k employees with five records each, 500k index entries ≈ 25 MB rather than 5 MB. That is
+the honest cost of the change and it is comfortably acceptable. Recorded so nobody is surprised by the number.
+
+### 12.3.2 Annualisation constants move to the pay market — OQ-BA-3
+
+**The SPM overruled the BA's own default on the BA's own evidence, and he is right.** Acme spans **Porto
+(Portugal, 14 statutory monthly payments)**, **Hamburg (Germany, 12)** and **Tallinn (Estonia, 12)** in one
+company. A company-level `monthly_payments_per_year` is wrong for a third of Acme's locations by **~17%** —
+more than three times the increment the whole feature is built around. A setting that manufactures a finding
+out of a payroll convention is not a default; it is a defect with a shrug attached.
+
+**Deltas:**
+
+```sql
+ALTER TABLE pay_markets
+    ADD COLUMN monthly_payments_per_year NUMERIC(4,1) NOT NULL DEFAULT 12.0,
+    ADD COLUMN standard_annual_hours     NUMERIC(7,2) NOT NULL DEFAULT 1976.00,
+    ADD CONSTRAINT chk_pm_payments CHECK (monthly_payments_per_year BETWEEN 12.0 AND 16.0),
+    ADD CONSTRAINT chk_pm_hours    CHECK (standard_annual_hours BETWEEN 500 AND 3000);
+```
+`company_compensation_settings.standard_annual_hours` **stays as the fallback** for an employee whose location
+resolves to no pay market, and gains `monthly_payments_per_year` for the same reason. Resolution order in
+`compensation_service.annualise()`: **pay market → company settings → hard default**, and the resolved source
+is recorded on the compensation row as `annualisation_source VARCHAR(16)` so a figure computed in 2026 can be
+explained in 2029. That column is three bytes of insurance against the single most likely "why is this number
+different?" support ticket in the feature.
+
+**ADR-014(d) is amended accordingly:** the formula is unchanged, the *constants* are resolved per pay market,
+and `annual_base_fte` remains **computed at write and stored** — which is precisely why the constants moving
+later cannot silently re-value history. The two decisions were already consistent; A1 makes the second one pay.
+
+## 12.4 ADR-017 — AMENDED. The step is a described job
+
+> Amends §4.4. **(a), (b) and (d) stand unchanged. (c) is withdrawn. (e) is refined.** Confidence **High** on
+> the model; **High** on the fourth feature code; **Medium-High** on the configuration gate split in 12.4.5.
+
+### 12.4.1 Step numbering — pinned in the schema, because an off-by-one here is a wrong salary
+
+**`job_levels.step_count` is the number of increments ABOVE entry.** A level with `step_count = 5` has **six
+discrete step values** — `0, 1, 2, 3, 4, 5`, displayed `1.0 … 1.5` — and its top-step pay point is the base
+compounded **five** times. A level with `step_count = 3` runs `.0 … .3`.
+
+This must be a **constraint, not a convention**, and it cannot be a single-table CHECK because `step_no` lives
+on `employee_job_assignments` and `step_count` on `job_levels`. §3.2 accepted that gap as TD-21 on the grounds
+of proportionality. **A1 withdraws that judgement: the bound is now load-bearing on money.** A `step_no` of 6
+on a `step_count = 5` level does not produce a cosmetic error — it produces a pay point compounded six times,
+a `PAY_BELOW_STEP` finding against a rate nobody is entitled to, and a "Propose adjustment" action that
+pre-fills a pay rise from a number that should not exist.
+
+**Ruling: one trigger, on `employee_job_assignments`, and TD-21 is closed rather than accepted.**
+
+```sql
+CREATE OR REPLACE FUNCTION employee_job_assignment_step_valid() RETURNS trigger AS $$
+DECLARE max_step INT;
+BEGIN
+    SELECT step_count INTO max_step FROM job_levels WHERE id = NEW.job_level_id;
+    IF max_step IS NULL THEN
+        RAISE EXCEPTION 'job level % does not exist', NEW.job_level_id;
+    END IF;
+    IF NEW.step_no < 0 OR NEW.step_no > max_step THEN
+        RAISE EXCEPTION 'step_no % is outside level %''s ladder: valid steps are 0..% '
+                        '(step_count counts increments ABOVE entry, so a step_count of % '
+                        'yields % discrete values). EP42 ADR-017 §12.4.1.',
+                        NEW.step_no, NEW.job_level_id, max_step, max_step, max_step + 1;
+    END IF;
+    RETURN NEW;
+END; $$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_eja_step_valid
+    BEFORE INSERT OR UPDATE OF step_no, job_level_id ON employee_job_assignments
+    FOR EACH ROW EXECUTE FUNCTION employee_job_assignment_step_valid();
+```
+
+`BEFORE INSERT OR UPDATE **OF step_no, job_level_id**` — the trigger does not fire when only `effective_to` is
+closed, which is the hot write. And the exception text states the semantics, because the engineer who hits it
+is the one who needed to be told.
+
+**Schema deltas to §3.2:**
+
+```sql
+ALTER TABLE job_levels
+    ADD COLUMN step_count         INT           NOT NULL,   -- NO DEFAULT. Deliberate.
+    ADD COLUMN step_increment_pct NUMERIC(6,4)  NOT NULL,   -- NO DEFAULT. ADR-024.
+    ADD COLUMN step_tolerance_pct NUMERIC(6,4)  NOT NULL,   -- NO DEFAULT. ADR-024.
+    ADD CONSTRAINT chk_jl_step_count CHECK (step_count BETWEEN 1 AND 12),
+    ADD CONSTRAINT chk_jl_increment  CHECK (step_increment_pct > 0 AND step_increment_pct <= 100),
+    ADD CONSTRAINT chk_jl_tolerance  CHECK (step_tolerance_pct > 0),
+    -- ADR-024(c). The whole feature turns on this one line.
+    ADD CONSTRAINT chk_jl_tolerance_lt_half_increment
+        CHECK (step_tolerance_pct * 2 < step_increment_pct);
+
+ALTER TABLE employee_job_assignments
+    ADD CONSTRAINT chk_eja_step_no CHECK (step_no >= 0 AND step_no <= 12);  -- replaces BETWEEN 1 AND 12
+```
+
+**`NOT NULL` with no default on all three columns is the point, not an oversight.** The SPM's D3 ruling is
+that a step count *"expresses how much distance there is between this position and the next one"* and that
+Trainee→Junior and Junior→Mid are genuinely different distances — so the configurator must **require an
+answer**, exactly as D4c requires the pay question to be answered rather than defaulted. A column default is
+how "we never decided" becomes indistinguishable from "we decided five". The migration therefore **cannot**
+add these columns to a populated `job_levels` table without a value; since `job_levels` does not exist before
+migration `11`, this is free — and it is the last moment it will ever be free.
+
+### 12.4.2 `job_step_expectations` — the biggest addition in A1
+
+Replaces the withdrawn `job_level_step_targets` (§3.2's sparse target-point table), which was guidance about
+*pay*; this is content about *the job*.
+
+```sql
+CREATE TABLE IF NOT EXISTS job_step_expectations (
+    job_level_id  UUID         NOT NULL,
+    company_id    UUID         NOT NULL,
+    step_no       INT          NOT NULL,
+    summary       VARCHAR(200) NOT NULL,     -- one line, shown in lists and on the roadmap
+    description   TEXT         NOT NULL,     -- the responsibilities and expectations
+    updated_by_user_id UUID    NULL REFERENCES users(id) ON DELETE SET NULL,
+    updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (job_level_id, step_no),
+    CONSTRAINT chk_jse_step CHECK (step_no >= 0 AND step_no <= 12),
+    CONSTRAINT chk_jse_text CHECK (btrim(summary) <> '' AND btrim(description) <> ''),
+    CONSTRAINT fk_jse_level FOREIGN KEY (job_level_id, company_id)
+        REFERENCES job_levels (id, company_id) ON DELETE CASCADE
+);
+```
+
+**Sparse, and deliberately so.** A level may be defined before its expectations are authored; an unauthored
+step shows *"Expectations not yet defined"* — an explicit empty state, never a blank, and never inherited from
+another step. Authoring is a substantial content exercise per tenant (six blocks of text per level × N levels)
+and blocking the ladder on it would stall W1.
+
+**Readable by every employee.** `job_architecture:r` is seeded to every role (§12.4.5) precisely so the
+transparency the owner asked for is the default and not a grant somebody has to remember. The employee's own
+step and the next one are shown side by side on their profile; the whole ladder is browsable.
+
+**No ratings, no scores, no assessment fields — and the schema says so.** There is no `score`, no `rating`, no
+`achieved`, no `met_expectations` column here or in `employee_step_roadmaps`, and **there must never be one**.
+That is the §14.5 / R-17 boundary expressed where it is enforceable rather than as a note in a design
+document. **A PR adding an assessment column to either table is returned** — it is the first increment of a
+performance-management module arriving through an entirely reasonable-sounding change.
+
+### 12.4.3 `employee_step_roadmaps` — versioned from the start
+
+```sql
+CREATE TABLE IF NOT EXISTS employee_step_roadmaps (
+    id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    company_id        UUID        NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    employee_id       UUID        NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+    version           INT         NOT NULL,
+    -- What this roadmap points at. Denormalised from the assignment ON PURPOSE:
+    -- the target must survive the employee moving, so "what did we agree in March"
+    -- still reads correctly after a level change.
+    from_job_level_id UUID        NOT NULL,
+    from_step_no      INT         NOT NULL,
+    target_job_level_id UUID      NOT NULL,
+    target_step_no    INT         NOT NULL,
+    content           TEXT        NOT NULL,
+    -- §14.5: record the review context, do NOT build the review.
+    review_context    VARCHAR(24) NOT NULL,
+    review_date       DATE        NULL,
+    authored_by_user_id UUID      NOT NULL REFERENCES users(id),
+    authored_by_label VARCHAR(255) NOT NULL,
+    authored_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    acknowledged_at   TIMESTAMPTZ NULL,
+    acknowledged_by_user_id UUID  NULL REFERENCES users(id) ON DELETE SET NULL,
+    superseded_at     TIMESTAMPTZ NULL,
+    correlation_id    UUID        NOT NULL,
+
+    CONSTRAINT chk_esr_version  CHECK (version >= 1),
+    CONSTRAINT chk_esr_content  CHECK (btrim(content) <> ''),
+    CONSTRAINT chk_esr_steps    CHECK (from_step_no >= 0 AND target_step_no >= 0),
+    CONSTRAINT chk_esr_context  CHECK (review_context IN
+        ('PROBATION_REVIEW','MID_TERM_GOAL_REVIEW','PERFORMANCE_REVIEW','OFF_CYCLE')),
+    CONSTRAINT chk_esr_ack      CHECK ((acknowledged_at IS NULL) = (acknowledged_by_user_id IS NULL)),
+    CONSTRAINT fk_esr_target FOREIGN KEY (target_job_level_id, company_id)
+        REFERENCES job_levels (id, company_id) ON DELETE RESTRICT,
+    UNIQUE (employee_id, version)
+);
+
+-- Exactly one live roadmap per employee. A new version supersedes the previous one
+-- inside the same transaction; the previous one stays READABLE, which is the entire
+-- reason this table is versioned rather than updated in place.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_esr_one_live
+    ON employee_step_roadmaps (employee_id) WHERE superseded_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_esr_unacknowledged
+    ON employee_step_roadmaps (company_id, authored_by_user_id)
+    WHERE superseded_at IS NULL AND acknowledged_at IS NULL;
+```
+
+**Five design points, each of which someone would otherwise get wrong:**
+
+1. **Versioned, never overwritten.** *"What did we agree in March"* is the question this object exists to
+   answer (§14.3.3). `UPDATE` is permitted only to set `acknowledged_*` and `superseded_at`; a
+   `trg_employee_step_roadmap_immutable` trigger, modelled exactly on
+   `employee_compensation_immutable()` (§3.3), raises on any change to `content`, `target_*`,
+   `review_context`, `version` or `authored_*`. Same pattern, same reasoning, and engineers already know it.
+2. **Acknowledgement is recorded, never enforced.** No approval workflow, no blocking gate — an unresponsive
+   employee must not be able to freeze their own development plan (§14.3.3). `idx_esr_unacknowledged` is what
+   surfaces it back to the manager, and it is a **partial index over exactly the rows that query touches**.
+3. **The employee acknowledges; nobody acknowledges on their behalf.** `acknowledged_by_user_id` is asserted
+   in the service to be the subject's own user id — server-side, never from a parameter. A manager marking
+   their report's roadmap as acknowledged is the failure that makes "mutually decided" a fiction, and it is
+   the sort of convenience that gets added in week three.
+4. **`from_*` and `target_*` are denormalised snapshots**, not joins to the current assignment. Otherwise a
+   level change silently re-points every historical roadmap at a target that was never agreed.
+5. **No `job_architecture` roadmap exists for a person with no assignment.** `from_job_level_id` is `NOT NULL`,
+   so a roadmap cannot be authored before the employee is on the ladder — which is the right order and makes
+   KAN-207 correctly depend on KAN-191.
+
+### 12.4.4 ADR-025 — the roadmap is not performance management, and the boundary is structural
+
+**Decision: Build the roadmap as a versioned statement of expectations with an acknowledgement, and enforce
+the performance-management boundary in the schema and the review checklist, not in prose.** Confidence
+**High** on the mechanism; the boundary is **the risk** (SPM R-17).
+
+**Why an ADR for what looks like one table.** Because R-17 is real and it is a *drift* risk, not a *design*
+risk: nobody will propose building performance management. What will happen is a sequence of individually
+reasonable requests — "can the manager mark whether the expectation was met?", "can we show progress?", "can
+we roll these up for the department?" — each of which is small, and the third of which is a rating system.
+An ADR is the artifact that makes the fourth request visibly a change of decision rather than a change of
+scope.
+
+**The boundary, in enforceable terms:**
+
+| Permitted | Forbidden — a PR adding it is returned |
+|---|---|
+| A text statement of what the next step requires | Any score, rating, grade, percentage or scale |
+| An acknowledgement timestamp | Any "met / not met / partially met" field |
+| A review context and date | A review *cycle*, schedule, window or reminder |
+| Version history | Aggregation of roadmaps across a team, department or company |
+| The step's generic expectation shown alongside | Goals, objectives, key results or a competency framework |
+| A count of unacknowledged roadmaps, to their author | A dashboard of who has "achieved" what |
+
+**Why this is not merely tidiness.** A rating attached to a person, stored and aggregated, is an
+employee-evaluation system — Charter §1's GDPR Art. 22 and EU AI Act territory, and the exact class D3.4
+gates. The moment a `met_expectations` boolean exists, the roadmap stops being a transparency artifact and
+becomes an assessment record, with a different lawful basis, a different retention obligation and a different
+conversation with the works council. **The distinction is not stylistic and it is not the BA's alone to hold.**
+
+**Consequence for the audit vocabulary:** the roadmap's actions are `STEP_ROADMAP_AUTHORED`,
+`STEP_ROADMAP_ACKNOWLEDGED` and `STEP_ROADMAP_SUPERSEDED`, `retention_class='EMPLOYMENT'`, and their
+`_ALLOWED_DIFF_KEYS` sets contain `target_job_level_id`, `target_step_no`, `review_context`, `version` — **and
+nothing that could carry an evaluation**. The allowlist is the boundary again, in the one place that outlives
+everybody's memory of this decision.
+
+### 12.4.5 The fourth feature code — `job_architecture` — and the gate split
+
+**§14.3.2's reasoning is correct and I am adopting it: the manager authors the roadmap, and under the Wave 2
+model ladder writes were `compensation:w`, so a manager could not have done their job without write access to
+everyone's salary.** But the SPM's table puts *both* the ladder configuration and the roadmap behind
+`job_architecture:w`, and those two writes need **different audiences**:
+
+- **Roadmap authoring** must reach `SOLID_LINE_MANAGER`, row-scoped to their reports.
+- **Ladder configuration** must not. A manager editing the company's job architecture is a much larger grant
+  than the one A1 asks for, and it would arrive as a side-effect.
+
+**Ruling — three gates, one new code, no new grant to any manager beyond what A1 requires:**
+
+| Surface | Gate | Seeded audience | Precedent |
+|---|---|---|---|
+| **Browse the ladder, read step expectations, read own roadmap** | `@require_feature_access('job_architecture')` | **every role `r`** — this is the transparency A1 asked for, and it must be the default rather than a grant | — |
+| **Author / supersede a step roadmap** | `@require_feature_access('job_architecture','w')` **+ row scope** (`visible_scope`-shaped: subject is a direct report, or the actor holds company-wide scope) | `SOLID_LINE_MANAGER` **w** · `HR_ADMIN` w · `PORTAL_ADMIN` w | ADR-018's scope object, reused for a second feature |
+| **Configure families, levels, `step_count`, step expectations** | `@require_feature_access('org_structure','w')` | **HR_ADMIN r+w+d and PORTAL_ADMIN r+w+d, and no manager role** (`scripts/setup_db.py:128-160`) — exactly §14.3.1's intended audience, with **no seed change at all** | **V14** — `app/routes/org_change.py:381` already gates the org-change *workflow configuration* page this way while its runtime uses `org_change`. Same shape, same code, second use |
+| **Base pay point, step increment, step tolerance** | `@require_feature_access('compensation','w')` | HR_ADMIN, PORTAL_ADMIN | It is money (§12.5.4) |
+
+**Why `org_structure:w` rather than a fifth code or a `job_architecture:d`.** A fifth code is permanent
+surface area for a distinction two existing codes already draw. `d` was rejected by the SPM in CFL-42-20 for a
+reason that applies identically here — a grant labelled *delete* that actually confers *configure* misleads at
+the exact moment the tenant admin makes the choice. `org_structure` is, literally, organisational structure
+configuration; the ladder is org structure; and the seeded audience is already right without touching
+`seed_rbac.sql`. **Logged as CFL-42-35 for the SPM's ratification**, because it is a refinement of his §14.3.2
+table rather than an implementation of it.
+
+**Does this re-open CFL-42-18? No — and here is the query that proves it.** CFL-42-18 was: *gating the ladder
+on `compensation` blanks the directory job title for everyone.* The split holds because **the level title
+displayed for a person is an attribute of that person**, read through the employee path:
+
+```sql
+-- app/routes/org.py / helpers.TREE_CTE / the directory query — gated `employee_profiles`,
+-- NOT `job_architecture`. Adding the join does not add a gate.
+LEFT JOIN employee_job_assignments eja
+       ON eja.employee_id = e.id
+      AND eja.effective_from <= CURRENT_DATE
+      AND (eja.effective_to IS NULL OR eja.effective_to > CURRENT_DATE)
+LEFT JOIN job_levels jl ON jl.id = eja.job_level_id
+```
+**Rule, and it is a review gate: no directory, org-tree, profile-header or search query may be wrapped in
+`has_feature_access('job_architecture')`.** A tenant with `job_architecture` switched off still sees everyone's
+job title; what they lose is the ladder browser, the expectations and the roadmaps. **T-190-9** asserts it by
+rendering the directory for a user with no `job_architecture` access and checking the title is present.
+
+**Four-place registration (amends §5.2) — four codes, `sort_order` 14–17:**
+
+| Code | Label | sort_order | `default_enabled` | Registered in |
+|---|---|---|---|---|
+| `compensation` | Compensation | 14 | FALSE | KAN-194 (migration `12`) |
+| `compensation_self` | My Pay | 15 | FALSE | KAN-194 (migration `12`) |
+| `pay_equity` | Pay Equity | 16 | FALSE | KAN-194 (migration `12`) |
+| **`job_architecture`** | **Job Architecture** | **17** | **FALSE** | **KAN-190 (migration `11`)** |
+
+Seeded `role_feature_access` for `job_architecture`: **`r` for all ten roles**; **`w` for `SOLID_LINE_MANAGER`,
+`HR_ADMIN`, `PORTAL_ADMIN`**; `d` for none — there is no delete path (a ladder in use cannot be deleted, a
+superseded roadmap is history). All four places: `scripts/setup_db.py::step4_seed_portal_features` (the
+`features` tuple **and** the `access_map`), migration `11`, **`database/seed_rbac.sql`** with explicit UUID
+literals, and `role_feature_access` defaults in **both**. `TestFeatureRegistryHasNoDrift` catches a miss in the
+migration; **T-194-3's parity assertion is extended to four codes** and now genuinely earns its place, because
+this is the first code registered by a *different migration from the other three* — the exact asymmetry that
+makes a manual check unreliable.
+
+**`default_enabled = FALSE`** for consistency with the other three and with OQ-7. Deliberate consequence: a
+tenant that wants job architecture must be switched on for it, and the "off" state is
+`feature_disabled.html` — which, per the rule above, does **not** take the directory with it.
+
+## 12.5 ADR-024 — NEW. The step pay point, compounding, and the configuration this product refuses
+
+**Decision: Build. A configured **base pay point** per `(job level × pay market)`; each step's pay point
+derived from it by the level's **compound** increment; a per-level **tolerance** constrained by a declarative
+`CHECK` to be strictly less than half the increment; the derivation **computed, never materialised**, in Python
+`Decimal`, by **one function** shared by the equity check and the pay proposal.** Confidence **High** on the
+model and the storage ruling; **High** on compounding (the SPM ruled it and his reasoning holds); **Medium-High**
+on the tolerance default of ±2%, which is a default and the first tenant will tell us.
+
+### 12.5.1 The tables
+
+```sql
+-- The base rate at step .0 for one level in one market. Effective-dated, because
+-- a base pay point moves — and when it moves, every finding computed against the
+-- old one must still be explicable. Half-open, GiST, no stored is_current (§12.3.1).
+CREATE TABLE IF NOT EXISTS job_level_pay_points (
+    id             UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    company_id     UUID          NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    job_level_id   UUID          NOT NULL,
+    pay_market_id  UUID          NOT NULL,
+    base_amount    NUMERIC(14,2) NOT NULL,     -- the rate at step .0, FTE 1.0, annualised
+    currency       CHAR(3)       NOT NULL,
+    effective_from DATE          NOT NULL,
+    effective_to   DATE          NULL,
+    created_by_user_id UUID      NULL REFERENCES users(id) ON DELETE SET NULL,
+    reason         TEXT          NOT NULL,
+    correlation_id UUID          NOT NULL,
+    created_at     TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+    CONSTRAINT chk_jlpp_amount   CHECK (base_amount > 0),
+    CONSTRAINT chk_jlpp_currency CHECK (currency ~ '^[A-Z]{3}$'),
+    CONSTRAINT chk_jlpp_interval CHECK (effective_to IS NULL OR effective_to >= effective_from),
+    CONSTRAINT fk_jlpp_level  FOREIGN KEY (job_level_id, company_id)
+        REFERENCES job_levels (id, company_id) ON DELETE CASCADE,
+    CONSTRAINT fk_jlpp_market FOREIGN KEY (pay_market_id, company_id)
+        REFERENCES pay_markets (id, company_id) ON DELETE CASCADE
+);
+ALTER TABLE job_level_pay_points
+    ADD CONSTRAINT excl_jlpp_no_overlap
+    EXCLUDE USING gist (
+        job_level_id WITH =, pay_market_id WITH =,
+        daterange(effective_from, effective_to, '[)') WITH &&
+    );
+CREATE INDEX IF NOT EXISTS idx_jlpp_lookup
+    ON job_level_pay_points (company_id, job_level_id, pay_market_id, effective_from DESC);
+
+-- SPARSE. The level's increment applies to every step unless a row here says
+-- otherwise. Rows exist only where a company wants the last step of a level worth
+-- more than the first (§14.2.1).
+CREATE TABLE IF NOT EXISTS job_step_increment_overrides (
+    job_level_id  UUID         NOT NULL,
+    company_id    UUID         NOT NULL,
+    step_no       INT          NOT NULL,          -- the increment FROM step_no-1 TO step_no
+    increment_pct NUMERIC(6,4) NOT NULL,
+    updated_by_user_id UUID    NULL REFERENCES users(id) ON DELETE SET NULL,
+    updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (job_level_id, step_no),
+    CONSTRAINT chk_jsio_step CHECK (step_no BETWEEN 1 AND 12),   -- never an override "to" step 0
+    CONSTRAINT chk_jsio_pct  CHECK (increment_pct > 0 AND increment_pct <= 100),
+    CONSTRAINT fk_jsio_level FOREIGN KEY (job_level_id, company_id)
+        REFERENCES job_levels (id, company_id) ON DELETE CASCADE
+);
+```
+
+`step_increment_pct`, `step_tolerance_pct` and `step_count` live on `job_levels` (§12.4.1) — **not** on the pay
+point, because they are properties of the ladder's shape, not of one market's money. A five-step level is a
+five-step level in Tallinn and in Stockholm; only the base differs.
+
+### 12.5.2 Compounding — ruled, and the schema proves which was chosen
+
+**`point(n) = base × (1 + i)^n`, compound, not linear.** The SPM ruled it and named exactly why it needed
+ruling: across a five-step level at 5% the two readings diverge by **~2.1% of salary** — small enough that an
+engineer would guess either way and never notice, large enough to be wrong, and *precisely the same order as
+the ±2% tolerance the check turns on*. A linear implementation would put the top step of every level almost
+exactly one tolerance band out and generate a `PAY_BELOW_STEP` finding for every correctly-paid senior person
+in the tenant. **That is not a rounding difference; it is a systematically wrong answer that looks plausible.**
+
+With per-step overrides the derivation is a product, not a power:
+
+```python
+def step_pay_point(base: Decimal, level_increment_pct: Decimal,
+                   overrides: dict[int, Decimal], step_no: int) -> Decimal:
+    """The pay point for `step_no`. Exact decimal throughout; ONE quantise at the
+    end (BR-1.5 / ADR-014). Compound: each step uplifts the PREVIOUS step's point."""
+    point = base
+    for n in range(1, step_no + 1):
+        pct = overrides.get(n, level_increment_pct)
+        point = point * (Decimal(1) + pct / Decimal(100))
+    return point.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+```
+
+**No intermediate rounding.** Quantising each step would compound the rounding error along with the increment
+and make `point(5)` depend on how it was reached. The loop runs at most twelve times.
+
+**The reference table UAT must reproduce by hand** (base 60,000.00, i = 5%, `step_count = 5`), with the linear
+values alongside **so a linear implementation fails loudly rather than quietly**:
+
+| Step | Compound (correct) | Linear (wrong) | Δ |
+|---|---|---|---|
+| `.0` | 60,000.00 | 60,000.00 | — |
+| `.1` | 63,000.00 | 63,000.00 | — |
+| `.2` | 66,150.00 | 66,000.00 | +150.00 |
+| `.3` | 69,457.50 | 69,000.00 | +457.50 |
+| `.4` | 72,930.38 | 72,000.00 | +930.38 |
+| `.5` | **76,576.89** | 75,000.00 | **+1,576.89 (2.1%)** |
+
+`.4` is `72,930.375` before quantising → **72,930.38** under HALF_UP. That single half-cent is the reason
+BR-1.5 exists and the reason the quantise happens once, at the end, and not inside the loop.
+
+### 12.5.3 Computed, not materialised — the §15.2 item 4 ruling
+
+**Ruling: computed. Confidence High.** Four arguments, and one that decides it.
+
+1. **Consistency with CFL-42-16.** "Current is computed, never stored" is now the project's rule for derived
+   temporal facts. A materialised pay-point table is the same class of object and would be the one exception.
+2. **Materialised means stale.** `(levels × markets × steps)` ≈ 12 × 5 × 6 = **360 rows per tenant** — small,
+   which is exactly why the temptation exists. But every base change, increment change, override change and
+   `step_count` change would need a regeneration, and "did we regenerate?" is a silent-wrongness bug class on
+   the number the entire feature compares against.
+3. **The cost is negligible.** The event path evaluates one employee: one row from `job_level_pay_points`, one
+   from `job_levels`, ≤12 `Decimal` multiplications. The company run needs at most 360 distinct points,
+   computed once per run and cached for its duration.
+4. **The decider — one function, one number.** The equity check compares against a pay point, and the
+   step-change proposal (§14.4) **pre-fills the same number**. If those two came from different code paths
+   they would eventually differ in the last cent, and the consequence is specific and bad: a
+   `PAY_BELOW_STEP` finding whose own "Propose adjustment" remedy does not clear it, because the proposed
+   amount lands a cent outside the tolerance. The finding would re-open forever and nobody would understand
+   why. **One `step_pay_point()`, called by both.** That is the property worth protecting, and materialising
+   would give it to us too — but only if the materialiser and the proposal used the same code, which returns
+   us to needing one function anyway, plus a table.
+
+**And it must not be computed in SQL.** V16: PostgreSQL's `power(numeric, numeric)` is not documented as
+exact. `numeric` multiplication is. The engine therefore computes the (bounded) set of pay points in Python
+and **joins them into the query as a `VALUES` list**:
+
+```sql
+JOIN (VALUES (%s::uuid, %s::int, %s::numeric), …) AS pp(job_level_id, step_no, point)
+  ON pp.job_level_id = eja.job_level_id AND pp.step_no = eja.step_no
+```
+One row per (level, step) in scope — 1 for an event, ≤360 for a company run. A 360-row `VALUES` list is
+nothing, and it buys exact, reproducible, identical-to-the-proposal arithmetic. Cached on `g` per request.
+
+### 12.5.4 The refused configuration — `tolerance < increment / 2`
+
+**This is the single most likely way to render the whole feature useless through a plausible-looking setting**
+(SPM R-16), so it gets the strongest enforcement available.
+
+**With a 5% increment and a ±5% tolerance, adjacent steps' tolerance bands overlap.** Step `.2` at 66,150 with
+±5% spans 62,842.50–69,457.50; step `.1` at 63,000 spans 59,850–66,150; step `.3` at 69,457.50 spans
+65,984.63–72,930.38. Every employee is "correctly paid" for *some* step. **The check reports zero findings, the
+screen says everything is fine, and it is measuring nothing.** A control that fails silently while appearing to
+work is worse than no control, because the organisation now believes it has one.
+
+**Where it lives, answering §15.2 item 6 — "so it cannot be bypassed by direct SQL or by an import":**
+
+| Case | Enforcement | Bypassable? |
+|---|---|---|
+| **The common case** — one increment for the whole level | **`chk_jl_tolerance_lt_half_increment CHECK (step_tolerance_pct * 2 < step_increment_pct)` on `job_levels`** (§12.4.1) | **No.** A single-row `CHECK` binds the ORM-less service, direct `psql`, a CSV import, a migration and a future engineer equally |
+| **The sparse case** — a per-step increment override lower than 2× the level's tolerance | **One `BEFORE INSERT OR UPDATE` trigger on `job_step_increment_overrides`**, reading the parent level's tolerance and raising with the same message | **No** |
+| **Lowering an override below tolerance by raising the tolerance instead** | The level `CHECK` fires against `step_increment_pct`; the trigger must therefore **also** fire on a `job_levels` tolerance update. **Second trigger, `AFTER UPDATE OF step_tolerance_pct ON job_levels`**, validating every override row for that level | **No** |
+
+**Two triggers, and I am justifying them rather than adding them casually** — §3.2 declined a trigger for
+`step_no` on proportionality grounds and §12.4.1 has already reversed that judgement for the same reason this
+one applies: **this constraint is load-bearing on money, and the failure mode is silence.** The declarative
+`CHECK` carries the common case at zero cost; the triggers cover the two cross-table paths, on a sparse table
+and on a rarely-updated column. That is the smallest enforcement that is actually complete.
+
+**Strict inequality, deliberately.** `tolerance * 2 < increment`, not `<=`. At exactly half, adjacent bands
+*touch*: a salary precisely between two pay points is simultaneously at the top of one band and the bottom of
+the next, and which step it "belongs to" depends on evaluation order. Excluding the boundary costs a tenant
+nothing and removes an ambiguity that would surface as a non-deterministic finding.
+
+**The error message explains the geometry, because "invalid configuration" teaches nobody:**
+
+> *"A tolerance of ±5.00% cannot be used with a 5.00% step increment: the tolerance bands of adjacent steps
+> would overlap, so every employee would count as correctly paid for some step and the check would report
+> nothing. The tolerance must be under 2.50% for this level."*
+
+**The second guard — a level base below the previous level's top step — is a WARNING, not a refusal, and the
+distinction is architectural.** It spans rows across levels *and* markets, and it is **sometimes legitimate**
+(a broad senior band whose entry deliberately overlaps the junior band's top). A refusal would block a real
+configuration. So: `job_architecture_service.ladder_warnings(company_id) -> list[Warning]`, computed on
+demand, rendered by the configurator **at the point the choice is made** (the SPM's standing rule, §12.4 of
+his file), and **never** as a constraint. **Rule for engineers: a refusal is a `CHECK` or a trigger; a warning
+is a service function and a screen. Do not implement a warning as a soft constraint that code can skip — that
+is a refusal with a hole in it.**
+
+## 12.6 ADR-023 — RE-CUT. Check A′ is absolute; Check B stays statistical
+
+> Supersedes §4.10's Check A. **§4.10's *placement* — event-driven per group, after commit, in its own
+> transaction, with an advisory-locked company run — stands unchanged and is the part of that ADR that was
+> right.** Confidence **High**.
+
+### 12.6.1 Two engines behind one service, and they are genuinely different shapes
+
+| | **Check A′ — step-pay correspondence** | **Check B — gender pay gap** |
+|---|---|---|
+| Question | "Does this person's pay match the step they are on?" | "Does this group show a gender gap?" |
+| Unit | **One employee** | One `(company, family, level, market)` group |
+| Reference | **The step's configured pay point** | Median male vs median female within the group |
+| Arithmetic | One subtraction, one division, one quantise | `percentile_cont(0.5)` with `FILTER`, even-group case |
+| Group minimum | **None. `n = 1` is valid and meaningful** | **`n ≥ 5`, ≥ 2 of each gender compared** |
+| Coverage gate | **None** — replaced by per-employee preconditions + the ladder-fitted-and-reviewed gate | **Retained** |
+| Gated on | The ladder gate | The ladder gate **and DPO-1** |
+| Finding types | `PAY_BELOW_STEP` (primary) · `PAY_ABOVE_STEP` (secondary) | `GENDER_GAP`, with direction |
+
+**Do not delete the statistical machinery.** §4.10(c)'s group query survives **verbatim for Check B** — the
+`percentile_cont`, the gendered `FILTER`s, `n_male` / `n_female`, `currency_count`, the coverage gate and the
+`OTHER`/`NULL` excluded-and-counted path. What it loses is `median_all` as the *primary* reference. This is the
+single most likely thing to be lost in the clear-out, which is why it is stated as a prohibition.
+
+### 12.6.2 Check A′, precisely
+
+```python
+expected  = step_pay_point(base, increment, overrides, step_no)   # Decimal, 2dp (§12.5.2)
+actual    = row['annual_base_fte']                                 # Decimal, 2dp, already FTE-normalised
+deviation = ((actual - expected) / expected * 100).quantize(Decimal('0.01'), ROUND_HALF_UP)
+
+if deviation < -tolerance:  raise_finding('PAY_BELOW_STEP', deviation, expected)   # primary
+elif deviation > tolerance: raise_finding('PAY_ABOVE_STEP', deviation, expected)   # secondary
+else:                       no finding
+```
+
+**Boundary: exactly `±tolerance` is INSIDE — no finding.** Consistent with the SPM's ratified inclusivities
+(UAT-F-01b: the coverage gate evaluates at exactly 80%; the justification window does not re-fire on its last
+day) and with the conservative reading — do not flag somebody who is exactly on the line the tenant configured
+as acceptable. **Documented in the UI**, per BR-1.6 / CFL-42-34: the comparison uses the **2dp value the screen
+shows**, so a user can reproduce the finding from what is in front of them. A check whose result cannot be
+recomputed from the displayed numbers destroys trust in a compliance figure faster than being wrong would.
+
+**Per-employee preconditions — each counted and shown, never silent** (§14.2.3). An employee failing any of
+these is **"not evaluable"** with the reason named, which is a distinct state from "no finding":
+
+| # | Precondition | Not-evaluable reason |
+|---|---|---|
+| 1 | Current level **and step** assignment | `NO_LADDER_ASSIGNMENT` |
+| 2 | Current compensation record (`status='ACTIVE'`, in force today) | `NO_PAY_RECORD` |
+| 3 | Location resolves to a pay market | `NO_PAY_MARKET` |
+| 4 | A pay point configured for that `(level, market)` | `NO_PAY_POINT` |
+| 5 | `employment_status = 'ACTIVE'` | `NOT_ACTIVE` |
+| 6 | `employment_type NOT IN ('CONTRACTOR','INTERN')` | `EXCLUDED_EMPLOYMENT_TYPE` |
+| 7 | The compensation currency equals the pay point's currency | `CURRENCY_MISMATCH` — **never converted**, no silent 1:1 |
+
+Counts per reason are written to `pay_equity_evaluations` and rendered above the register. **A register showing
+"0 findings" over 90 not-evaluable employees is the most dangerous screen in the epic** (D7.4's reasoning,
+which survives A1 intact even though the coverage gate that motivated it does not).
+
+### 12.6.3 The ladder-fitted-and-reviewed gate, and the fitting algorithm
+
+**The risk A1 creates:** a naive `.0`-for-everyone backfill makes every employee paid above entry — which is
+most of them — a `PAY_ABOVE_STEP` finding in the first hour. R-1's alert storm returning in a new costume.
+
+**Part 1 — the backfill fits the step to the pay.** `job_architecture_service.fit_step()`:
+
+```python
+def fit_step(actual_annual_base_fte, level, market, points):
+    """Choose the step whose pay point is closest to what the person is ACTUALLY paid.
+    Returns (step_no, fit_state, fit_deviation_pct, reason).
+
+    This is circular ONLY if you read it as measurement. It is not: it is an initial
+    load, and the ladder is being fitted to a reality that came first. Measurement
+    begins after HR has reviewed the fit — which is what Part 2 gates."""
+    if actual is None:                    return 0, 'NEEDS_REVIEW', None, 'NO_PAY_RECORD'
+    if not points:                        return 0, 'NEEDS_REVIEW', None, 'NO_PAY_POINT'
+    if actual < points[0]:                return 0, 'NEEDS_REVIEW', dev(0), 'PAY_BELOW_ENTRY'
+    if actual > points[level.step_count]: return level.step_count, 'NEEDS_REVIEW', \
+                                                 dev(level.step_count), 'PAY_ABOVE_TOP_STEP'
+    best = min(range(0, level.step_count + 1),
+               key=lambda n: (abs(actual - points[n]), n))     # exact-tie → the LOWER step
+    return best, 'FITTED', dev(best), None
+```
+
+**Four rulings inside that function, each of which someone would otherwise decide differently:**
+
+- **Exact ties resolve to the *lower* step.** Asymmetric cost, conservative side — the same reasoning as D4h.
+  Fitting **up** manufactures a *job-content* claim (this person holds step 1.3's responsibilities) on the
+  evidence of *pay alone*, and it suppresses a `PAY_BELOW_STEP` finding that may be real. Fitting **down** at
+  worst produces a `PAY_ABOVE_STEP` — the secondary, low-severity finding, which is exactly the queue HR is
+  meant to work through. Ties are also not hypothetical: with a round base and a round increment, a salary set
+  by a previous HR system on the same arithmetic lands exactly between two points regularly.
+- **Never extrapolate below `.0` or above the top step.** Clamp, and mark `NEEDS_REVIEW`. Extrapolating would
+  invent steps that do not exist on the ladder the tenant configured.
+- **Nobody is fitted without a pay record.** Step `.0`, `NEEDS_REVIEW`, reason `NO_PAY_RECORD`. That is the
+  honest state and it feeds the review screen rather than the findings register.
+- **The fit is recorded as a fit.** `employee_job_assignments.fit_state VARCHAR(16)` ∈ `MANUAL` ·
+  `FITTED` · `NEEDS_REVIEW` · `REVIEWED`, plus `fit_deviation_pct NUMERIC(6,2) NULL`. A manually-set step is
+  `MANUAL` and is never re-fitted by a subsequent import.
+
+**Part 2 — the gate.** `company_compensation_settings.ladder_fit_reviewed_at TIMESTAMPTZ NULL` and
+`ladder_fit_reviewed_by_user_id`. **Check A′ raises no finding for a company until it is set**, by a deliberate
+act of an `org_structure:w` holder on the fit-review screen, audited as `LADDER_FIT_REVIEWED`. Until then the
+register shows the **review progress** (`n of m reviewed`, grouped by `fit_state`), not findings.
+
+**One gate, one human act, and it is far better targeted than a percentage** — the 80% coverage gate would have
+opened the floodgates at 80% of *coverage*, which says nothing about whether the fitted steps are right.
+Setting it back to NULL (a re-fit after a ladder change) is permitted, audited, and closes every `OPEN`
+Check A′ finding as `RESOLVED_BY_DATA` rather than leaving findings computed against a ladder that has moved.
+**Check B is not gated on it** — a gender gap does not depend on the step fit being reviewed.
+
+### 12.6.4 `pay_equity_findings` — amended
+
+```sql
+-- Amends §3.6. The lifecycle columns, the CHECK set and uq_pef_one_open stand.
+ALTER TABLE pay_equity_findings
+    ADD COLUMN finding_type    VARCHAR(24) NOT NULL,
+    ADD COLUMN step_no         INT         NULL,      -- part of the key for A′, reported for B
+    ADD COLUMN reference_value NUMERIC(14,2) NULL,    -- the pay point used. MONEY — see below
+    ADD COLUMN deviation_pct   NUMERIC(6,2)  NULL,    -- signed: negative = below
+    ADD COLUMN direction       VARCHAR(8)    NULL,    -- Check B: which gender is ahead
+    ALTER COLUMN group_size     DROP NOT NULL,        -- Check B only
+    ALTER COLUMN compared_count DROP NOT NULL,        -- Check B only
+    ALTER COLUMN coverage_pct   DROP NOT NULL,        -- Check B only
+    ADD CONSTRAINT chk_pef_type CHECK (finding_type IN
+        ('PAY_BELOW_STEP','PAY_ABOVE_STEP','GENDER_GAP')),
+    -- Each finding type carries exactly the columns its own check produces. This is
+    -- what stops a Check B finding acquiring a step-level reference by copy-paste.
+    ADD CONSTRAINT chk_pef_shape CHECK (
+        (finding_type IN ('PAY_BELOW_STEP','PAY_ABOVE_STEP')
+             AND subject_employee_id IS NOT NULL AND step_no IS NOT NULL
+             AND reference_value IS NOT NULL AND deviation_pct IS NOT NULL)
+     OR (finding_type = 'GENDER_GAP'
+             AND subject_employee_id IS NULL AND group_size IS NOT NULL
+             AND compared_count IS NOT NULL AND direction IS NOT NULL
+             AND reference_value IS NULL)),
+    ADD CONSTRAINT chk_pef_direction CHECK (direction IS NULL
+                                         OR direction IN ('MALE_AHEAD','FEMALE_AHEAD'));
+
+-- The uniqueness key now includes the step and the type: one open finding per
+-- (subject, level, market, step, type).
+DROP INDEX IF EXISTS uq_pef_one_open;
+CREATE UNIQUE INDEX uq_pef_one_open ON pay_equity_findings (
+    company_id, finding_type,
+    COALESCE(subject_employee_id, '00000000-0000-0000-0000-000000000000'::uuid),
+    job_level_id, pay_market_id, COALESCE(step_no, -1)
+) WHERE state = 'OPEN';
+```
+
+**`reference_value` is money in a `pay_equity`-gated table, and CFL-42-19 applies to it.** The finding stores
+the pay point it used so that a finding remains reproducible after the base changes — without it, a base
+change makes every historical finding unexplainable. But `reference_value` **is** the step's rate, and
+`reference_value × (1 + deviation_pct/100)` **is** the subject's salary. So the same rule the SPM ratified for
+compa-ratios binds it:
+
+> **`reference_value` and `deviation_pct` are returned only to an actor holding `pay_equity:r` AND
+> `compensation:r`.** To a `pay_equity`-only holder the register renders a **band label** — *"below the step
+> rate"* / *"above the step rate"* — and the finding is still fully workable: they can see who, which step,
+> which direction, and disposition it. What they cannot do is reconstruct the number.
+
+That is CFL-42-19 applied to a **stored column** rather than a computed ratio, and it is why §4.10's original
+`measured_value` design needed re-examining rather than renaming. The `GENDER_GAP` finding carries no
+`reference_value` at all (the `chk_pef_shape` CHECK enforces it) — a median-to-median percentage is not
+invertible to any individual's pay, which is why Check B's number is safe to render to `pay_equity:r` alone.
+
+**Asymmetric severity, in the data and not only in the copy.** `PAY_BELOW_STEP` is the owner's stated concern
+and carries a computable remedy; `PAY_ABOVE_STEP` is legitimate far more often than not (market premium,
+red-circled legacy pay, retention). The register defaults to filtering `PAY_BELOW_STEP + GENDER_GAP`, the bell
+notifies on `PAY_BELOW_STEP` and `GENDER_GAP` only, and **`PAY_ABOVE_STEP` never raises a notification** — it
+is a register-only condition. Treating the two with equal weight is how a queue fills with things nobody
+should act on, which is R-1 by another route.
+
+**"Propose adjustment" — the remedy that ships with the finding.** On a `PAY_BELOW_STEP`, an actor holding
+`pay_equity:r` **and** `compensation:w` gets an action that pre-fills a `COMPENSATION_REVIEW` request at
+`reference_value`, through the **existing** chain — one endpoint, one engine, four-eyes intact, nothing
+auto-applied. The finding transitions to `RESOLVED` when a compensation record lands at or above the tolerance
+floor, detected by the ordinary post-commit re-evaluation (§4.10b) rather than by the request knowing about
+the finding. **The finding does not hold a foreign key to the request**: coupling them would make the finding's
+lifecycle depend on a request that can be rejected, cancelled or superseded. The correlation is by re-evaluation,
+which is idempotent and self-correcting.
+
+### 12.6.5 Cost, re-run — it improves substantially
+
+Check A′ has **no aggregate, no window function and no group-by**. It is one indexed scan joined to a small
+`VALUES` list, evaluated row by row in `Decimal`.
+
+| Population | Check A′ — one employee (the event path) | Check A′ — whole company | Check B — whole company (unchanged) |
+|---|---|---|---|
+| Acme 46 / Telia 100 | **< 2 ms** | **< 15 ms** | < 20 ms |
+| 10,000 | **< 2 ms** | **60–150 ms** *(was 150–400 ms)* | 150–400 ms |
+| 100,000 | **< 3 ms** | **0.8–2 s** *(was 2–5 s)* | 2–5 s |
+
+**The event path is now O(1) rather than O(group)** — a salary write re-evaluates *that employee*, not their
+comparison group, because the reference is absolute. That is the structural improvement A1 buys and it is
+larger than the wall-clock numbers suggest: it removes the whole class of "a colleague's pay change re-raised
+my finding" behaviour that a median reference would have produced. **Check B still needs the group**, so a
+compensation write triggers a Check A′ re-evaluation for one employee **and** a Check B re-evaluation for one
+group; the group path is the §4.10(b) mechanism, unchanged.
+
+`pay_equity_evaluations` gains `check_type VARCHAR(24) NOT NULL CHECK (check_type IN ('A_PRIME','B','BOTH'))`
+and `not_evaluable_counts JSONB NOT NULL DEFAULT '{}'` (the §12.6.2 reason tallies). `duration_ms` is still
+written on every run — the cost model above is **modelled above 146 and must be checked against reality**
+rather than believed (T-200-8, unchanged).
+
+## 12.7 The remaining Wave 3 rulings that change this design
+
+Actioned here rather than scattered, with the task that carries each. §12 of the SPM's file is the
+authoritative conflict register; **my §10.3 numbering is superseded by it.**
+
+| SPM ruling | Change to this design | Task |
+|---|---|---|
+| **CFL-42-9** | `_apply_change` closes `manager_relationships` with no `effective_to`; two such rows exist. Already designed in **T-189-4**; now also **backfills the two rows** to the closing date implied by the successor row, or to `created_at` where no successor exists, recorded in the migration comment | T-189-9 |
+| **CFL-42-11 / 26 / 31** | Four-eyes: **≥2 independently satisfiable levels required at create** for money- or level-bearing requests (refused, naming the configuration fix); **a seeded two-level default chain** (HR_ADMIN → PORTAL_ADMIN) for those types; **the initiator may not decide any level**. Without the first two the control is a silent no-op in every tenant today (**V18**) | T-198-7, T-198-8 |
+| **CFL-42-13** | A manager without `compensation:r` records `pay_decision = 'NOT_ANSWERED_NO_PERMISSION'`, and **the first `compensation:r` approver must answer before approving**. Added to `chk_ocp_decision`'s enum and to `decide()`'s pre-conditions | T-196-10 |
+| **CFL-42-14 / 15** | **Subject ≠ initiator** and **subject ≠ decider**, universal, every role including SYSTEM_ADMIN → **KAN-203, W0, P0**. `CLAUDE.md`'s org-change invariant 2 is tightened in the same commit (my file) | KAN-203 |
+| **CFL-42-16** | `is_current` withdrawn; current computed | §12.3.1 |
+| **CFL-42-19** | Both halves adopted: the both-codes rule (already T-201-3) **plus a config-time advisory on the Feature Access tab** where `pay_equity` is granted without `compensation` | T-201-12 |
+| **CFL-42-24** | The bell badge counts findings **with no owner**; `[ Take ]` is a recorded, audited act (`PAY_EQUITY_FLAG_TAKEN`) that decrements the badge while the finding stays `OPEN` in the register. Adds `owner_user_id` and `taken_at` to `pay_equity_findings` | T-201-13 |
+| **CFL-42-25** | `LEVEL_CHANGE` + `direction` | §12.2(d) |
+| **CFL-42-27** | The subject may **read** a finding about themselves; the disposition controls are **absent** (not disabled). Where that leaves no eligible dispositioner, the warning goes to Compensation Settings, the Feature Access tab **and** the SYSTEM_ADMIN tenant banner | T-201-14 |
+| **CFL-42-28** | The bell's one-click `✓ Approve` is **suppressed** for any request carrying a pay or level change; the line shows "Review →" | T-196-11 |
+| **CFL-42-29** | **KAN-204** — EP38's shared shell accessibility fixes (global `:focus-visible`, shared live regions, `prefers-reduced-motion`) land in W0, tagged EP33 | KAN-204 |
+| **CFL-42-30 / A-2** | The structural allowlist **stands and is what I rely on**. The mandatory `reason` on compensation-bearing actions becomes a **seeded, company-editable category** + optional free text; the free text carries a **non-blocking numeric-pattern warning** and is in the compensation redaction path. **No criterion may claim the guard covers free text** — I over-claimed in ADR-019 and the correction is right | T-193-10 |
+| **CFL-42-32** | No aggregate of any kind rendered below **n = 5**; the configurable minimums **floored in the database** (already `chk_ccs_min_o` / `chk_ccs_min_g`, floor raised from 2 to 2 with the render rule separate) | T-200-12 |
+| **CFL-42-33** | **`404`, not `403`, for every EP42 cross-tenant subject substitution** — a 403 confirms the id exists. The EP38 inconsistency is **TD-26** for the S5 sweep, recorded deliberately | T-194-11 |
+| **CFL-42-34** | **BR-1.6 wins: compare the value the UI displays.** Already adopted in §12.6.2 | — |
+| **OQ-BA-3** | Annualisation constants on the **pay market** | §12.3.2 |
+| **OQ-BA-5** — *costed, as asked* | A "who viewed this salary" read log. **Measured, not guessed: four call sites** — `current()`, `history()`, `self_view()` and the equity register's amount rendering — because ADR-018 funnels every scoped read through one `Scope`. One append-only table, one insert per read, `retention_class='SECURITY'`. **Estimate 0.5 dev-days.** Per the SPM's own condition (*"if it is ≤ half a day it lands in KAN-194 as a Should"*), **it lands in KAN-194** | T-194-12 |
+| **UXQ3** | Seed a starter list of salary-change reason categories — `Annual review`, `Promotion`, `Market adjustment`, `Role change`, `Correction`, `Other` — company-editable. Supplies the structured half of A-2 | T-193-10 |
+| **UXQ5** | An audited salary export in **KAN-202**, row-scoped exactly as the screen is, watermarked with actor and timestamp, audited as `COMPENSATION_EXPORTED` with row count and scope | T-202-6 |
+| **UXQ8** | A **contractor's rate is recordable** and **excluded from every comparison with the exclusion counted**. `chk_ec_*` already permits it; what changes is two distinct empty states — *"No rate recorded"* vs *"Not applicable for comparison — contractor rate recorded"* | T-195-5 (amended) |
+| **UAT-F-01d** | Same-date append permitted, tie-break by `created_at`, superseded row marked | §12.3.1 |
+| **UAT-F-08** | A non-ACTIVE employee: history readable and retained; the record **closes at `exit_date`**; new records refused except a correction | T-193-11 |
+| **UAT-Q9** | A third standalone regression suite, `tests/ui/test_compensation_workflow.py`. UAT owns the suite; **the `CLAUDE.md` amendment naming it in the regression-flow-test list is mine, in the same commit** | T-194-13 |
+
+## 12.8 The task breakdown, amended
+
+**Same contract as §9:** one-line statement of work, exact files, owner, estimate in dev-days, dependency,
+tests, definition of done — on top of the Engineering Charter §4 DoD, which applies to every row.
+
+**Totals: 21 stories · 175 tasks · 133.5 task-days → 90–110 dev-days delivered · critical path 71.0.**
+§9's 112 tasks stand except where withdrawn below. **31 new-story tasks · 33 amendment tasks · 3 re-homed ·
+1 withdrawn.**
+
+### 12.8.0 Withdrawn and re-homed
+
+| Task | Was | Now |
+|---|---|---|
+| **T-200-5** | Check A — compa-ratio to band midpoint / group median, `n ≥ 3` | **WITHDRAWN.** Replaced by **T-200-11** (Check A′). Its group-median code was the thing A1 removed |
+| **T-199-3, T-199-4, T-199-6** | Band CRUD · compa-ratio + out-of-band flag · step target points | **RE-HOMED to KAN-205** as T-205-1/2/3 (SPM Ruling 32 — KAN-199 splits). Step *target points* become **step expectations** and move to KAN-190 (T-190-10) |
+| **§3.2 `job_level_step_targets`** | A sparse percentile target per step | **WITHDRAWN.** Replaced by `job_step_expectations` (§12.4.2) — the object A1 actually asked for |
+
+### 12.8.1 KAN-203 — subject ≠ initiator, subject ≠ decider — **W0 · Must · P0** — lead: SNR
+
+> **A live Critical defect, not new scope** (V17, SPM §12.5). Today an HR_ADMIN can raise a position change
+> for themselves and approve it on the seeded default chain. **P0 and first**, because it is a self-approved
+> desk move now and a self-approved pay rise the day KAN-196 lands, and I will not carry a P0 through four waves.
+
+| Task | Owner | Work · files | Dep | Est | Tests | Done when |
+|---|---|---|---|---|---|---|
+| **T-203-1** | SNR | `_can_initiate_for` (`app/routes/org_change.py:55-64`): the admin branch gains `and subject_id != u.get('employee_id')`. **The exemption exists so HR can move *other* people** — that is its whole purpose. | — | 0.5 | EMPLOYEE, SOLID_LINE_MANAGER, HR_ADMIN, PORTAL_ADMIN and **SYSTEM_ADMIN** each refused on themselves; each still permitted on another | no role, at any privilege level, can initiate for themselves |
+| **T-203-2** | SNR | `decide()` (`org_change_service.py:235-249`): refuse when `user['employee_id'] == req['employee_id']`, **before** the SYSTEM_ADMIN branch at `:248` and before any write. Named error, not a generic one. | T-203-1 | 0.5 | the subject cannot decide any level of their own request, at any privilege level | — |
+| **T-203-3** | SNR | Hide the affordance: `can_initiate_org_change_for()` (`org_change.py:67`) returns False for self, so the Transfer… entry points do not offer it. **Display only — the route re-checks** (the helper's own docstring already says so). | T-203-1 | 0.5 | the `⋯` menu and the profile button are absent on your own row; a hand-crafted POST is still refused | hiding a button is never the control |
+| **T-203-4** | SNR | Extend `tests/test_org_change.py` and `tests/test_transfer_entry_point.py`; add the two defect-reproduction cases named as **DEF-42-4** and **DEF-42-5** so a regression is unmistakable. | T-203-2 | 1.0 | both reproductions fail before the fix and pass after; both regression suites green, counts reported | — |
+| **T-203-5** | ARCH | **`../../CLAUDE.md`** — tighten org-change invariant 2 to say explicitly that **nobody, including HR_ADMIN, PORTAL_ADMIN and SYSTEM_ADMIN, may initiate or decide a request whose subject is themselves.** The headline was right and the detailed rule beneath it was wrong. `docs/ARCHITECTURE_REVIEW.md` records DEF-42-4/5 against EP27. **Same commit.** | T-203-4 | 0.5 | doc-currency gate | the invariant that everyone loads as binding rules now matches the code |
+
+**KAN-203: 3.0 dev-days.**
+
+### 12.8.2 KAN-204 — the shared shell accessibility fixes — **W0 · Must · P2** — lead: MID · tagged EP33
+
+> EP38's shell fixes never landed (UX verified: three of nine). EP42 adds ten surfaces; ten private live
+> regions is the doubling D-004 exists to prevent. **Tagged EP33 so that epic's scope shrinks honestly.**
+
+| Task | Owner | Work · files | Dep | Est | Tests | Done when |
+|---|---|---|---|---|---|---|
+| **T-204-1** | MID | Global `:focus-visible` in the shared stylesheet; verify against the existing shell rather than assuming EP38 delivered it. | — | 1.0 | keyboard traversal of the existing nav, bell and modals shows a visible focus ring on every interactive element | WCAG 2.4.7 met on the **shell**, not per-screen |
+| **T-204-2** | MID | Two shared ARIA live regions in `templates/base.html` (`polite` for status, `assertive` for errors) plus `announce(msg, level)` in the shared JS. Every EP42 DOM builder uses them; **no new surface declares its own.** | T-204-1 | 1.0 | a screen-reader announcement fires on save, error and empty-state transitions; grep-assert: exactly one `aria-live` container pair in `templates/` | — |
+| **T-204-3** | MID | `@media (prefers-reduced-motion: reduce)` honoured by every transition and the drag-and-drop affordance. | T-204-1 | 0.5 | reduced-motion snapshot | — |
+| **T-204-4** | MID | Document the three shell primitives in `TECHNICAL_DOCUMENTATION.md` so EP42's ten screens use them rather than reinventing; note the EP33 tag. Same commit. | T-204-3 | 1.0 | doc-currency gate | a new screen's accessibility is a call to an existing primitive |
+
+**KAN-204: 3.5 dev-days.**
+
+### 12.8.3 KAN-208 — synthetic gender across the seeded population — **W0 · Must · P2** — lead: MID
+
+> **The DEF-004 trap, exactly.** A dev DB updated by hand while `database/seed_data.sql` / `telia_seed.sql`
+> stay unchanged is how CI broke on 9 August. Seeds **and** migration, or it does not exist outside one laptop.
+
+| Task | Owner | Work · files | Dep | Est | Tests | Done when |
+|---|---|---|---|---|---|---|
+| **T-208-1** | MID | The assignment function: **deterministic and reproducible** — `gender = f(employee_number)` via a fixed, documented hash, **not** `random()`. A migration that produces different data on each machine is unreproducible and untestable. | — | 0.5 | running the function twice on the same input yields the same output; documented in the migration banner | two engineers get identical databases |
+| **T-208-2** | **MID** | **Shape the distribution so Check B is demonstrable** (SPM §14.6.3). A per-row coin flip across 146 people will not reliably give **≥5 in a group with ≥2 of each gender**. Assign by **comparison group**: pick two groups that will satisfy `n ≥ 5` and `≥2 each`, seed those deliberately, then distribute the remainder. Include `OTHER` for the excluded-and-counted fixture (SPM §12.4 / UAT-F-10). | T-208-1 | 1.0 | **assert after the seed: ≥2 comparison groups satisfy Check B's minimums, and `OTHER` is present** | a gender assignment that leaves Check B undemonstrable has not done its job |
+| **T-208-3** | MID | `database/migrations/10b_synthetic_gender.sql` — idempotent `UPDATE employees SET gender = … WHERE gender IS NULL` (never overwrites a value), plus a `_down` that nulls only the rows it set (tracked by a capture table, same pattern as §12.2(b)). | T-208-2 | 0.5 | apply / re-apply / reverse on a fresh DB | — |
+| **T-208-4** | **MID** | **The same values in `database/seed_data.sql` and `database/telia_seed.sql`.** A fresh CI database replays no migrations. This is the DEF-004 half and it is the half that gets missed. | T-208-3 | 0.5 | **CI-style fresh build** (`dropdb/createdb/schema/seed`) shows the same distribution as the dev DB | — |
+| **T-208-5** | MID | Migration banner + `TECHNICAL_DOCUMENTATION.md`: this is **synthetic data for fictional people**; it does **not** authorise collecting gender from real people; **T5 is unaffected**; **DPO-1 still gates Check B** — having data does not make processing it lawful. Same commit. | T-208-4 | 0.0 | doc-currency gate | nobody later reads the seeded values as a precedent for collection |
+
+**KAN-208: 2.5 dev-days.**
+
+### 12.8.4 KAN-206 — step pay points, increments and tolerance — **W2 · Must · P1** — lead: SNR · design: ARCH (ADR-024)
+
+> **Hard prerequisite of KAN-200 and KAN-192.** It is the reference value for the entire equity feature and
+> the pre-fill for every step-change pay proposal.
+
+| Task | Owner | Work · files | Dep | Est | Tests | Done when |
+|---|---|---|---|---|---|---|
+| **T-206-1** | ARCH | ADR-024 signed off (§12.5). Walk **compounding vs linear** and the **~2.1% divergence** with SNR before any code — it is the one an engineer would guess and never re-examine. | KAN-199 | 0.5 | — | SNR can state why the top step of a five-step level is not `base × 1.25` |
+| **T-206-2** | SNR | Migration `12b_step_pay_points.sql`: `job_level_pay_points` (+ `excl_jlpp_no_overlap`, `idx_jlpp_lookup`), `job_step_increment_overrides`. Companion `_down`. Regenerate `schema.sql`. | T-206-1, T-190-8 | 1.0 | fresh apply; re-apply no-op; overlapping pay-point periods refused; a cross-tenant `job_level_id` refused **by the composite FK** | — |
+| **T-206-3** | **SNR** | **`compensation_service.step_pay_point(base, increment, overrides, step_no)`** — exact `Decimal`, compound, **one** `ROUND_HALF_UP` quantise at the end (§12.5.2). **This is the only implementation; KAN-200 and KAN-192 both call it.** | T-206-2, T-193-4 | 1.0 | the §12.5.2 reference table (base 60,000, i=5%, 5 steps) **byte-for-byte, including 72,930.38**; the linear values asserted **not** to match; a 3-step level; per-step overrides; `step_no = 0` returns the base unchanged | a linear implementation fails loudly |
+| **T-206-4** | **SNR** | **The refused configuration.** `chk_jl_tolerance_lt_half_increment` on `job_levels` (§12.4.1) **plus** the two triggers of §12.5.4 (on `job_step_increment_overrides` insert/update, and on `job_levels` tolerance update). Error text explains the geometry. | T-206-2 | 1.0 | tolerance 2.5 / increment 5.0 **refused** (strict `<`); 2.49 / 5.0 accepted; an override of 4.0 against a 2.5 tolerance refused **by the trigger**; **the same refusals via direct `psql` and via a CSV import**, not only via the service | **R-16 closed at the database, not the form** |
+| **T-206-5** | MID | Pay-point CRUD gated `@require_feature_access('compensation','w')`; effective-dated, half-open; audited `PAY_POINT_CHANGED` with `currency`, `effective_date`, `job_level_id`, `pay_market_id` and `pct_change_band` — **never an amount** (ADR-019). | T-206-3 | 1.0 | superseding a pay point closes the old one with no overlap; the audit diff passes `_ALLOWED_DIFF_KEYS` | — |
+| **T-206-6** | MID | `job_architecture_service.ladder_warnings(company_id)` — the level-base-below-previous-top-step **warning** (§12.5.4), computed on demand, rendered at the point the choice is made. **A service function and a screen, never a constraint.** | T-206-3 | 0.5 | a descending ladder warns and still saves; an ascending one does not warn | a warning is not a soft constraint |
+| **T-206-7** | MID | The joint configuration screen: `step_count`, expectations and titles on `org_structure:w`; base pay point, increment and tolerance on `compensation:w`. **It must read coherently to a holder of one gate and not the other** — absent, not disabled, not broken (SPM CFL-42-20 consequence). | T-206-5, UX | 1.0 | an `org_structure:w` holder without `compensation:w` sees the ladder half and **no money fields in the payload**; the reverse holds | two gates, one screen, no broken state |
+| **T-206-8** | MID | "Cost of the ladder" — total gap between current pay and fitted step pay points, for HR to see before adopting (§14.2.6). **Should · P3**, aggregate only, and **not rendered below n = 5** (CFL-42-32). Docs in the same commit. | T-206-7 | 0.0 | the aggregate is absent below n=5 | — |
+
+**KAN-206: 6.0 dev-days.**
+
+### 12.8.5 KAN-207 — the step roadmap and employee transparency — **W1 · Must · P1** — lead: MID · design: ARCH (ADR-025)
+
+> **The object the owner actually asked for.** No compensation dependency, which is why it can close W1 with a
+> shippable, employee-visible outcome and no pay data anywhere in it.
+
+| Task | Owner | Work · files | Dep | Est | Tests | Done when |
+|---|---|---|---|---|---|---|
+| **T-207-1** | ARCH | ADR-025 signed off (§12.4.4), **including the forbidden-column table**. Add "an assessment field on `employee_step_roadmaps` or `job_step_expectations`" to the standing review checklist. | T-190-8 | 0.5 | — | R-17 has a named review gate, not a good intention |
+| **T-207-2** | SNR | Migration `11b_step_roadmaps.sql`: `employee_step_roadmaps` with every CHECK in §12.4.3, `uq_esr_one_live`, `idx_esr_unacknowledged`, and `trg_employee_step_roadmap_immutable` (modelled on `employee_compensation_immutable`). Companion `_down`. Regenerate `schema.sql`. | T-207-1 | 1.0 | two live roadmaps for one employee **refused by the index**; an `UPDATE` of `content` **raises**; an `UPDATE` of `acknowledged_at` succeeds | versioning is a database guarantee |
+| **T-207-3** | MID | `job_architecture_service.author_roadmap()` — supersede-then-insert in **one** `transaction()`, `version = prev + 1`, snapshot `from_*` and `target_*`, mandatory `review_context`, audit `STEP_ROADMAP_AUTHORED` + `STEP_ROADMAP_SUPERSEDED`. | T-207-2, T-193-3 | 1.0 | a rollback leaves the previous version live; the previous version stays **readable**; no roadmap without a current assignment | — |
+| **T-207-4** | **MID** | **Row scoping** (§12.4.5): `@require_feature_access('job_architecture','w')` **+** the subject is a direct report, **or** the actor holds company-wide scope. Reuses ADR-018's `Scope` — a second feature, the same object. **Not a sub-flag: the flag grants the surface, the scope decides the rows.** | T-207-3, T-194-4 | 1.0 | a manager authors for their report and gets **404** on a non-report (CFL-42-33); an HR_ADMIN authors for anyone; an EMPLOYEE gets 403 with no state change | the CC-2 boundary holds for a second feature |
+| **T-207-5** | **MID** | **The employee's view — the primary one.** Own current step's expectation, the target step's expectation, the roadmap content, its version history, and **[ I have read and discussed this ]** which sets `acknowledged_at`. Gated `job_architecture:r`, **hard-scoped to `session['employee_id']` server-side — no parameter exists.** | T-207-4, UX | 1.5 | an employee sees **their own** roadmap and **404** on a colleague's, **asserted at the payload**; there is no `employee_id` parameter to tamper with — assert by inspecting the route signature | the transparency the owner asked for is the default |
+| **T-207-6** | MID | **The employee acknowledges; nobody acknowledges for them.** `acknowledged_by_user_id` asserted server-side to equal the subject's user id. Unacknowledged roadmaps surface back to their **author** via `idx_esr_unacknowledged` — **a list, not a blocking gate** (§14.3.3). | T-207-5 | 0.5 | a manager cannot acknowledge their report's roadmap; an unacknowledged roadmap never blocks a step change | "mutually decided" is recorded, not enforced |
+| **T-207-7** | MID | The manager's authoring view: the target step's generic expectation shown alongside the free-text field so the roadmap is written **against** it. Copy is UX's — **expectations, not an assessment, no implied promise**. WCAG 2.2 AA using KAN-204's primitives. | T-207-5, UX | 1.0 | copy matches the UX spec verbatim; no field on the screen accepts a score or a rating | R-17's boundary visible in the UI |
+| **T-207-8** | ARCH | `TECHNICAL_DOCUMENTATION.md` — a "Job architecture: expectations and roadmaps" section **including ADR-025's forbidden-column table**, so the boundary is discoverable by the engineer who gets the "can we add a rating?" request. Same commit. | T-207-7 | 0.5 | doc-currency gate | — |
+
+**KAN-207: 7.0 dev-days.**
+
+### 12.8.6 KAN-205 — salary bands as the level envelope — **W4 · Should · P2** — lead: MID
+
+> Split from KAN-199 (SPM Ruling 32). **Repositioned, not resized:** bands are the level's min/max envelope
+> ("is this pay sane for this level at all?"), no longer the comparison basis.
+
+| Task | Owner | Work · files | Dep | Est | Tests | Done when |
+|---|---|---|---|---|---|---|
+| **T-205-1** | MID | *(was T-199-3)* `salary_bands` migration + effective-dated CRUD gated `compensation:w`; `PAY_BAND_CHANGED` audited with `width_pct_change_band`, never amounts. **`is_current` withdrawn** (§12.3.1). | T-206-2 | 1.5 | overlapping bands refused; `min > mid` refused | — |
+| **T-205-2** | MID | *(was T-199-4)* Out-of-band pay is **allowed, flagged, and requires a reason — never hard-blocked**. The flag is a UI state on the pay form, not a refusal. **Band position is a fact, not a finding** (SPM OQ-BA-1) — it renders on the Compensation card and raises nothing. | T-205-1 | 1.0 | an out-of-band amount saves with a reason and is marked; no `pay_equity_findings` row is created | red-circled pay stays in the system |
+| **T-205-3** | MID | *(new — SPM OQ-BA-8)* **Band context for the approver at decision time** on a money-bearing request: where the proposed amount lands in the level's band. Gated `compensation:r`. It could not be in KAN-196 because bands did not exist yet. | T-205-2, T-196-6 | 0.5 | absent for an approver without `compensation:r` | an approver is not deciding blind |
+| **T-205-4** | MID | Docs: bands section, and the explicit note that **bands are an envelope, not the equity basis** — so a future reader does not reconnect them to the engine. Same commit. | T-205-3 | 0.5 | doc-currency gate | — |
+
+**KAN-205: 3.5 dev-days.** *(KAN-199 retains T-199-1, T-199-2, T-199-5, T-199-7 — pay markets only, plus the
+annualisation constants of §12.3.2 — and drops to **2.5 dev-days**, moving to **W2** as a hard prerequisite.)*
+
+### 12.8.7 Amendment tasks on existing stories
+
+| Task | Owner | Work · files | Dep | Est | Tests | Done when |
+|---|---|---|---|---|---|---|
+| **T-188-11** | SNR | **`feature_access_for(user_id, company_id)`** and **`feature_access_for_users(ids, company_id)`** in `app/auth.py`, sharing **one** `_feature_access_sql(scope)` builder with `_load_feature_access()` (§12.2a). | T-188-4 | 1.0 | a candidate approver's resolved access matches what they get from their own session; SYSTEM_ADMIN short-circuits identically; the plural form is **one** query for N users | CFL-42-12 / DEP-10 closed |
+| **T-188-12** | SNR | Two grep-asserts: `company_features` + `role_feature_access` appear in **exactly one** SQL string in `app/`; `feature_access_for*` is **never called from `app/routes/`**. | T-188-11 | 0.5 | both | a second permission query cannot be added silently |
+| **T-188-13** | SNR | `company_features_pre_kan188` capture table **before** the repair UPDATE, and the `_down` that restores from it (§12.2b). `ON CONFLICT DO NOTHING` on the capture — first run wins. | T-188-3 | 0.5 | **round trip**: apply → 330-cell matrix unchanged → reverse → the 18 rows byte-identical to T-188-2's fixture → re-apply → unchanged | a rollback cannot re-black-out both tenants |
+| **T-188-14** | SNR | **CFL-42-8 / V15:** `require_feature_access` denies with a **JSON 403** for `/api/*` and JSON `Accept`, and the HTML flash+redirect otherwise; the tenant-disabled branch returns `feature_disabled.html` (HTML) or `403 {'error':'feature_disabled'}` (JSON) — **distinguishable codes** (§12.2e). | T-188-4 | 1.0 | every `/api/*` deny returns 403 with a JSON body; every page deny still redirects; **full regression pass** — this changes the deny response of every gated route | EP38's "returns 403" criteria become true |
+| **T-189-9** | SNR | **CFL-42-9:** backfill the two `manager_relationships` rows closed with a NULL `effective_to` — to the successor row's `effective_from`, or to `created_at` where none exists — inside migration `10`, with the reasoning in the banner. | T-189-4 | 0.5 | zero `is_current = FALSE` rows with `effective_to IS NULL` remain | the pattern EP42 copies is no longer broken on its closing side |
+| **T-190-8** | SNR | `job_levels` gains `step_count`, `step_increment_pct`, `step_tolerance_pct` — **`NOT NULL`, no default** — plus `chk_jl_step_count`, `chk_jl_increment`, `chk_jl_tolerance` and **`chk_jl_tolerance_lt_half_increment`** (§12.4.1). `employee_job_assignments.chk_eja_step_no` becomes `0..12`. | T-190-2 | 1.0 | a level cannot be created without a step count; the tolerance CHECK refuses 2.5/5.0 | "we never decided" cannot look like "we decided five" |
+| **T-190-9** | MID | Register **`job_architecture`** in **all four places** at `sort_order` 17 (§12.4.5) — `setup_db.py` features tuple **and** `access_map`, migration `11`, `seed_rbac.sql` with UUID literals, `role_feature_access` in both. Ladder **reads** move to `job_architecture:r`; **configuration** moves to `org_structure:w`. | T-190-8 | 1.0 | `TestFeatureRegistryHasNoDrift` green **on a CI-style fresh build**; **the directory renders a level title for a user with no `job_architecture` access** — CFL-42-18 does not re-open | four codes, four places, and the directory survives |
+| **T-190-10** | MID | `job_step_expectations` table + the expectations editor inside the configurator, gated `org_structure:w`. Sparse; an unauthored step shows *"Expectations not yet defined"* — never blank, never inherited. **No score, rating or assessment field** (ADR-025). | T-190-9, UX | 0.5 | an unauthored step renders the empty state; grep-assert: no `rating`/`score`/`achieved` column in the migration | the biggest addition in A1 exists |
+| **T-191-10** | SNR | Assignment carries a **step**; `trg_eja_step_valid` (§12.4.1) enforcing `0 <= step_no <= level.step_count`, firing only on `INSERT OR UPDATE OF step_no, job_level_id`. | T-190-8, T-191-1 | 1.0 | step 6 on a 5-step level **refused by the trigger** with the semantics in the message; closing `effective_to` does not fire it | TD-21 **closed**, not accepted |
+| **T-191-11** | **SNR** | **`fit_step()`** (§12.6.3) — nearest pay point, **exact ties to the LOWER step**, clamped at `.0` and the top step, `fit_state` ∈ `MANUAL`/`FITTED`/`NEEDS_REVIEW`/`REVIEWED`, `fit_deviation_pct`. A `MANUAL` step is never re-fitted by a later import. | T-191-10, T-206-3 | 1.5 | hand-computed fixtures incl. **an exact tie**, pay below entry, pay above the top step, and no pay record; the tie resolves **down** | R-1's new route closed |
+| **T-191-12** | MID | The **fit-review screen** and the gate: per-employee fitted step with its deviation, HR override, and one deliberate **"Mark ladder fit reviewed"** by an `org_structure:w` holder setting `ladder_fit_reviewed_at`, audited `LADDER_FIT_REVIEWED`. Resetting it closes every `OPEN` Check A′ finding as `RESOLVED_BY_DATA`. | T-191-11, UX | 0.5 | Check A′ raises **nothing** until the flag is set; resetting it retires open A′ findings for **every** recipient | one gate, one human act |
+| **T-192-7** | MID | Mandatory **`review_context`** on every step change — `PROBATION_REVIEW` · `MID_TERM_GOAL_REVIEW` · `PERFORMANCE_REVIEW` · `OFF_CYCLE` (+ `INITIAL_LOAD`, `LEVEL_CHANGE` set by the system) — plus `review_date` and an optional note. **Mandatory to answer, with an off-cycle option** (D4c's pattern). | T-191-10 | 0.5 | a step change with no context is refused; `OFF_CYCLE` is a valid answer, not a bypass | **no review cycle, schedule, reminder, goal, rating or probation entity is created** — grep-assert the migration |
+| **T-192-8** | **SNR** | **Propose, never apply** (§14.4). Advancing a step **pre-fills a `COMPENSATION_REVIEW`** at `step_pay_point()` and routes it through the existing chain. `job_architecture_service` calls `org_change_service.create_request()` — a permitted call direction (§2.2); it **never** writes `employee_compensation`. The pay answer is mandatory and may be "no change" with a reason. | T-192-7, T-206-3, T-196-3 | 1.0 | **a step change writes zero rows to `employee_compensation`** — asserted directly against the DB; the pre-filled request is an ordinary request subject to four-eyes; the pre-filled amount is **byte-identical** to the one Check A′ compares against | the deliberate consequence — step and pay temporarily out of correspondence — is what Check A′ detects |
+| **T-192-9** | MID | The top-step signal narrows to **the reporting manager only** (§14.3.4); HR sees it in the register. **New:** step distribution as a live report of scope taken on, on the team view. | T-192-2 | 0.5 | `compensation:w` holders no longer receive the notification; the manager still does; the subject **never** does (OQ-BA-4) | a straight noise reduction |
+| **T-193-10** | SNR | **A-2 / CFL-42-30:** on compensation-bearing actions the mandatory `reason` becomes a **seeded, company-editable category** (`Annual review`, `Promotion`, `Market adjustment`, `Role change`, `Correction`, `Other` — UXQ3) **plus optional free text** carrying a **non-blocking numeric-pattern warning**, and included in the compensation redaction path. | T-193-3 | 1.0 | a category is required; free text with digits warns and still saves; **no test claims the guard covers free text** | I over-claimed in ADR-019; the correction is right |
+| **T-193-11** | MID | **UAT-F-08:** a non-ACTIVE employee's record **closes at `exit_date`**; history stays readable and retained; new records refused except a correction. | T-193-5 | 0.0 | offboarding closes the interval; a new record is refused with a named error | — |
+| **T-194-11** | MID | **CFL-42-33: `404`, not `403`, for every EP42 cross-tenant subject substitution.** A 403 confirms the id is real. The EP38 inconsistency is **TD-26**, recorded deliberately rather than discovered. | T-194-6 | 0.5 | an Acme admin gets 404 on a Telia employee id across every EP42 endpoint | the existence oracle is closed for EP42 |
+| **T-194-12** | MID | **OQ-BA-5, costed at 0.5d and therefore in scope as a Should:** `compensation_read_log` (append-only, `retention_class='SECURITY'`) written from the **four** call sites ADR-018's `Scope` funnels reads through — `current()`, `history()`, `self_view()`, the equity register's amount rendering. | T-194-4 | 0.5 | a read by a manager logs subject, actor, scope and timestamp; a 403 logs nothing | measured, not guessed |
+| **T-194-13** | ARCH | **UAT-Q9:** add `tests/ui/test_compensation_workflow.py` to **`../../CLAUDE.md`**'s regression-flow-test list (my file, UAT owns the suite). Same commit as the suite. | T-194-6 | 0.5 | the rule names three suites | — |
+| **T-196-10** | SNR | **CFL-42-13:** `pay_decision = 'NOT_ANSWERED_NO_PERMISSION'` added to `chk_ocp_decision`; **the first `compensation:r` approver must answer it before approving.** Satisfies D4c and D4f simultaneously. | T-196-3 | 0.5 | a manager without `compensation:r` raises a move that records the value; the first eligible approver is blocked until they answer | the control is not optional for the population that raises most moves |
+| **T-196-11** | MID | **CFL-42-28:** suppress the bell's one-click `✓ Approve` for any request carrying a **pay or level** change; the line shows "Review →". The product's own precedent — reject is already a deep link because a decision without a recorded reason is not auditable. | T-196-7 | 0.5 | a money-bearing request offers no quick approve in the bell; a placement-only one still does | nobody approves an amount they cannot see |
+| **T-197-8** | SNR | **CFL-42-25:** rename `'PROMOTION'` → **`'LEVEL_CHANGE'`** in the enum, the CHECK, `_infer_request_type()` and every call site; add **`direction`** (`UP`/`DOWN`/`LATERAL`), `NOT NULL` for that type, derived server-side, **`LATERAL` whenever the family changes regardless of ordinals**. `PROMOTION_APPLIED` → `LEVEL_CHANGE_APPLIED` in `ACTIONS` and `_ALLOWED_DIFF_KEYS`. "Promotion" stays the user-facing word when `direction = 'UP'`. | T-197-1 | 0.5 | a demotion never reads "Promotion" in the inbox, the bell, the timeline **or the audit action**; a cross-family move is `LATERAL` | the durable record stops lying |
+| **T-198-7** | **SNR** | **CFL-42-11 / V18 — without this the control does nothing.** For money- or level-bearing requests, **refuse at create unless the chain has ≥2 independently satisfiable levels**, resolved through `feature_access_for_users()` (T-188-11), naming the configuration fix. Also refuse the CFL-42-26 case (one person the only possible approver at two levels). | T-198-2, T-188-11 | 1.0 | the **seeded default single-HR_ADMIN chain refuses a money-bearing request** with a message naming the fix; a two-level chain with one shared holder also refuses; a placement-only request is unaffected | "the control exists" and "the control works" become the same statement |
+| **T-198-8** | SNR | Ship a **seeded two-level default chain** (HR_ADMIN → PORTAL_ADMIN) for money- and level-bearing request types, in `seed_rbac.sql` **and** the migration **and** `setup_db.py`. Plus **initiator ≠ decider** on those types (CFL-42-31). | T-198-7 | 0.5 | a tenant that has configured nothing can still raise and approve a money request, with two people; the initiator cannot decide any level | the four-place rule applies to seeded chains too |
+| **T-198-9** | SNR | **Ruling 13's condition (§12.2c):** `cancel()` gains a **mandatory reason** and writes `ORG_CHANGE_CANCELLED_BY_ADMIN` (`retention_class='SECURITY'`) inside its transaction; the four-eyes refusal message **names the cancel-and-reconfigure remedy**. **Cancel is not approve; `decide()` gains no SYSTEM_ADMIN escape.** | T-198-2 | 0.5 | a stuck chain can be cancelled by SYSTEM_ADMIN, **applies nothing**, and leaves one audit row; a cancel with no reason is refused | the SYSTEM_ADMIN narrowing has its remedy |
+| **T-200-11** | **SNR** | **Check A′ (§12.6.2)** — replaces the withdrawn T-200-5. Absolute, per employee, no group minimum, no coverage gate; the seven per-employee preconditions each **counted and named**; the `±tolerance` boundary **inclusive** (no finding at exactly the tolerance); comparison on the **2dp displayed value** (BR-1.6 / CFL-42-34). | T-206-3, T-191-12 | 1.5 | hand-computed fixtures at exactly ±2%, just inside and just outside; each precondition produces its named not-evaluable reason; **`n = 1` produces a valid finding** | the thin-data problem is dissolved |
+| **T-200-12** | SNR | Amend `pay_equity_findings` (§12.6.4): `finding_type`, `step_no`, `reference_value`, `deviation_pct`, `direction`, the nullable Check-B columns, `chk_pef_shape`, and the rebuilt `uq_pef_one_open`. **CFL-42-32:** no aggregate rendered below **n = 5**, minimums floored in the database. | T-200-2 | 1.0 | a `GENDER_GAP` row with a `reference_value` is **refused by `chk_pef_shape`**; a second open A′ finding for the same (subject, level, market, step) is refused by the index; an n=4 aggregate is absent from the payload | each finding type carries exactly its own columns |
+| **T-200-13** | SNR | **Keep Check B intact.** T-200-3's group query survives **for Check B only** — `percentile_cont`, gendered `FILTER`s, `n≥5`, ≥2 of each gender, `OTHER`/`NULL` excluded-and-counted, `|gap| ≥ threshold` with direction recorded, coverage gate retained. **Gated on DPO-1.** Step added as a **reported** dimension, not a grouping one. | T-200-3, T-208-2 | 0.5 | every surviving UAT Check-B fixture green; the statistical path is demonstrably still there | the clear-out did not take Check B with it |
+| **T-201-12** | MID | **CFL-42-19 second half:** a config-time advisory on the **Feature Access tab** where `pay_equity` is granted without `compensation` — the consequence shown where the choice is made. | T-201-3 | 0.5 | granting `pay_equity` alone shows the advisory | the SPM's standing rule, third application |
+| **T-201-13** | MID | **CFL-42-24:** `owner_user_id` + `taken_at` on `pay_equity_findings`; **the badge counts unowned findings**; `[ Take ]` is a recorded, audited act (`PAY_EQUITY_FLAG_TAKEN`) that decrements the badge while the finding stays `OPEN`. | T-201-5 | 1.0 | taking does not retire the finding; the badge drops; the register still shows it; **taking is not reading** | R-1's second route closed |
+| **T-201-14** | MID | **CFL-42-27:** the subject may **read** a finding about themselves; the disposition controls are **absent** (not disabled), with the stated line. Where that leaves no eligible dispositioner, the warning goes to Compensation Settings, the Feature Access tab **and** the SYSTEM_ADMIN tenant banner. | T-201-4 | 0.5 | the subject's payload contains the finding and **no disposition affordance**; the no-dispositioner warning appears in all three places | same family as KAN-139 and KAN-203 |
+| **T-201-15** | **MID** | **"Propose adjustment"** on `PAY_BELOW_STEP` (§12.6.4) — pre-fills a `COMPENSATION_REVIEW` at `reference_value` through the **existing** chain, for an actor holding `pay_equity:r` **and** `compensation:w`. **No FK from the finding to the request**; the finding retires as `RESOLVED` via ordinary post-commit re-evaluation. `PAY_ABOVE_STEP` **never** raises a notification. | T-201-13, T-200-11 | 1.0 | the pre-filled amount is byte-identical to the reference; a rejected request leaves the finding `OPEN`; the finding resolves when the pay lands | **the best thing A1 gives us**, and it carries its own remedy |
+| **T-202-6** | MID | **UXQ5:** an audited salary export — row-scoped **exactly** as the screen is, watermarked with actor and timestamp, audited as `COMPENSATION_EXPORTED` with row count and scope. Plus the **step and roadmap timeline alongside the pay timeline** (§14.8) — "how did this person get here" is one story. | T-202-3, T-207-5 | 1.0 | a manager's export contains their reports only, asserted at the file; every export writes one audit row | the alternative is somebody adding an unaudited CSV button |
+
+### 12.8.8 Revised sequencing and the re-cut critical path
+
+Built against the SPM's §14.8 build order, with the dependency graph resolved rather than the wave order
+assumed serial.
+
+```
+W0  S2   KAN-203 (3.0, P0)  ∥  KAN-204 (3.5)  ∥  KAN-208 (2.5)  ∥  KAN-188 (9.0)  ∥  KAN-189 (5.0)
+              │                                                        │
+              └── unblocks nothing; it CLOSES a live P0 ────────────────┤
+                                                                       ▼
+W1  S3   KAN-190 (8.5) ──► KAN-191 (11.0) ──► KAN-207 (7.0)   ← shippable: ladder + expectations +
+              │                  │                              everyone placed + roadmaps.  NO MONEY.
+              │                  │
+W2  S3   KAN-199 (2.5) ──► KAN-206 (6.0)     ← markets, then pay points.  206 blocks 200 AND 192
+              │                  │
+              ▼                  │
+         KAN-193 (8.0) ──► KAN-194 (9.0) ──► KAN-195 (6.0)      ← minimum shippable slice ends here
+                                 │
+W3  S3                     KAN-196 (8.5) ──► KAN-197 (5.5) ──► KAN-198 (6.5) ──► KAN-192 (6.5)
+                                 │
+W4  S3                     KAN-200 (7.5) ──► KAN-201 (9.5) ──► KAN-205 (3.5) ──► KAN-202 (5.0)
+                                 ▲
+                        ⛔ KAN-168 real-DB tier — SPM Ruling 27: hard entry condition for W4
+```
+
+**Critical path — 71.0 dev-days:**
+`KAN-188 (9.0) → KAN-190 (8.5) → KAN-191 (11.0) → KAN-193 (8.0) → KAN-194 (9.0) → KAN-196 (8.5) →
+KAN-200 (7.5) → KAN-201 (9.5)`.
+
+**KAN-206 is NOT on the critical path**, and that is worth stating because it is a hard prerequisite of
+KAN-200 and reads like one: it needs KAN-199 (2.5, startable the moment KAN-188 lands) and KAN-190, so it
+completes around day 24 while KAN-200 cannot start before day 54. **KAN-207 is also off-path** — it closes W1
+for value, not for dependency. Neither should be sequenced as if it constrains the finish.
+
+| Milestone | Path | Days |
+|---|---|---|
+| **P0 closed** | KAN-203 alone | **3.0** |
+| **W1 shippable** — a ladder, described expectations, everyone on it, roadmaps, **no pay data** | 188 → 190 → 191 → 207 | **35.5** |
+| **Minimum shippable slice** (SPM's "could we stop here?") | 188 → 190 → 191 → 193 → 194 | **45.5** |
+| **R1–R4, R6, R7 satisfied** (everything but the equity engine) | + 196 → 197 → 198 → 192 | **~72** |
+| **Complete** | + 200 → 201 → 205 → 202 | **71.0 critical path / 133.5 task-days** |
+
+**Parallel tracks:** **A** critical path (SNR-1 + MID-1) · **B** KAN-189 + KAN-203 from day 1 (SNR-2) ·
+**C** KAN-204 + KAN-208 from day 1 (MID-2, then KAN-199 → KAN-206) · **D** KAN-207 and KAN-195 as float ·
+**E** DEVOPS continuous (btree_gist, logging, runbooks, the KAN-208 seed parity check, equity telemetry).
+
+**Effort: 133.5 task-days → 90–110 dev-days delivered.** With 2 SNR + 2 MID + 0.3 DEVOPS the **critical path,
+not the total, is the binding constraint: ≈ 14–16 calendar weeks** including ARCH review and a regression pass
+per story. **Confidence Medium.** That is a full grade lower than my Wave 2 figure and the reason is honest:
+A1 added two objects, a feature code and three stories, and it added them to the two stories (KAN-191, KAN-201)
+whose estimates were already the least certain.
+
+**Effort by story, revised:**
+
+| Wave | Story | Was | Now | Δ | Why |
+|---|---|---|---|---|---|
+| W0 | **KAN-203** | — | **3.0** | new | Live P0 (V17) |
+| W0 | **KAN-204** | — | **3.5** | new | EP33 shell debt (CFL-42-29) |
+| W0 | **KAN-208** | — | **2.5** | new | Synthetic gender, seeds **and** migration |
+| W0 | KAN-188 | 7.0 | **9.0** | +2.0 | Non-session resolver, reversibility capture, JSON denial |
+| W0 | KAN-189 | 4.5 | **5.0** | +0.5 | CFL-42-9 backfill |
+| W1 | KAN-190 | 6.0 | **8.5** | +2.5 | Fourth code, step columns + CHECK, expectations editor |
+| W1 | KAN-191 | 8.0 | **11.0** | +3.0 | Step assignment + trigger, `fit_step`, the fit-review gate |
+| W1 | **KAN-207** | — | **7.0** | new | The roadmap — the object the owner asked for |
+| W2 | KAN-199 | 5.5 | **2.5** | −3.0 | Split: markets only, moved to W2 |
+| W2 | **KAN-206** | — | **6.0** | new | Step pay points, compounding, the refused configuration |
+| W2 | KAN-193 | 7.0 | **8.0** | +1.0 | Reason category + numeric warning, `exit_date` closure |
+| W2 | KAN-194 | 7.5 | **9.0** | +1.5 | 404, read log, fourth-code parity, `CLAUDE.md` |
+| W2 | KAN-195 | 6.0 | **6.0** | — | Contractor empty state absorbed |
+| W3 | KAN-196 | 7.5 | **8.5** | +1.0 | `NOT_ANSWERED_NO_PERMISSION`, quick-approve suppression |
+| W3 | KAN-197 | 5.0 | **5.5** | +0.5 | `LEVEL_CHANGE` + direction |
+| W3 | KAN-198 | 4.5 | **6.5** | +2.0 | ≥2 satisfiable levels, seeded chain, initiator bar, cancel remedy |
+| W3 | KAN-192 | 4.5 | **6.5** | +2.0 | `review_context`, propose-not-apply, narrowed signal |
+| W4 | KAN-200 | 8.5 | **7.5** | **−1.0** | **Check A′ is genuinely simpler** — no `percentile_cont`, no windowing, no coverage gate |
+| W4 | KAN-201 | 7.5 | **9.5** | +2.0 | Three finding types, badge/Take, self-disposition, Propose adjustment |
+| W4 | **KAN-205** | — | **3.5** | split | Bands as the envelope |
+| W4 | KAN-202 | 4.0 | **5.0** | +1.0 | Audited export, roadmap timeline |
+| | **Total** | 93.0 | **133.5** | **+40.5** | |
+
+**KAN-200 getting cheaper is the one number worth pausing on.** A1 removed a group aggregate, a windowing
+function, a coverage gate and an entire class of small-group edge case from the epic's largest story, and
+replaced them with a subtraction. **A better-specified requirement made the hardest thing we had to build
+smaller.** That is worth saying out loud, because the amendment otherwise reads as pure cost.
+
+## 12.9 Register updates
+
+### 12.9.1 ADRs — after A1
+
+| ADR | Status | Change |
+|---|---|---|
+| ADR-014 | **Stands**, amended | §12.3.2 — annualisation constants resolve **pay market → company → default**, recorded on the row as `annualisation_source` |
+| ADR-015 | **Stands**, amended | §12.3.1 — stored `is_current` withdrawn; the GiST exclusion constraint is the sole guarantee; `as_at(date)` becomes possible, which a stored flag never allowed |
+| ADR-016 | **Ratified by the SPM**, amended | §12.2(a) `feature_access_for` / `feature_access_for_users` · §12.2(b) the reversibility capture · §12.2(e) the JSON 403 |
+| **ADR-017** | **Amended** | §12.4 — entry at `.0`, `step_count` = increments above entry, per level with **no default**, the step trigger (TD-21 **closed**), `job_step_expectations` replacing `job_level_step_targets`, and the three-gate split of §12.4.5 |
+| ADR-018 | **Stands**, extended | The `Scope` object is reused by `job_architecture:w` for roadmap authoring (T-207-4) — a second feature, the same boundary |
+| ADR-019 | **Stands**, amended | `LEVEL_CHANGE_APPLIED`; five A1 actions; the structural allowlist is what I rely on, and the **free-text `reason` claim is withdrawn** (A-2) |
+| ADR-020 | **Stands unchanged** | Half-open intervals; CFL-4 closed. A1 touched nothing here, and §12.3.1 makes it load-bearing rather than merely tidy |
+| ADR-021 | **Stands**, amended | `LEVEL_CHANGE` + `direction`; `NOT_ANSWERED_NO_PERMISSION`; the child-table decision is untouched |
+| ADR-022 | **Stands**, amended | §12.2(c) cancel-not-approve remedy; ≥2 satisfiable levels; the initiator bar; the universal subject rules move to KAN-203 |
+| **ADR-023** | **Re-cut** | §12.6 — Check A′ absolute, Check B statistical and intact, the ladder gate, the improved cost model. **Placement stands unchanged** |
+| **ADR-024** | **NEW** | §12.5 — the step pay point, compounding, `tolerance < increment/2` refused declaratively, computed-not-materialised, one shared `step_pay_point()` |
+| **ADR-025** | **NEW** | §12.4.4 — the roadmap is a versioned statement of expectations; the performance-management boundary is structural, with a forbidden-column table |
+
+### 12.9.2 Technical Debt — changes and additions
+
+| ID | Change |
+|---|---|
+| **TD-21** | **CLOSED, not accepted.** The cross-table `step_no <= step_count` bound is now enforced by `trg_eja_step_valid` (§12.4.1). A1 made it load-bearing on money — a step beyond the ladder produces a pay point nobody is entitled to — and proportionality no longer favours leaving it to the service |
+| **TD-25** *(new)* | A rollback of migration `10` **after** the EP42 `portal_features` rows exist is a **partial** rollback: `default_enabled` disappears while the four codes remain, so their absent-row default silently flips to enabled. The `_down` refuses to run while any EP42 code exists, and the runbook says so. **P2** |
+| **TD-26** *(new)* | **EP38 returns `403` on a cross-tenant id; EP42 returns `404`** (CFL-42-33). A deliberate, recorded inconsistency, not a discovered one. Bringing EP38 into line is an **S5 hardening** item, not an EP42 story. **P3** |
+| **TD-27** *(new)* | `idx_ec_in_force` is sized by **history**, not headcount, now that `is_current` is computed — ~25 MB at 100k employees × 5 records rather than ~5 MB. Acceptable and recorded so the growth is expected. **P4** |
+| **TD-28** *(new)* | Two triggers now guard `tolerance < increment/2` across tables (§12.5.4). If PostgreSQL ever gains multi-table CHECK constraints — or if the tolerance moves onto a single row with the increment — they collapse to one declarative constraint. **P4** |
+| TD-16, 17, 18, 19, 20, 22, 23, 24 | Unchanged |
+
+### 12.9.3 Technical Risk — changes and additions
+
+| ID | Change |
+|---|---|
+| **TR-15** | **Downgraded to Medium probability.** The SPM ratified ADR-016 in full and made the 330-cell matrix a **release gate** rather than a task. The mechanism is unchanged; what changed is that it can no longer be waved through |
+| **TR-18** | **Unchanged in substance, and now SPM-owned at P0.** KAN-168 is a hard entry condition for W4 (Ruling 27). If it slips, **W4 slips and EP42 ships through W3** — which satisfies R1, R2, R3, R4, R6 and R7 |
+| **TR-27** *(new)* | **A linear step-pay-point implementation.** Diverges ~2.1% at the top of a five-step level — the same order as the ±2% tolerance — so it would flag every correctly-paid senior person in the tenant while looking plausible. **Medium × High.** Mitigated by T-206-3's reference table with the linear values asserted **not** to match |
+| **TR-28** *(new)* | **A plausible configuration silently disables Check A′** (SPM R-16). **Medium × High** → **Low × High** after mitigation: `chk_jl_tolerance_lt_half_increment` plus the two triggers make it unrepresentable through the service, direct SQL **and** an import |
+| **TR-29** *(new)* | **The roadmap drifts into performance management** through three individually reasonable requests (SPM R-17). **Medium × High.** Mitigated by ADR-025's forbidden-column table, the absence of any assessment column, and the standing review-checklist item. **This one has no technical fix — it is held by review discipline, and I am naming that rather than implying the schema solves it** |
+| **TR-30** *(new)* | **The fitted-step backfill is wrong at scale and HR marks it reviewed anyway**, because reviewing 146 fitted steps is tedious and the button is right there. The gate then certifies a ladder nobody checked. **Medium × High.** Mitigated by showing `fit_deviation_pct` per person and sorting the review screen by it — the worst fits first — so a partial review still catches the worst cases. **Not fully mitigable** |
+| **TR-31** *(new)* | **The Check B statistical machinery is deleted in the A1 clear-out** because it looks like the code A1 withdrew. **Medium × High.** Mitigated by T-200-13 being an explicit *retention* task with its own tests, and by the prohibition being written in §12.6.1 rather than implied |
+| **R-1 / TR-24** | **Widened then narrowed.** A1 opened a new route (the naive `.0` backfill) and closed it (fitted step + reviewed gate). Net: **lower than Wave 2**, because an absolute reference raises far fewer findings than a 5% dispersion rule ever would |
+
+### 12.9.4 New conflict-log entries
+
+> The SPM's §12.3 register is authoritative and supersedes my §10.3 numbering. These are new, from Wave 4.
+
+| ID | Conflict | Sev | Ruling |
+|---|---|---|---|
+| **CFL-42-35** | **§14.3.2 puts ladder configuration and roadmap authoring behind one `job_architecture:w` grant, but they need different audiences.** A manager must author roadmaps; a manager must not edit the company's job architecture. Granting `w` for the first hands them the second. | **High** | **Resolved — §12.4.5.** Three gates: reads on `job_architecture:r` (everyone), roadmap writes on `job_architecture:w` + row scope (managers included), **ladder configuration on `org_structure:w`** — which is seeded HR_ADMIN + PORTAL_ADMIN and **no manager**, needs no seed change, and has an in-repo precedent at `app/routes/org_change.py:381`. **SPM to ratify.** |
+| **CFL-42-36** | **`reference_value` on `pay_equity_findings` is money in a `pay_equity`-gated table.** `reference_value × (1 + deviation_pct/100)` is the subject's salary. CFL-42-19 was ruled for computed compa-ratios; this is a **stored column** and inherits the same problem. | **High** | **Resolved — §12.6.4.** `reference_value` and `deviation_pct` render only to holders of **both** `pay_equity:r` and `compensation:r`; otherwise a band label. `GENDER_GAP` findings carry no `reference_value` at all, enforced by `chk_pef_shape`. |
+| **CFL-42-37** | **The step tolerance must live on `job_levels`** for the `tolerance < increment/2` CHECK to be declarative — but the SPM put thresholds on `company_settings:w` (CFL-42-20) and the increment is money (`compensation:w`). A CHECK spanning two permission domains cannot be satisfied in one transaction from one screen. | Medium | **Resolved with a named consequence.** The increment **and** the tolerance are written together, gated `compensation:w`. The step tolerance therefore sits outside CFL-42-20's `company_settings:w` threshold set. **The alternative — a cross-table trigger instead of a CHECK — trades a guarantee for a permission boundary, and on the constraint that makes or breaks the feature (R-16) I take the guarantee. SPM to ratify.** |
+| **CFL-42-38** | **A1 anchors step changes to "the performance review process", which does not exist.** The SPM ruled record-the-context-only (§14.5), and I agree — but the boundary is held by **review discipline, not by architecture**, and three reasonable increments cross it. | Medium | **Resolved as far as it can be — ADR-025 (§12.4.4).** The forbidden-column table, the absence of any assessment field, the audit allowlist, and a standing review-checklist item. **I am recording that this is a discipline control, not a technical one**, so nobody believes the schema is holding it. |
+
+## 12.10 Technical-readiness verdict, re-issued against A1
+
+### 12.10.1 Is EP42 still buildable as scoped?
+
+**Yes. 21 stories, 175 tasks, 133.5 task-days → 90–110 dev-days, critical path 71.0, ≈14–16 calendar weeks.**
+RAG **🟡 Amber**. Confidence **Medium** — one grade below Wave 2, and the reason is the amendment's size, not
+any unknown in it. **I still have no unresolved architectural unknowns.**
+
+**A1 is, on balance, good news for engineering, and I want that on the record because the effort table reads
+the other way.** It removed a statistical reference nobody could reproduce by hand, took `percentile_cont`, a
+coverage gate, group minimums and a whole family of small-group edge cases off the **primary** check, and made
+the epic's largest story **cheaper**. What it added — expectations, roadmaps, a fourth code, pay points — is
+mostly well-bounded CRUD over tables whose shape follows patterns already in this schema. **The +40.5 task-days
+buy a feature that answers the owner's actual question rather than the one we inferred.**
+
+### 12.10.2 The riskiest part — it has moved
+
+**It is no longer KAN-188.** The SPM ratified ADR-016 and made the 330-cell before/after matrix a **release
+gate**; the mechanism is unchanged but it can no longer be waved through. Still Critical if it fails, now much
+less likely to.
+
+**It is now the correspondence between three numbers that must be byte-identical:** the pay point Check A′
+compares against, the pay point the step-change proposal pre-fills, and the pay point `fit_step()` fitted the
+employee to. If any two diverge — by a cent, from a second implementation, from a linear derivation, from
+rounding inside the loop instead of once at the end — the result is not a wrong number on a screen. It is a
+**`PAY_BELOW_STEP` finding whose own "Propose adjustment" remedy does not clear it**, re-opening on every
+re-evaluation, with no one able to explain why. That is the failure that would make HR stop trusting the
+register, and it arrives through three entirely reasonable-looking pieces of code.
+
+**Which is why `step_pay_point()` is one function** (§12.5.3), why the reference table is asserted **including
+the 72,930.38 half-cent** (T-206-3), why the linear values are asserted **not** to match, and why T-192-8
+asserts the pre-filled amount is byte-identical to the reference. Four controls on one arithmetic function is
+not over-engineering; it is proportionate to a defect that presents as a haunting.
+
+**Second-riskiest: TR-31, deleting Check B in the clear-out.** A1's language ("the statistical machinery is
+withdrawn") is about the *primary* check, and the engineer doing the removal will be reading the same
+sentences. T-200-13 is an explicit retention task for exactly this reason.
+
+**Third: TR-29, the roadmap drifting into performance management.** No technical fix exists. Named as a
+discipline control (CFL-42-38) rather than pretended away.
+
+### 12.10.3 Blockers — re-issued
+
+| # | Blocker | Owner | Status |
+|---|---|---|---|
+| **B-1** | **KAN-168 — the real-DB integration tier — is ⬜ not started** and hard-blocks KAN-200. | **SPM (Ruling 27)** | **UNCHANGED, and now correctly owned.** Promoted to P0 in the S2 enabler set and a hard entry condition for W4. If it slips, W4 slips and EP42 ships through W3. **Check A′ needs it no less than Check A did** — the exclusion constraints, the triggers, the `VALUES`-join and the `_IN_FORCE` predicate are all SQL semantics |
+| **B-2** | Reconcile with the BA / UX / UAT Wave 4 outputs. **CFL-42-35, -36, -37 each change what the BA must write.** | ARCH + BA + UX + UAT | **RE-OPENED for Wave 4.** P0 before code |
+| **B-3** | SPM acknowledgement of the ADR-016(c) correction | — | **✅ CLOSED.** Ratified in full (SPM A-1), with two additions actioned in §12.2 |
+| **B-4** | OQ-9 ratification, now covering **three** rules plus the SYSTEM_ADMIN narrowing | SPM → owner | **Open, P1**, blocks KAN-198 only. The SPM has ruled and attached the cancel-remedy condition, which §12.2(c) delivers |
+| **B-5** *(new)* | **DPO-1 gates Check B.** KAN-208 gives it data; it does not make processing that data lawful. Gender is a special category under GDPR Art. 9 on most readings, and the purpose-limitation question (a column collected for vacation eligibility, reused for a pay check) is untouched. | BA + DPO | **Open, P1**, blocks **T-200-13's release**, not its build. Build it, gate the enablement |
+
+### 12.10.4 Stories I will not call technically ready
+
+| Story | Verdict | What is missing |
+|---|---|---|
+| **KAN-200** | **NOT READY — still the only P0-grade one** | **B-1 (KAN-168).** Unchanged by A1: a simpler computation is not a verified one, and Check A′'s correctness now rests on constraints and triggers that mocks cannot exercise at all |
+| **KAN-207** | **NOT READY — and this is a new entry worth reading** | Not for a technical reason. Its acceptance turns on **copy that reads as expectations rather than as an assessment** (SPM §14.3.3, UAT §7.3's must-be-walked-by-a-human list). That is not assertable by any test I can specify, and ADR-025's forbidden-column table constrains the *schema*, not the *sentences*. **KAN-207 is Ready when UX's copy has been reviewed by a human against the R-17 boundary, and not before.** I would rather say that than certify a story whose principal risk my tests cannot see |
+| **KAN-202** | **NOT READY** | DEP-8 — the SPM's audit read-surface decision. Unchanged |
+| **KAN-192** | **Buildable** | OQ-1 is **CLOSED** (the owner confirmed: not automatic), so its Wave 2 blocker is gone. OQ-A1-2 (propose-not-apply) carries a default and does not block |
+| **KAN-206** | **Buildable, needs one ratification** | **CFL-42-37** — the step tolerance sits outside CFL-42-20's threshold set, gated `compensation:w` with the increment, so the CHECK is declarative. SPM to ratify; the build proceeds on the default |
+| **KAN-190** | **Buildable, needs one ratification** | **CFL-42-35** — ladder configuration on `org_structure:w` rather than `job_architecture:w`. SPM to ratify; the build proceeds on the default |
+| **KAN-203, KAN-204, KAN-208** | **READY** | Nothing outstanding. KAN-203 should start **first**; it closes a live P0 and depends on nothing |
+| Everything else | **Ready once B-2 clears** | BA criteria and UX specs for the A1 deltas |
+
+### 12.10.5 Revised priorities
+
+| Priority | Item |
+|---|---|
+| **P0** | **KAN-203** (a live Critical defect, depends on nothing, start it first) · **B-1** KAN-168 scheduled now, not when W4 opens · **B-2** reconcile with BA/UX/UAT on CFL-42-35/36/37 · T-188-2/6/13 the matrix and its reversibility |
+| **P1** | The critical path: 188 → 190 → 191 → 193 → 194 → 196 → 200 → 201 · **T-206-3/4** the pay-point function and the refused configuration · **T-191-11** `fit_step` · **T-198-7/8** the ≥2-satisfiable-levels rule (without it four-eyes does nothing) · **T-200-13** keep Check B · **B-4** OQ-9 · **B-5** DPO-1 |
+| **P2** | KAN-189 · KAN-204 · KAN-208 · KAN-207 · KAN-199 · KAN-206 · KAN-195 · KAN-197 · KAN-192 · TD-25 the partial-rollback refusal |
+| **P3** | KAN-205 · KAN-202 · TD-18 · TD-20 · TD-26 EP38's 403/404 inconsistency in the S5 sweep |
+| **P4** | TD-16 · TD-27 · TD-28 · KAN-206's ladder-cost aggregate |
+
+### 12.10.6 My verdict on A1
+
+**Proceed. Start KAN-203 immediately and independently of everything else — it closes a live P0 and blocks
+nothing. Hold the rest until B-2 clears; hold W4 until B-1 clears.**
+
+**Four things I want the SPM to take from this amendment.**
+
+1. **A1 made the hardest story smaller.** KAN-200 drops from 8.5 to 7.5 dev-days, loses `percentile_cont`, the
+   coverage gate, the group minimums and a family of small-group edge cases from its primary path, and gains a
+   check that works at `n = 1`. A better-specified requirement is the cheapest optimisation available, and this
+   is the clearest example of it I have seen on this project.
+2. **Three ratifications, all small, all with defaults being built against:** CFL-42-35 (ladder configuration
+   on `org_structure:w` — no seed change, existing precedent, and it keeps managers out of the job
+   architecture), CFL-42-36 (`reference_value` inherits CFL-42-19), CFL-42-37 (the step tolerance lives with
+   the increment so the constraint can be declarative). **None blocks; all three change what the BA writes.**
+3. **The four-eyes control was a silent no-op and I did not catch it.** V18: the seeded default chain is one
+   level and no tenant has configured a workflow, so ADR-022 as I wrote it would have shipped, passed its
+   tests, and bound nobody. The BA and UAT found it from two directions. **T-198-7/8 is not an enhancement to
+   KAN-198 — it is the difference between KAN-198 existing and KAN-198 working**, and it should be read as
+   part of the control rather than as scope on top of it.
+4. **One boundary in this epic is held by review discipline and not by architecture.** ADR-025 constrains the
+   schema, the audit allowlist and the review checklist, and none of that stops the third reasonable request
+   from turning the roadmap into a rating system. **KAN-207 is not technically ready until a human has read
+   the copy against the R-17 boundary**, and I would rather carry that as a named condition than certify
+   around it.
+
+*Amendment A1 applied. Everything above obeys `../../CLAUDE.md`. No task is done until `python -m pytest -q`
+and the regression flow test pass with 0 failures, and no schema, guard or invariant change is approvable
+without the corresponding documentation updated in the same commit.*

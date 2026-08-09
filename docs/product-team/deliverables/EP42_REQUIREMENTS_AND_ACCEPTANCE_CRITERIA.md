@@ -23,30 +23,99 @@
 > Nothing here is legal advice (Charter §9.7). §4.7 is the resolution of **CFL-42-3** and is the section the DPO
 > should read first.
 >
-> **Identifiers.** Epic **EP42**. Stories **KAN-188 … KAN-202**. `KAN-###` are local IDs, plain text, never links.
+> **Identifiers.** Epic **EP42**. Stories **KAN-188 … KAN-208**. `KAN-###` are local IDs, plain text, never links.
 > Nothing existing is renumbered.
+
+---
+
+## 0. Amendment history — read this before anything else
+
+| Wave | Date | What changed here | Source |
+|---|---|---|---|
+| **W2** | 2026-08-09 | Original — 532 acceptance criteria across KAN-188…KAN-202 | SPM §1–§11 |
+| **W3** | 2026-08-09 | Three reworks sent back by the SPM's reconciliation: the **`LEVEL_CHANGE` rename** (§14), the **A-2 audit-guarantee honesty correction** (§19), and the **KAN-199 → KAN-199 + KAN-205 split** (§16, §25). Plus the conflict-register reconciliation (§20.0) | SPM §12 |
+| **W4** | 2026-08-09 | **Amendment A1 — the product owner's answers.** D1 and D3 re-ruled. Applied throughout; every superseded rule and criterion is marked, never deleted | SPM §14, §15.1 |
+
+### 0.1 Amendment A1 — what changed, in one page
+
+**The owner answered OQ-1 and OQ-3, and OQ-3 was a reinterpretation, not an answer.**
+
+1. **"5%" was never a pay-equity dispersion threshold. It is the pay increment between consecutive steps** —
+   company-defined, and its purpose is that *taking on additional responsibility must be matched by a pay
+   adjustment*. The reference value for the primary check therefore stops being the **group median** and becomes
+   **the employee's own step's configured pay point**. The comparison stops being **statistical** and becomes
+   **absolute**.
+2. **The step model is richer than I specified.** Entry is at step **`.0`**; `step_count` counts increments
+   **above** entry (count 5 → six values `.0…​.5`, matching the owner's `2.0…2.5`); counts are **per level, per
+   company, with no default**. Two new first-class objects: the **step expectation** (what step 1.2 *means* here,
+   readable by every employee) and the **step roadmap** (the manager's forward-looking statement to one named
+   employee — its stated purpose is *transparency to the employee*).
+3. A **fourth feature code, `job_architecture`**, because under my Wave 2 model a manager could not have authored
+   a roadmap without write access to everyone's salary.
+4. A step change **proposes** a pay change through the existing chain and **never auto-applies** — so the step can
+   land before the pay, which is precisely the `PAY_BELOW_STEP` condition the primary check exists to catch.
+5. **Synthetic gender data is authorised** for the seeded population (KAN-208). Having the data does not make
+   processing it lawful — **DPO-1 still gates Check B**.
+
+### 0.2 What A1 supersedes in this document — the index
+
+| Superseded | By | Note |
+|---|---|---|
+| **BR-4.1 … BR-4.17** (group formation, coverage gate, median, compa-ratio, thresholds) **for Check A only** | **BR-10.1 … BR-10.14** (§4.4A) | **Check B keeps all of it — see §0.3** |
+| **BR-4.8** band midpoint as the primary basis | BR-10.3 — the step pay point is the basis | Bands become the level's **envelope** (KAN-205) |
+| **BR-4.9** `n >= 3` for Check A | Withdrawn — **n = 1 is a valid, meaningful check** | **Retained verbatim for Check B (BR-4.19)** |
+| **BR-4.5** the 80% coverage gate for Check A | BR-10.11 — per-employee preconditions + the **fitted-and-reviewed** gate | **Retained verbatim for Check B** |
+| **BR-4.12** the 0.95 / 1.10 compa-ratio bounds | BR-10.5 — the **±2% tolerance** around the step pay point | Different number, different meaning |
+| **BR-5.2, BR-5.5, BR-5.8** (step numbering, count default 5, the top-step signal) | BR-5.2′, BR-5.5′, BR-5.8′ (§4.5) | Entry at `.0`; count = increments above entry; **no default** |
+| **CC-42-7** three feature codes | CC-42-7′ — **four** codes | `job_architecture` added, registered in KAN-190 |
+| **AC-200-01 … AC-200-23** (Check A) | **AC-200-59 … AC-200-84** | Old IDs retained and marked superseded, never reused |
+| **WE-4, WE-5, WE-6** (median, boundaries, band basis) | **Re-scoped to Check B or withdrawn** — see §4.4.6 | **WE-1, WE-2, WE-3, WE-7 survive unchanged** |
+| **AC-199-08 … AC-199-17, AC-199-22, AC-199-23** (bands) | Moved to **KAN-205, §25**, with new IDs `AC-205-nn` | Ruling 32 — the story split, so the criteria split |
+| **AC-197-\*** `PROMOTION` | `LEVEL_CHANGE` throughout (CFL-42-25) | "Promotion" stays the **user-facing word when direction is UP** |
+| **AC-202-08, AC-202-10, AC-202-14** the audit guarantee over `reason` | **AC-202-26 … AC-202-31** (amendment A-2) | The mechanism cannot see inside free text and the criteria must stop saying it can |
+| **OQ-BA-1** (exempt the band basis from `n >= 3`?) | **Closed — moot** | There is no group minimum on the primary check to exempt |
+
+### 0.3 ⚠️ Check B is NOT cleared out — the guardrail on this amendment
+
+**The single most likely way this amendment goes wrong is that the Check A clear-out takes Check B's cases with
+it.** Stated once, prominently, and asserted in §4.4B:
+
+**Check B — the gender pay gap — remains statistical and retains every protection**: group formation on
+`(company, job_family, job_level, pay_market)` · **`n >= 5`** · **`>= 2` compared of each gender** · the median
+arithmetic **including the even-group mean-of-the-two-middle-values case** · `OTHER`/NULL
+**excluded-and-counted** · the **gender-coverage sub-gate** · `|gap| >= threshold` inclusive with direction
+recorded · and **CFL-42-32's floor — no aggregate of any kind rendered below n = 5, with the configurable
+minimums floored in the database**. §4.4B carries them, unchanged, in one place, so a reader amending Check A
+cannot reach them by accident. The only change to Check B is that **step becomes a reported dimension**
+(BR-4.24′) — a display and drill-down requirement, not a change to the arithmetic.
 
 ---
 
 ## 1. Scope
 
-| Wave | Story | Title | MoSCoW · P (SPM §5) | Covered here |
+| Wave | Story | Title | MoSCoW · P | Covered here |
 |---|---|---|---|---|
+| W0 | **KAN-203** | Subject ≠ initiator, subject ≠ decider — universal (SPM §12.5) | Must · **P0** | **Not covered** — SPM created it in Wave 3 from my CFL-42-14/15. Criteria are AC-196-34, AC-197-17, AC-197-20, AC-198-04, AC-192-28/29, which this document already carries and which KAN-203 now owns. See §20.0 |
+| W0 | **KAN-204** | EP33 shared-shell accessibility debt (CFL-42-29) | Must · P2 | **Not covered** — EP33 debt, not an EP42 requirement |
+| W0 | **KAN-208** | Synthetic gender across the seeded population (A1 §14.6) | Must · P2 | **Full (§27)** — new in A1 |
 | W0 | **KAN-188** | Tenant feature-exposure switch, centrally resolved (R7) | Must · P1 | Full (§5) |
 | W0 | **KAN-189** | Effective date on org-change requests (resolves CFL-4 / `AC-185-07`) | Must · P1 | Full (§6) |
-| W1 | **KAN-190** | Job families, levels and steps — per-company configurator (R6) | Must · P1 | Full (§7) |
-| W1 | **KAN-191** | Assign every employee to a level and step; title→level mapping (R6, R2) | Must · P1 | Full (§8) |
-| W1 | **KAN-192** | Step advancement, `promotion_eligible` signal, no automatic roll-up (R6, D3) | Must · P1 | Full (§9) |
+| W1 | **KAN-190** | Job families, levels, steps **and step expectations** — the configurator (R6) | Must · P1 | Full (§7), **amended by A1** |
+| W1 | **KAN-191** | Every employee on a level **and step**; title→level mapping; **fitted-step backfill** (R6, R2) | Must · P1 | Full (§8), **amended by A1** |
+| W1 | **KAN-207** | The step roadmap and the employee transparency surface (R6 · A1 §14.3.3) | Must · P1 | **Full (§26)** — new in A1 |
+| W2 | **KAN-199** | **Pay markets** and the annualisation constants (Ruling 32) | Must · P1 | Full (§16), **rescoped in W3** |
+| W2 | **KAN-206** | **Step pay points, the increment, the tolerance and the two configuration guards** (A1 §14.2) | Must · P1 | **Full (§25)** — new in A1 |
 | W2 | **KAN-193** | The effective-dated compensation record (R1) | Must · P1 | Full (§10) |
-| W2 | **KAN-194** | Who may see a salary — three feature codes and row scoping (D5) | Must · P1 | Full (§11) |
-| W2 | **KAN-195** | Backfill — bulk CSV and manual entry, coverage meter (R2, D7) | Must · P1 | Full (§12) |
+| W2 | **KAN-194** | Who may see a salary — **four** feature codes and row scoping (D5) | Must · P1 | Full (§11), **amended by A1** |
+| W2 | **KAN-195** | Backfill — bulk CSV and manual entry, coverage meters (R2, D7) | Must · P1 | Full (§12) |
 | W3 | **KAN-196** | Pay decision inside the position-change request (R3, D4) | Must · P1 | Full (§13) |
-| W3 | **KAN-197** | Promotion as a first-class request type (R4, D4e) | Must · P1 | Full (§14) |
+| W3 | **KAN-197** | **`LEVEL_CHANGE`** as a first-class request type (R4, D4e) | Must · P1 | Full (§14), **renamed in W3** |
 | W3 | **KAN-198** | Four-eyes on money — segregation of duties (D4h) | Must · P1 | Full (§15) |
-| W4 | **KAN-199** | Salary bands per level × pay market (D3.5) | Should · P2 | Full (§16) |
-| W4 | **KAN-200** | The pay-equity comparison engine (R5, D1) | Must · P1 | Full (§17) — the arithmetic |
-| W4 | **KAN-201** | Flag delivery, queue and lifecycle (R5, D2) | Must · P1 | Full (§18) |
-| W4 | **KAN-202** | Compensation history read surface + audit coupling (D5.6) | Should · P2 | Full (§19) |
+| W3 | **KAN-192** | Step advancement, **review context**, **propose-not-apply**, the top-step signal (R6, D3) | Must · P1 | Full (§9), **substantially amended by A1** |
+| W4 | **KAN-200** | The pay-equity engine — **Check A′** (absolute) + **Check B** (statistical) (R5, D1) | Must · P1 | Full (§17), **substantially amended by A1** |
+| W4 | **KAN-201** | Finding delivery, the register and the lifecycle (R5, D2) | Must · P1 | Full (§18), **amended by A1** |
+| W4 | **KAN-205** | **Salary bands as the level's min/max envelope** (Ruling 32) | Should · P2 | **Full (§28)** — split out of KAN-199 in W3 |
+| W4 | **KAN-202** | Compensation **and step/roadmap** history + audit coupling (D5.6, A-2) | Should · P2 | Full (§19), **amended in W3 and by A1** |
 
 **Epic-level out of scope.** SPM §3.3 is adopted verbatim and is not restated. Two additions this document makes
 explicit because they are the two things a reader of §4 will assume are in scope and they are not:
@@ -117,19 +186,50 @@ everything EP42 touches; the rows below are additional or sharpened.
 
 ### 3.2 Feature access model for EP42
 
-7. **CC-42-7** Three feature codes are registered in **all four places** — `portal_features` in `setup_db.py`, a
-   numbered migration under `database/migrations/`, **`database/seed_rbac.sql`**, and default `role_feature_access`
-   rows **in both the migration and the seed**. `TestFeatureRegistryHasNoDrift` (`tests/test_regression.py`) must fail
-   if any one of the four is missed. This is the DEF-004 lesson and it applies three times over.
+7. ~~**CC-42-7** Three feature codes…~~ — **SUPERSEDED by A1 (SPM §14.3.2). There are four codes, not three.**
 
-   | Code | Label | Governs | Seeded `role_feature_access` defaults (SPM D5.1) |
+   **CC-42-7′** **Four** feature codes are registered in **all four places** — `portal_features` in `setup_db.py`,
+   a numbered migration under `database/migrations/`, **`database/seed_rbac.sql`**, and default
+   `role_feature_access` rows **in both the migration and the seed**. `TestFeatureRegistryHasNoDrift`
+   (`tests/test_regression.py`) must fail if any one of the four places is missed, for any of the four codes.
+   This is the DEF-004 lesson and it now applies **four** times over. **EP42 has no single "register the feature
+   codes" story — each story registers what it needs**, so `job_architecture` is registered in **KAN-190** and the
+   other three in **KAN-194**.
+
+   | Code | Label | Governs | Seeded `role_feature_access` defaults |
    |---|---|---|---|
-   | `compensation` | Compensation | Other people's pay in scope; entering and proposing pay; bands; backfill; history | `HR_ADMIN` r+w · `PORTAL_ADMIN` r+w+d · `SOLID_LINE_MANAGER` **r** (row-scoped) · all others none |
+   | **`job_architecture`** *(new — A1)* | Job Architecture | The ladder; **step expectations**; **step roadmaps**; step counts | **every role `r`** — an employee must be able to read the expectations of their step and the next one, which is the whole stated purpose · `HR_ADMIN` r+w · `PORTAL_ADMIN` r+w · **`SOLID_LINE_MANAGER` r+w (row-scoped to direct reports)** — see CC-42-7a |
+   | `compensation` | Compensation | Other people's pay in scope; entering and proposing pay; **base pay points, increments, tolerances**; envelope bands; backfill; history | `HR_ADMIN` r+w · `PORTAL_ADMIN` r+w+d · `SOLID_LINE_MANAGER` **r** (row-scoped) · all others none |
    | `compensation_self` | My Pay | The "My Pay" panel on your own profile, hard-scoped to yourself | every role **r** (everyone is also an employee) |
-   | `pay_equity` | Pay Equity | The equity queue, flags and their disposition | `HR_ADMIN` r+w · `PORTAL_ADMIN` r+w · all others none |
+   | `pay_equity` | Pay Equity | The equity register, findings and their disposition | `HR_ADMIN` r+w · `PORTAL_ADMIN` r+w · all others none |
 
-8. **CC-42-8** All three codes are seeded `company_features.is_enabled = FALSE` for **every existing tenant**
+   **CC-42-7a — the seeded default the SPM's own table contradicts, and it must be fixed before KAN-207 is
+   built.** SPM §14.3.2 creates `job_architecture` specifically so that *"a manager authors a roadmap for their
+   direct reports"* — that is the stated reason the fourth code exists. **Its seeded-defaults table in the same
+   section gives `SOLID_LINE_MANAGER` no `w` at all** (`EMPLOYEE` r · every other role r · HR_ADMIN r+w ·
+   PORTAL_ADMIN r+w). Under those defaults the manager still cannot do the thing the code was created to let them
+   do, and the fourth code buys nothing. **Resolution required: seed `SOLID_LINE_MANAGER` `job_architecture:w`,
+   row-scoped to their `DIRECT` set (BR-8.1/BR-8.2).** Logged as **CFL-42-35**; ratification is the SPM's, and it
+   is a seed value, not a code change.
+
+   **CC-42-7b — the split within `job_architecture`, stated because one screen has two gates.** The step
+   **count** and the step **expectations** are **job content** → `job_architecture:w`. The level's **base pay
+   point**, the **increment** and the **tolerance** are **money** → `compensation:w`. Both live on the same
+   configurator screen and it must read coherently to a holder of one and not the other — **absent, not disabled,
+   not broken** (the CFL-42-20 pattern applied a second time).
+
+   **CC-42-7c — ladder reads, and the CFL-42-18 boundary as A1 refines it.** *Browsing the ladder* (families,
+   levels, step expectations) is **`job_architecture:r`**, which every role holds by default. **An employee's own
+   level title displayed on their profile or directory row remains `employee_profiles`** — it is an attribute of
+   the person, like their name. That split is what stops a tenant switching `job_architecture` off from blanking
+   the directory, which is the failure CFL-42-18 identified.
+
+8. **CC-42-8** All **four** codes are seeded `company_features.is_enabled = FALSE` for **every existing tenant**
    (SPM D6 req. 2, D8 safeguard, OQ-7). The capability is invisible until the product owner switches it on.
+   *(Note the consequence for `job_architecture`, which has no money in it: with the tenant switch off, no
+   employee can read their step expectations or their roadmap. That is correct — the whole capability is
+   commercially gated — but it means **W1 delivers nothing visible until the switch is on**, which the demo script
+   must state.)*
 9. **CC-42-9** Defaults are a **ceiling a tenant may widen or narrow** through the existing Feature Access tab, and
    the implementation respects that with **no extra checks inside any route** (CC-42-2). Granting `compensation`
    read to any additional role through the matrix gives that role scoped access with **no code change**.
@@ -330,10 +430,31 @@ request into the same convention.
 
 *This is the section UAT builds hand-computed fixtures from. Every number below is arithmetic, not guidance.*
 
-#### 4.4.1 Group formation
+> ### ⚠️ Amendment A1 — read this before reading anything in §4.4
+>
+> **The primary check is no longer statistical.** A1 (SPM §14.2) replaces the group median with **the employee's
+> own step's configured pay point**. What that does to this section:
+>
+> | Sub-section | Status under A1 |
+> |---|---|
+> | **§4.4.1 group formation** (BR-4.1 … BR-4.7) | **Retained in full — but for Check B only.** It is no longer used by the primary check, which has no group. Read it as Check B's group definition |
+> | **§4.4.2 Check A** (BR-4.8 … BR-4.17) | **SUPERSEDED IN FULL.** Replaced by **§4.4A / Check A′** (BR-10.1 … BR-10.14). Kept below, struck through, so the reasoning trail survives |
+> | **§4.4.3 Check B** (BR-4.18 … BR-4.24) | **UNCHANGED AND FULLY IN FORCE.** One addition: BR-4.24′, step as a *reported* dimension. **Do not clear any of it out** — see §0.3 |
+> | **§4.4.4 evaluation and re-fire** (BR-4.25 … BR-4.31) | **Retained, amended** for the two new finding types — see BR-4.27′ and BR-4.29′ |
+> | **§4.4A** *(new)* | **Check A′ — step-pay correspondence.** The primary check |
+>
+> **The one-line reason the group machinery survives at all:** Check B measures a *gap between two populations*,
+> which has no meaning without a population. Check A′ measures one person against a number somebody configured,
+> which has no need of one.
+
+#### 4.4.1 Group formation *(retained — **Check B only** under A1)*
+
+> **A1 scope note.** Every rule in §4.4.1 now serves **Check B alone**. Check A′ forms no group, needs no
+> population and applies none of these gates; its per-employee preconditions are **BR-10.11**.
 
 - **BR-4.1 The key.** `(company_id, job_family_id, job_level_id, pay_market_id)` — **never `job_title`, never step**
-  (D1). Step is carried into a finding as an explanatory factor only.
+  (D1). Step is carried into a finding as an explanatory factor only. **A1: for Check B the key is unchanged;
+  step becomes a reported dimension (BR-4.24′), not part of the key.**
 - **BR-4.2 Pay market derivation.** From the employee's **current org assignment's** `location_id`
   (`employee_org_assignments` where in effect on the evaluation date) → that location's pay market. An employee whose
   current assignment has `location_id IS NULL`, or whose location belongs to no pay market, is in **no group** and is
@@ -367,58 +488,159 @@ request into the same convention.
   statistic is a colleague's salary with one arithmetic step removed. **[BA call]**, and it is a privacy requirement,
   not a nicety.
 
-#### 4.4.2 Check A — individual outlier
+#### 4.4.2 ~~Check A — individual outlier~~ — **SUPERSEDED IN FULL BY A1**
 
-- **BR-4.8 Basis selection.** If a **band** exists for `(job_level, pay_market)` and is in effect on the evaluation
-  date → basis `BAND_MIDPOINT`. Otherwise → basis `GROUP_MEDIAN`. The basis actually used is **recorded on the flag
-  and displayed**; a finding whose comparator is unstated is not actionable.
-- **BR-4.9 Minimum group size.** `|compared| >= 3`. Below it: `INSUFFICIENT_GROUP`, **never a flag**. Boundary:
-  2 → not evaluated; 3 → evaluated.
-  - **Property to state on screen:** with `|compared| = 3` and a `GROUP_MEDIAN` basis, the middle member's ratio is
-    exactly 1.000 and can never be flagged. With `|compared| = 2` the median is the midpoint and both members are
-    equidistant from it, so both flag or neither — arithmetically useless, which is the justification for n ≥ 3.
-- **BR-4.10 Median.** Over the **multiset** of `fte_normalised_annual` values of the compared set, ascending:
-  odd n → the middle value; **even n → the arithmetic mean of the two middle values**, exact decimal, HALF_UP to 2 dp.
-  Duplicates count as separate members. **The subject's own value is included** in the median of their own group.
-  - **Alternative considered and rejected:** a leave-one-out median (excluding the subject) is arguably a better
-    outlier statistic, but it makes the comparator *different for every row in the queue*, which an HR business
-    partner cannot explain to the person they are discussing. Recorded so it is not reopened casually.
-- **BR-4.11 Ratio.** `ratio = fte_normalised_annual ÷ comparator`, HALF_UP to **3 dp**, where `comparator` is the band
-  midpoint or the group median per BR-4.8.
-- **BR-4.12 Thresholds and boundaries.** Defaults: flag when `ratio < 0.950` (LOW) or `ratio > 1.100` (HIGH). Both
-  comparisons are **strict**; exactly 0.950 and exactly 1.100 are **not** flagged. Configurable per company: low
-  bound 0.50–1.00, high bound 1.00–2.00, PORTAL_ADMIN-only, audited. Per BR-1.6 the effective boundaries are 0.9495
-  and 1.1005.
-- **BR-4.13 One person, one finding.** Never pairwise. A group of ten produces at most ten findings, not 45.
-- **BR-4.14 Currency guard.** If the compared set contains more than one currency, the group is
-  `NOT_EVALUATED_CURRENCY`, produces **zero** flags, and raises a configuration warning to `pay_equity:w` holders.
-  No conversion, no 1:1, no "mostly EUR" (BR-1.7).
-- **BR-4.15 Worked example WE-4** — Acme · Engineering · L3 · Germany, `GROUP_MEDIAN` basis, all EUR.
+> **Withdrawn by SPM §14.2 / §14.7 rows 1–5. Replaced by §4.4A (Check A′).** Kept, struck through, because a
+> reader of the Wave 2 version needs to be able to find what happened to each rule rather than discover it is
+> simply gone. **Nothing below is in force.**
+>
+> | Withdrawn rule | Why | Where it went |
+> |---|---|---|
+> | ~~BR-4.8~~ basis = band midpoint, else group median | The owner's "5%" is the step increment, not a dispersion threshold | **BR-10.3** — the step pay point is the basis. Bands become the level's **envelope** (KAN-205) |
+> | ~~BR-4.9~~ `n >= 3` minimum | An absolute reference needs no peers. **n = 1 is a valid, meaningful check** | Withdrawn for Check A′. **Retained verbatim for Check B — BR-4.19** |
+> | ~~BR-4.10~~ group median arithmetic | No group | **Retained verbatim for Check B — BR-4.19a**, including the even-n case |
+> | ~~BR-4.11~~ ratio to comparator | Replaced by an absolute deviation from a configured point | **BR-10.4** |
+> | ~~BR-4.12~~ 0.95 / 1.10 compa-ratio bounds | Replaced by the **±2% tolerance**, a different number with a different meaning | **BR-10.5** |
+> | ~~BR-4.13~~ one person, one finding | **Still true, and now true by construction** — the check is per employee | **BR-10.8** |
+> | ~~BR-4.14~~ multi-currency group guard | No group. The per-employee equivalent survives | **BR-10.11**, precondition (f) |
+> | ~~BR-4.15 (WE-4)~~, ~~BR-4.16 (WE-5)~~, ~~BR-4.17 (WE-6)~~ | They demonstrate a statistical Check A that no longer exists | **WE-4 and WE-5 re-scoped to Check B** (§4.4.6); **WE-6 withdrawn** — there is no band-midpoint basis |
+>
+> **One thing the withdrawal does not cost us, and it is worth recording.** The owner's original ask — *"flag if
+> there is a difference of 5% for the same position"* — is **still delivered, by construction**: two people at the
+> same step in the same position are measured against **the same pay point**, so if they are paid materially
+> apart at least one of them deviates and is flagged. The correspondence check **subsumes** the dispersion check
+> (SPM §14.1). We are not dropping his first request in favour of his second.
 
-  | Compared | `fte_normalised_annual` |
-  |---|---|
-  | A | 54,000.00 |
-  | B | 58,500.00 |
-  | C | 60,000.00 |
-  | D | 61,000.00 |
+---
 
-  n = 4 (even) → median = (58,500.00 + 60,000.00) ÷ 2 = **59,250.00**.
-  A: 54,000 ÷ 59,250 = 0.911392… → **0.911** → < 0.950 → **FLAG (LOW)**.
-  B: 0.987341… → **0.987** → no flag. C: 1.012658… → **1.013** → no flag. D: 1.029536… → **1.030** → no flag.
-  **One flag, on A.**
+### 4.4A Check A′ — step-pay correspondence *(new — the primary check under A1)*
 
-  Add E = 90,000.00 → n = 5 (odd) → median = **60,000.00**. A: 0.900 → FLAG (LOW). B: 0.975 → no. C: 1.000 → no.
-  D: 1.017 → no. E: 1.500 → **FLAG (HIGH)**. **Two flags.** *(The mean of the same five values is 64,700, which
-  would give A a ratio of 0.835 and E 1.391 — the mean moves every member's answer because of one salary. This is
-  the D1 median-not-mean decision, demonstrated.)*
-- **BR-4.16 Worked example WE-5 — boundaries.** Median 60,000.00. 57,000.00 → 0.950 → **not** flagged.
-  56,999.99 → 0.9499998 → rounds to 0.950 → **not** flagged. 56,940.00 → 0.949 → **flagged**.
-  66,000.00 → 1.100 → **not** flagged. 66,060.00 → 1.101 → **flagged**.
-- **BR-4.17 Worked example WE-6 — band basis.** Band L3 × Germany: min 54,000, **mid 62,000**, max 72,000, EUR.
-  A at 54,000 → 0.871 → FLAG (LOW), and **in band** (at the minimum) — the out-of-band flag is a separate,
-  independent signal (BR-4.22). E at 75,000 → 1.210 → FLAG (HIGH) **and** out-of-band high.
+*The reference value is configured, not computed from peers. This is the section UAT's new fixtures come from.*
 
-#### 4.4.3 Check B — group gender pay gap
+#### 4.4A.1 The reference value
+
+- **BR-10.1 Base pay point.** Each **(job level × pay market)** carries a configured **base pay point** — the rate
+  at entry, step `.0` — with a currency and an `effective_from`. It is money: authored under `compensation:w`
+  (CC-42-7b), effective-dated per §4.3, audited.
+- **BR-10.2 The step increment, and it compounds.** Each step's pay point is **the previous step's uplifted by the
+  company-defined increment** — **compound, not linear** (SPM §14.2.1, Confidence Medium-High):
+
+  > `pay_point(step n) = base × (1 + i)^n`
+
+  where `n` is the step number (`.0` → n=0) and `i` is the increment. Exact decimal, **no intermediate rounding**,
+  HALF_UP to 2 dp **once, at the end** (BR-1.5). **The rounding happens on the final pay point, not on each
+  step** — rounding at every step accumulates drift and produces a different top-step value.
+- **BR-10.2a The increment is configured per level, with an optional per-step override.** A company may make the
+  last step of a level worth more than the first. Default behaviour: one increment for the whole level. Range
+  0.1%–50%; **no product default** — the owner's "5%" is his example, not a shipped constant.
+- **BR-10.3 The basis.** An employee's pay is compared to **their own step's pay point**. No group, no median, no
+  peers, no band midpoint. The basis recorded on every finding is `STEP_PAY_POINT`.
+- **BR-10.4 Deviation.** `deviation = (fte_normalised_annual − pay_point) ÷ pay_point`, exact decimal, HALF_UP to
+  **3 dp**, displayed as a signed percentage to 1 dp. FTE normalisation and annualisation are unchanged — **§4.2
+  survives A1 in full** (BR-2.1 … BR-2.7, and WE-1 is still the fixture).
+- **BR-10.5 The tolerance.** Correspondence is checked within a company-configurable **tolerance** around the pay
+  point. **Flag when `|deviation| > tolerance`** — the comparison is **strict**, so a deviation of exactly the
+  tolerance is **not** flagged, consistent with BR-4.12's withdrawn convention and with BR-1.6 (compare the value
+  the UI shows).
+- **BR-10.6 Worked example WE-8 — compound pay points, hand-computed.** Base 60,000.00 EUR, increment 5%,
+  `step_count = 5` → **six** step values:
+
+  | Step | n | Compound pay point | *(linear, for contrast — a linear implementation must fail loudly)* |
+  |---|---|---|---|
+  | `.0` | 0 | **60,000.00** | 60,000.00 |
+  | `.1` | 1 | **63,000.00** | 63,000.00 |
+  | `.2` | 2 | **66,150.00** | 66,000.00 |
+  | `.3` | 3 | **69,457.50** | 69,000.00 |
+  | `.4` | 4 | **72,930.38** | 72,000.00 |
+  | `.5` | 5 | **76,576.89** | 75,000.00 |
+
+  The divergence at the top step is 1,576.89 — **2.1% of salary**, comfortably inside the range where an
+  implementation would guess either way and nobody would notice, and comfortably outside the ±2% tolerance.
+  *(`.4`: 60,000 × 1.05⁴ = 72,930.375 → HALF_UP → 72,930.38. `.5`: 60,000 × 1.05⁵ = 76,576.89375 → 76,576.89.)*
+- **BR-10.6a Worked example WE-8b — a 3-step level.** Base 80,000.00, increment 4%, `step_count = 3` → **four**
+  values: `.0` 80,000.00 · `.1` 83,200.00 · `.2` 86,528.00 · `.3` 89,989.12.
+
+#### 4.4A.2 The configuration this product must refuse
+
+- **BR-10.7 `tolerance < increment / 2`, enforced at configuration time.** A configuration where the tolerance is
+  **not strictly less than half the increment** is **refused**, with a message that explains *why* — not merely
+  that it is invalid.
+
+  > **Why this is a rule and not a nicety.** With a 5% increment and a ±5% tolerance, the tolerance bands of
+  > adjacent steps **overlap**: every employee is "correctly paid" for *some* step, no deviation is ever outside
+  > tolerance, and **the check silently means nothing while appearing to work**. This is the most likely way to
+  > render the entire feature useless through a plausible-looking setting (SPM R-16).
+
+  - **BR-10.7a — the gap the rule as written leaves open, and this needs the SPM.** SPM §14.2.1 permits a
+    **per-step increment override** and SPM §14.2.2 states the rule against *"the increment"*, singular. Where
+    increments differ between steps, adjacent bands overlap **at the smallest increment in the level**, so the
+    validation must be `tolerance < min(increment over all steps of the level) / 2`. Validating against the
+    level's default increment while a per-step override is smaller re-opens exactly the hole the rule closes.
+    **Logged as CFL-42-36.** Build against the `min()` form.
+  - **BR-10.7b — the default tolerance is invalid for any increment ≤ 4%, and this also needs the SPM.** A fixed
+    default of ±2% satisfies `tolerance < increment/2` only when `increment > 4%`. A company configuring a 3%
+    increment cannot save the shipped default and gets a refusal on their first attempt to configure the feature.
+    **Recommended: express the default relatively — `tolerance = increment ÷ 4`** (5% → 1.25%, 3% → 0.75%),
+    always valid by construction, overridable within the rule. **Logged as CFL-42-37.** Build against the
+    relative default; if the SPM prefers a fixed 2%, the configurator must refuse to offer it until the increment
+    is set and must never seed it.
+- **BR-10.8 One person, one finding — now true by construction.** The check is per employee against a configured
+  number. There is no pairwise comparison to avoid and no group size at which it degenerates.
+- **BR-10.9 The second configuration guard: a promotion that cuts pay.** The configurator **warns** (does not
+  refuse) when a level's base pay point is **below the previous level's top-step pay point** — moving up a level
+  would reduce pay. Shown at configuration time, where the choice is made.
+- **BR-10.10 Worked example WE-9 — tolerance boundaries, hand-computed.** Pay point `.2` = 66,150.00, tolerance
+  ±2.0%:
+  - upper limit 66,150.00 × 1.02 = **67,473.00**; lower limit 66,150.00 × 0.98 = **64,827.00**
+  - 67,473.00 → deviation exactly **+0.020** → **not flagged** (strict `>`)
+  - 67,473.01 → deviation 0.0200001… → rounds to **0.020** → **not flagged** (BR-1.6's effective boundary; the
+    first flagged value is the one whose deviation rounds to 0.021, i.e. **67,506.08** and above)
+  - 64,827.00 → deviation exactly **−0.020** → **not flagged**
+  - 64,000.00 → deviation −0.032… → **−0.032** → **flagged `PAY_BELOW_STEP`**
+  - 70,000.00 → deviation +0.058… → **+0.058** → **flagged `PAY_ABOVE_STEP`**
+- **BR-10.10a Worked example WE-10 — the refusal.** increment 5%, tolerance 2.5% → `2.5 < 2.5` is false →
+  **refused**. increment 5%, tolerance 2.4% → accepted. increment 4%, tolerance 2.0% → `2.0 < 2.0` is false →
+  **refused** (this is BR-10.7b's trap, demonstrated). increment 3% with a per-step override of 2% anywhere in
+  the level, tolerance 1.4% → **refused**, because `1.4 < 1.0` is false against the minimum increment (BR-10.7a).
+
+#### 4.4A.3 Evaluability, and the two findings
+
+- **BR-10.11 Per-employee preconditions.** An employee is evaluable by Check A′ only with **all** of:
+  (a) a level **and step** assignment in effect on the evaluation date · (b) a compensation record in effect ·
+  (c) a resolvable pay market · (d) a configured pay point for that (level, step, market) · (e)
+  `employment_status = 'ACTIVE'` · (f) the compensation record's currency **equal to** the pay point's currency ·
+  (g) `employment_type` not `CONTRACTOR` and not `INTERN`.
+  An employee missing any of these is **"not evaluable", with the reason named** — **never a finding, and never
+  invisible**. Each reason is counted and shown. There is **no coverage gate and no group minimum**.
+- **BR-10.12 The two findings, and they are deliberately asymmetric.**
+
+  | Finding | Condition | Severity | Why |
+  |---|---|---|---|
+  | **`PAY_BELOW_STEP`** | `deviation < −tolerance` | **Primary** | The owner's stated concern: *"when an employee taking additional responsibility and doing additional job the employees pay scale should be adjusted"*. Someone is doing the bigger job for the old money — and it has an obvious, computable remedy |
+  | **`PAY_ABOVE_STEP`** | `deviation > +tolerance` | **Secondary**, lower severity, **different copy** | Legitimate far more often than not — market premium, red-circled legacy pay, a retention adjustment. Treating it with the same weight as the primary case is how a register fills with things nobody should act on |
+
+  The two are separate finding types with separate default disposition categories, separate register filters and
+  separate copy. They are **never** merged into one "out of tolerance" finding.
+- **BR-10.13 `PAY_BELOW_STEP` carries its own remedy.** Because the pay point is computable, the finding offers a
+  **"Propose adjustment"** action that pre-fills a `COMPENSATION_REVIEW` at the step's pay point and routes it
+  through the existing chain. The finding retires as `RESOLVED` when the pay lands (AC-201-52). This is the most
+  useful thing A1 makes possible and it did not exist in any Wave 2 document.
+- **BR-10.14 The gate that replaces the coverage gate: ladder-fitted-and-reviewed.** Check A′ does **not** run for
+  a company until its level/step backfill is **explicitly marked reviewed** by a `job_architecture:w` holder
+  (BR-11.5). Until then the register shows the review progress, not findings.
+  > **Why a gate is still needed even though the statistical risk is gone.** If the backfill dropped everyone at
+  > step `.0`, then every employee paid above the entry rate — which is most of them — becomes a
+  > `PAY_ABOVE_STEP` finding **in the first hour of the first tenant's use**. That is SPM risk R-1 (alert fatigue)
+  > returning in a new costume. The fitted-step backfill (BR-11.4) does most of the work automatically; the human
+  > review is the gate, and it is far better targeted than a percentage.
+
+---
+
+#### 4.4.3 Check B — group gender pay gap *(**UNCHANGED BY A1 — see §0.3**)*
+
+> **⚠️ Do not clear any of this out.** Everything from BR-4.18 to BR-4.24 is **in force exactly as written**, and
+> it depends on §4.4.1's group formation, which is retained for it. A1 changed the *primary* check only. The one
+> addition is BR-4.24′ at the end of this sub-section.
 
 - **BR-4.18 Formula.** `gap = (median_male − median_female) ÷ median_male`, over the compared set of the group, using
   `fte_normalised_annual`. Each median follows BR-4.10. Result HALF_UP to **3 dp**; displayed as a percentage to
@@ -449,7 +671,35 @@ request into the same convention.
   *in favour of FEMALE*.
   Boundary: male median 60,000, female median 57,000 → `gap = 0.050` → exactly 5.0% → **FLAG** (inclusive).
 
-#### 4.4.4 Evaluation, re-fire and the anti-fatigue rule
+##### Check B's statistical protections, restated in one place so the A1 clear-out cannot reach them
+
+- **BR-4.19a Median arithmetic — restated here because BR-4.10 was withdrawn for Check A and Check B must not
+  inherit the withdrawal.** Each gender median is computed over the **multiset** of `fte_normalised_annual`
+  values of that gender within the compared set, ascending: **odd n → the middle value; even n → the arithmetic
+  mean of the two middle values**, exact decimal, HALF_UP to 2 dp. **Duplicates count as separate members.** This
+  is verbatim the arithmetic of the withdrawn BR-4.10 and it is **in force for Check B**. WE-7's male median
+  (four values → mean of the two middle) is the even-n case and it is a required fixture.
+- **BR-4.19b Group formation for Check B is §4.4.1, in force.** The key `(company_id, job_family_id,
+  job_level_id, pay_market_id)`; the group population and compared set of BR-4.3; the zero-denominator rule
+  BR-4.4; the **coverage gate** BR-4.5 (default 80.0%, evaluated first, 79.9% → not evaluated); the company gate
+  BR-4.6; the k-anonymity floor BR-4.7; and the multi-currency guard BR-4.14 — *all of which A1 withdrew for
+  Check A and **none of which A1 withdrew for Check B***.
+- **BR-4.19c CFL-42-32's floor stands unchanged.** **No aggregate of any kind — median, mean, count, gap,
+  distribution — is rendered below `n = 5`**, and the configurable group minimums are **floored in the database**
+  so they cannot be set below 2. This is not a Check B rule; it binds **every display** in the epic, including
+  the new step-distribution report A1 introduces (see BR-4.24′ and CFL-42-38).
+- **BR-4.24′ Step becomes a reported dimension of Check B, not a grouping one (A1, SPM §14.2.4).** A gender gap
+  inside a level is more informative when the reader can see whether the women in it are systematically at lower
+  steps. **The group key does not change.** The requirement is display and drill-down only: the finding shows the
+  step distribution of the compared set by gender.
+  - **BR-4.24′a — and it is subject to BR-4.19c.** A step distribution over a group of two people is an aggregate
+    below `n = 5`, and — once pay points are configured — a step plus a published base and increment is a salary
+    to within the tolerance. **The distribution is rendered only where `|compared| >= 5`**, and only to holders of
+    **both** `pay_equity:r` **and** `compensation:r` where any value in it is invertible (the CFL-42-19 rule).
+    **Logged as CFL-42-38** — SPM §14.3.4 asks for step distribution in the register and the team view without
+    reconciling it against his own CFL-42-32 floor.
+
+#### 4.4.4 Evaluation, re-fire and the anti-fatigue rule *(retained, amended by A1)*
 
 - **BR-4.25 Cadence.** Event-driven plus on-demand, **no batch** (SPM S16 — there is no scheduler). A group is
   re-evaluated when: a compensation record that becomes the currently-effective one is written or voided; a level or
@@ -458,33 +708,78 @@ request into the same convention.
   **"Run equity check"** on the queue, available to `pay_equity:w` holders.
 - **BR-4.26 A backdated record that does not become the currently-effective one triggers no re-evaluation**
   (WE-2). Stated because the naive implementation re-evaluates on every write.
-- **BR-4.27 Suppression key.** `(subject_employee_id, group_key, check_code, basis_code)`.
+- ~~**BR-4.27 Suppression key.** `(subject_employee_id, group_key, check_code, basis_code)`.~~ —
+  **AMENDED (A1).** **BR-4.27′:** the suppression key is `(subject_employee_id, finding_type, scope_key)`, where
+  `scope_key` is **`(job_level_id, step, pay_market_id)`** for `PAY_BELOW_STEP` / `PAY_ABOVE_STEP` and
+  **`group_key`** for `GENDER_GAP`. *Why it had to change: the old key carried `basis_code`, and Check A′ has
+  exactly one basis, so the key would have collapsed a `PAY_BELOW_STEP` and a `PAY_ABOVE_STEP` for the same
+  person into one suppression — which would mean justifying an underpayment silently suppresses a later
+  overpayment finding.*
 - **BR-4.28 Validity window.** A `JUSTIFIED` flag suppresses re-firing on the same suppression key for a per-company
-  **validity window**, default **12 months**, range 1–60 months, audited.
-- **BR-4.29 Early re-fire — stated as arithmetic, because "threshold + 2 percentage points" is ambiguous for a
-  ratio bound. [BA call]** A suppressed condition re-fires before its window expires if **any** of:
+  **validity window**, default **12 months**, range 1–60 months, audited. **Unchanged by A1.**
+- ~~**BR-4.29 Early re-fire…**~~ — **AMENDED (A1)** for the two new finding types. The Check B row is unchanged.
+
+  **BR-4.29′** A suppressed condition re-fires before its window expires if **any** of:
 
   | # | Condition | Precise test |
   |---|---|---|
-  | (a) | The gap widens materially — Check A LOW | `ratio < (low_bound − 0.020)` |
-  | (a) | The gap widens materially — Check A HIGH | `ratio > (high_bound + 0.020)` |
-  | (a) | The gap widens materially — Check B | `|gap| >= (threshold + 0.020)` (i.e. +2 percentage points) |
-  | (b) | The subject's own facts change | any change to the subject's level, step, or currently-effective compensation record |
-  | (c) | The configuration changes | any change to a threshold, group minimum, coverage gate, pay-market definition, or a band for that level × market |
+  | (a) | The condition worsens — `PAY_BELOW_STEP` | `deviation < −(tolerance + 0.020)` |
+  | (a) | The condition worsens — `PAY_ABOVE_STEP` | `deviation > +(tolerance + 0.020)` |
+  | (a) | The gap widens — **`GENDER_GAP` (Check B, unchanged)** | `\|gap\| >= (threshold + 0.020)` (i.e. +2 percentage points) |
+  | (b) | The subject's own facts change | any change to the subject's level, **step**, or currently-effective compensation record |
+  | (c) | The configuration changes | any change to a **base pay point, increment, tolerance**, Check B threshold, group minimum, coverage gate, pay-market definition, or an envelope band for that level × market |
 
+  *(Note that (c) now includes the base pay point and the increment. A company that re-bases a level's pay points
+  changes the reference value for every employee on it, so every justification against the old reference is
+  stale. Suppressing on a stale reference is worse than re-firing.)*
 - **BR-4.30 A re-fire raises a NEW flag.** The justified flag stays `JUSTIFIED` with its reason and category intact
   and is linked as `superseded_by` the new one. Re-opening the old flag would overwrite a disposition somebody made
   and signed, which is the record the feature exists to produce. **[BA call]**, High confidence.
 - **BR-4.31 Historical results are never recomputed.** An evaluation records the values it used (medians, counts,
-  thresholds, coverage) at the moment it ran. A later change produces a new evaluation, not a rewritten one.
+  thresholds, coverage — and under A1 also **the pay point, increment and tolerance in force**) at the moment it
+  ran. A later change produces a new evaluation, not a rewritten one. **This matters more under A1 than it did
+  before**: the reference value is now configuration, and configuration changes, so a finding that does not
+  record the pay point it was measured against cannot be explained six months later.
 
-### 4.5 The job ladder — validity rules
+#### 4.4.6 The worked-example register — what survives A1, what moves, what dies
+
+*UAT builds fixtures from these. Getting the disposition of each one wrong is how Check B's protections get lost.*
+
+| Fixture | Wave 2 purpose | Status under A1 |
+|---|---|---|
+| **WE-1** annualisation and FTE (E1–E5, incl. the hourly no-double-FTE case and the 14-payment Porto case) | The compared value | **SURVIVES UNCHANGED.** §4.2 is untouched by A1 and `fte_normalised_annual` is still what both checks compare |
+| **WE-2** backdated record splits the timeline | Effective dating | **SURVIVES UNCHANGED** |
+| **WE-3** coverage gate 79.9% / 80.0% | Check A's gate | **RE-SCOPED TO CHECK B.** The gate is withdrawn for Check A′ and retained for Check B (BR-4.19b), so the boundary fixture moves rather than dies |
+| **WE-4** group median, odd and even, one flag then two | Check A | **RE-SCOPED TO CHECK B** as a **median-arithmetic** fixture only (BR-4.19a). Its *flagging* half is withdrawn — there are no ratio bounds any more. The even-n mean-of-two-middles calculation is the part that must survive |
+| **WE-5** 0.950 / 1.100 boundary behaviour | Check A | **WITHDRAWN as a Check A fixture; the *rounding convention* it demonstrates is re-scoped** — BR-1.6 still governs, and **WE-9** is its replacement for the tolerance boundary |
+| **WE-6** band-midpoint basis | Check A | **WITHDRAWN.** There is no band-midpoint basis. Bands are the envelope (KAN-205) and the envelope check is a separate, independent signal (AC-205-06) |
+| **WE-7** gender gap, both directions, the 5.0% inclusive boundary | Check B | **SURVIVES UNCHANGED.** This is the fixture most at risk of being swept out with Check A and it must not be |
+| **WE-8 / WE-8b** *(new)* compound pay points, 5-step and 3-step, with the linear values alongside | Check A′ | **NEW.** The linear column is there so a linear implementation fails loudly |
+| **WE-9** *(new)* tolerance boundaries at exactly ±2%, just inside, just outside | Check A′ | **NEW** |
+| **WE-10** *(new)* the `tolerance < increment/2` refusal, including the per-step-override and the 4%-increment cases | Configuration guard | **NEW** — and it must prove the overlapping-bands configuration is **impossible to save**, not merely warned about |
+| **WE-11** *(new)* the fitted-step backfill, including an exact tie | Backfill | **NEW** — see BR-11.4 |
+
+### 4.5 The job ladder — validity rules *(amended by A1 — SPM §14.3)*
 
 - **BR-5.1 Family.** Company-scoped. Name mandatory, ≤ 150 chars, **unique within the company case-insensitively
   after trimming**. The product ships **no** families (D3.2 — no opinionated ladder).
-- **BR-5.2 Level.** Belongs to exactly one family. Carries `ordinal` (integer ≥ 1), `title` (mandatory, ≤ 150 chars,
-  unique within the family case-insensitively after trimming) and `steps_count` (integer, default **5**, range
-  **1–12**).
+- ~~**BR-5.2 Level.** … `steps_count` (integer, default **5**, range 1–12).~~ — **SUPERSEDED (A1, SPM §14.3.1).**
+
+  **BR-5.2′ Level.** Belongs to exactly one family. Carries `ordinal` (integer ≥ 1), `title` (mandatory, ≤ 150
+  chars, unique within the family case-insensitively after trimming) and **`step_count`**.
+  - **The level *is* the position** — Trainee SE, Junior SE, Mid SE — and the title is the canonical job title.
+  - **`step_count` is the number of increments ABOVE entry.** A level with `step_count = 5` therefore has **six
+    discrete step values** — `.0, .1, .2, .3, .4, .5` — and its top-step pay point is the base compounded
+    **five** times (BR-10.2). A level with `step_count = 3` runs `.0 … .3`, four values. **This matches the
+    owner's own example (`2.0 … 2.5`), and it is where an off-by-one becomes a wrong salary**, so it is stated
+    as arithmetic and asserted by fixture (WE-8, WE-8b).
+  - **Range 1–12. There is NO DEFAULT.** The configurator requires an answer per level, the same way D4c requires
+    the pay question to be answered rather than defaulted. *(My Wave 2 "default 5" was close and not right: the
+    count expresses **how much distance there is between this position and the next one**, and Trainee→Junior and
+    Junior→Mid are genuinely different distances — SPM §14.3.1. A default would be silently wrong for one of
+    them.)*
+  - **`step_count` is job content → `job_architecture:w`.** The level's **base pay point** and **increment** are
+    money → `compensation:w` (CC-42-7b).
 - **BR-5.3 Ordinals are contiguous from 1 with no gaps.** Creating level 3 when only levels 1 and 2 exist is
   permitted (it appends); creating level 5 when the highest is 2 is **refused**. **Why:** promotion and the
   "last step" signal both need a deterministic *next* level; a hole makes "the next level" undefined.
@@ -494,10 +789,30 @@ request into the same convention.
   KAN-190 backlog criteria.)
   - **Consequence, stated rather than hidden:** a company that later needs a level *between* 2 and 3 has **no path**
     other than creating a new family and re-mapping. Recorded as **OQ-BA-2** with a recommendation.
-- **BR-5.5 Steps.** Steps are implicit `1 … steps_count`, displayed `<ordinal>.<step>` (e.g. `1.1`, `1.5`, `3.2`).
-  They are not separately created. **Increasing** `steps_count` is always allowed. **Decreasing** it below the
-  highest step currently assigned to any employee (current assignment) is **refused**, naming the count of affected
-  employees and the highest step in use.
+- ~~**BR-5.5 Steps.** Steps are implicit `1 … steps_count`…~~ — **SUPERSEDED (A1).**
+
+  **BR-5.5′ Steps.** Steps run **`0 … step_count`**, displayed `<ordinal>.<step>` — `1.0`, `1.1`, `1.5`, `3.2`.
+  **An employee enters a level at `.0`, not at `.1`** (SPM §14.3.1). They are not separately created as records;
+  their *expectations* are (BR-11.1). **Increasing** `step_count` is always allowed. **Decreasing** it below the
+  highest step currently assigned to any employee with a current assignment is **refused**, naming the count of
+  affected employees and the highest step in use.
+- **BR-5.5a Step position is not public. [BA call] — and this is a disclosure channel A1 creates.**
+  Once pay points are configured (KAN-206), **a base pay point plus a published increment plus a known step is
+  that person's expected pay to within the tolerance** — typically ±2%. A1 makes step expectations readable by
+  every employee (`job_architecture:r`) and asks for step position to be visible as *"a live signal of scope
+  taken on"* (SPM §14.3.4). Read together, that discloses pay. **Therefore:**
+  - **an employee's own step is always visible to them** (that is the whole point of the transparency
+    requirement);
+  - **another employee's step position is visible under the same row scope as their pay** — `DIRECT` for a
+    solid-line manager, `COMPANY` for `compensation:r` holders — which preserves the owner's stated intent
+    exactly (*"a manager can see who has quietly taken on scope"* is about their own team);
+  - **the level title stays public** (BR-5.11) because it carries no pay point;
+  - **the generic step expectations stay public** (`job_architecture:r`) because they describe the job, not a
+    person.
+
+  **Logged as CFL-42-39.** This is the CFL-42-19 class of finding (a ratio is invertible into a salary) arriving
+  through a new door that A1 opened, and the SPM's §4.5.7 surface list — which he amended in Wave 3 to include
+  *inference* as a category — has not yet been applied to it.
 - **BR-5.6 Deletion.** A level or family referenced by **any** assignment — current **or** historical — cannot be
   deleted; the attempt returns `409` and offers **archive** instead. An archived level accepts no new assignments,
   disappears from pickers, keeps its existing assignments and still participates in historical grouping. A level with
@@ -505,13 +820,24 @@ request into the same convention.
   it would create a gap, BR-5.3). Every delete and archive is audited.
 - **BR-5.7 Assignment.** An employee holds at most **one** level assignment in effect on any date (BR-3.1). An
   assignment names `(family, level, step)`; the level must belong to the family and the step must be within
-  `1 … steps_count`. All three are mandatory — there is no "level without a step".
-- **BR-5.8 The last-step signal is a signal.** A `promotion_eligible` marker is raised on the assignment when, and
-  only when, an assignment **becomes** current with `step == steps_count`. It is **not** raised again for an
-  unrelated later edit that leaves the step unchanged, and it is **not** raised at all when the level is the
-  **highest ordinal in its family** (there is no next level — the UI shows "top of ladder" instead). **[BA call]** on
-  both edges; neither is in D3.
-- **BR-5.9 The signal can be un-raised.** If `steps_count` is later increased (5 → 7), an employee at step 5 is no
+  **`0 … step_count`** *(amended by A1 — entry is at `.0`)*. All three are mandatory — there is no "level without
+  a step", and **no assignment defaults its step**: an employee is placed at `.0` deliberately or at a fitted step
+  (BR-11.4), never by omission.
+- ~~**BR-5.8 The last-step signal is a signal.** … raised … to the manager and `compensation:w` holders~~ —
+  **AMENDED (A1, SPM §14.3.4).**
+
+  **BR-5.8′** A `promotion_eligible` marker is raised on the assignment when, and only when, an assignment
+  **becomes** current with **`step == step_count`**. It is **not** raised again for an unrelated later edit that
+  leaves the step unchanged, and it is **not** raised at all when the level is the **highest ordinal in its
+  family** (there is no next level — "Top of ladder" instead). **A1 narrows the recipient to the subject's
+  reporting (solid-line) manager alone** — *"it is indicative for the **reporting manager** to consider him at
+  strong candidature of promotion"*. `compensation:w` holders no longer receive a notification; they see it in
+  the register. That is a straight noise reduction and it is what the owner said.
+- **BR-5.8a Step position is a live signal, not only a countdown. [A1]** A Junior at `2.3` or `2.4`
+  *"is taking additional responsibility"*. The step distribution of a team is therefore a **report in its own
+  right**, readable between promotions — and it is where the *"pay never followed"* cases are actually spotted.
+  Subject to **BR-5.5a**'s scope rule and **BR-4.19c**'s `n >= 5` floor (CFL-42-38).
+- **BR-5.9 The signal can be un-raised.** If `step_count` is later increased (5 → 7), an employee at step 5 is no
   longer at the last step: the marker is **cleared** and its notification **retired** for every recipient. Leaving a
   stale "eligible for promotion" in somebody's bell after the ladder changed under them is the DEF-003 failure mode
   wearing a new hat.
@@ -533,6 +859,136 @@ request into the same convention.
   | Level title and working title are identical (case-insensitive, trimmed) | Show once, not twice |
   | Full-text search | **Both** must match. This does **not** work today (B42-14) and is a required change, not a display decision. |
   | Equity grouping | **Neither title.** The key is `job_level_id` (BR-4.1). |
+
+### 4.5A Step expectations, roadmaps, the fitted backfill and the review context *(new — A1)*
+
+*The four objects and rules A1 adds to the ladder. BR-11.1 and BR-11.2 are the two new first-class objects; the
+rest are the rules that make them work with what already exists.*
+
+#### 4.5A.1 The generic step expectation
+
+- **BR-11.1 A step is a described job, not a number.** Every `(level, step)` in a company's ladder carries a
+  **step expectation** — the responsibilities and expectations that define that step, authored per company. It
+  is the answer to *"what does 1.2 mean here"*.
+  - Mandatory fields: a **title** (short, ≤ 150 chars) and a **description** (free text). Optional: a list of
+    named responsibilities.
+  - **Authored under `job_architecture:w`.** Company-scoped. Versioned is **not** required (it is configuration,
+    and a change applies to everyone on that step from the moment it is made) — but every change is **audited**
+    with the before → after text, because "the expectations changed under me" is a question an employee will ask.
+  - **Readable by every employee** under `job_architecture:r`, which every role holds by default (CC-42-7′).
+    **An employee can read the expectations of their own step and of the next one.** That is the whole stated
+    purpose and it is not optional.
+  - **A step with no expectation authored is valid** — the ladder is usable before the content is written — and
+    it displays *"No expectations recorded for this step"*, never a blank. The configurator shows an authoring
+    progress count, because 6 values × 3 levels × 2 families is 36 pieces of content and that is a real
+    adoption cliff (the KAN-191 mapping-screen problem in a second place).
+  - **No ratings, no scores, no assessment.** See BR-11.3.
+
+#### 4.5A.2 The per-employee step roadmap
+
+- **BR-11.2 The roadmap is the manager's forward-looking statement to one named person.** Distinct from BR-11.1:
+  the expectation says *what step 1.2 means here*; the roadmap says *what you, specifically, need to do to get
+  there*.
+  - **Authored by the subject's solid-line manager, or by a `job_architecture:w` holder**, for a **named
+    employee**, **targeting a named next step**. Row-scoped exactly as pay is (BR-8.2): the flag grants the
+    surface, the scope decides the rows. **This requires `SOLID_LINE_MANAGER` to hold `job_architecture:w` —
+    see CC-42-7a / CFL-42-35, which the SPM's own seeded-defaults table currently contradicts.**
+  - **Visible to the employee. Not optional, not a manager-only note.** *If the employee cannot see it, we have
+    not built it.*
+  - **"Mutually decided" is recorded, not enforced.** The employee **acknowledges**, with a timestamp. An
+    unacknowledged roadmap is surfaced back to the manager. **There is no approval workflow for a conversation
+    that happens in a room** — a blocking gate would let a non-responsive employee freeze their own development
+    plan, which is the opposite of the intent.
+  - **Versioned, never overwritten.** Roadmaps are re-agreed at each review and **the previous version stays
+    readable**, because *"what did we agree in March"* is the question this object exists to answer. Each version
+    records author, timestamp, target step, and the acknowledgement (or its absence).
+  - **A roadmap does not confer, promise or entitle anything.** It is not a commitment to promote, to advance a
+    step, or to pay.
+- **BR-11.3 The "no ratings, no scores" boundary — stated as a testable rule, not an intention.**
+  A roadmap and a step expectation may contain: responsibilities, expectations, examples, target dates and free
+  text. They may **not** contain, in any form the product provides: a **rating**, a **score**, a **grade**, a
+  **percentage of achievement**, a **rank**, a **traffic light**, a **met/not-met assessment of past
+  performance**, or any field the product aggregates, sorts or compares across employees.
+  - **The testable form:** no numeric, enumerated or boolean field on either object is aggregatable across
+    employees, and no surface sorts, ranks or filters employees by roadmap content. The only structured fields
+    are the target step, the dates and the acknowledgement.
+  - **Why this is a rule.** It is the boundary between a development conversation and an employee-evaluation
+    system. Cross it and the object becomes automated processing with a significant effect on an individual —
+    GDPR Art. 22 and the EU AI Act's employee-evaluation category (Charter §1, BR-7.15/7.17) — and EP42 would
+    have built two thirds of a performance module by accident (SPM R-17).
+  - **UX and the BA both hold this line**, and it is on the human-walkthrough list: *does the roadmap read as
+    expectations, or as a performance rating?* That cannot be asserted by a test, and it is the boundary holding
+    or failing in practice.
+
+#### 4.5A.3 The fitted-step backfill and its gate
+
+- **BR-11.4 The backfill fits the step to the pay, not the pay to the step.** Where a compensation record exists,
+  the level/step backfill places the employee at **the step whose configured pay point is closest to their actual
+  `fte_normalised_annual`**, and HR overrides where it is wrong.
+  - **Closest = smallest absolute difference** between the employee's `fte_normalised_annual` and the step's pay
+    point. **On an exact tie, the LOWER step wins** — **[BA call]**, because the alternative silently credits
+    someone with a step they were not given, and because a `PAY_ABOVE_STEP` finding (secondary) is a better
+    error than a `PAY_BELOW_STEP` one (primary) that nobody has to act on.
+  - Pay **above the top step's** pay point → fitted to the **top** step. Pay **below the base** pay point →
+    fitted to **`.0`**. Both are flagged for review with the reason; neither is an error.
+  - **An employee with no compensation record defaults to `.0` and is flagged for review** — explicitly, not
+    silently.
+  - **Worked example WE-11.** Ladder from WE-8 (60,000 base, 5%, six steps). Employee at 67,000 →
+    |67,000−66,150| = 850 vs |67,000−69,457.50| = 2,457.50 → fitted to **`.2`**. Employee at 64,575.00 → exactly
+    equidistant from `.0` (60,000, diff 4,575) and… no: distances are `.1` 1,575 and `.2` 1,575 → **exact tie →
+    `.1`** (the lower step). Employee at 90,000 → above the top → **`.5`**, flagged. Employee at 50,000 → below
+    the base → **`.0`**, flagged.
+  - *This sounds circular and it is exactly right for an initial load: the ladder is being fitted to reality,
+    because reality came first.*
+- **BR-11.5 The ladder-fitted-and-reviewed gate.** Check A′ does **not** run for a company until its level/step
+  backfill is **explicitly marked reviewed** by a `job_architecture:w` holder. One gate, one deliberate human
+  act. Until then the register shows **review progress** (`n of m employees confirmed`), not findings.
+  - The gate is per company, recorded with actor and timestamp, and **audited**.
+  - It can be **re-opened**: adding a new level, changing a `step_count`, or bulk-reassigning steps re-opens the
+    review for the affected employees only, not for the whole company. **[BA call]** — an all-or-nothing re-open
+    would mean no tenant ever changes their ladder after go-live.
+  - **Check B is not gated on it** — Check B has its own coverage gate (BR-4.19b) and does not use step at all
+    in its arithmetic.
+
+#### 4.5A.4 The review context, and propose-not-apply
+
+- **BR-11.6 A step change carries a mandatory review context** (SPM §14.5): `PROBATION_REVIEW` ·
+  `MID_TERM_GOAL_REVIEW` · `PERFORMANCE_REVIEW` · `OFF_CYCLE`, plus a **review date** and an optional note.
+  **Mandatory to answer, with an off-cycle option** — mirroring D4c: an unanswered context means the question
+  fell on the floor. It is **recorded, not required**: nothing enforces that a step change *must* occur at a
+  review.
+  - **BR-11.6a — a fifth value the SPM's four do not cover. [BA call]** The **fitted-step backfill** (BR-11.4)
+    sets a step for up to 146 people in one operation, and none of the four contexts is true of it. Requiring
+    one would be absurd and would be answered dishonestly. **`INITIAL_LOAD` is a fifth context value, available
+    only to the backfill path and never selectable by a human.** Logged as **CFL-42-40**.
+- **BR-11.7 EP42 records that a step change happened at a review. It does not build the review.**
+  There is no performance-review, probation or goal module anywhere in the schema and **none is being built**:
+  no review cycles, no scheduling, no reminders, no goals or objectives, no ratings or calibration, no review
+  forms or templates, no probation entity, no probation end date, no probation outcome (SPM §14.5). This
+  boundary is stated in the product documentation as well as here, so the owner is not surprised later
+  (**OQ-A1-3**).
+- **BR-11.8 A step change PROPOSES a pay change and NEVER applies one.** Advancing a step **pre-fills a
+  `COMPENSATION_REVIEW`** with the new step's pay point as the proposed amount and routes it through the
+  **existing** approval chain. Four independent reasons, all of which have to be wrong for auto-apply to be
+  right: (i) A1's whole answer to OQ-1 is that progression is a human, mutually agreed decision; (ii) auto-apply
+  has **zero** approvers and drives straight through KAN-198's four-eyes control; (iii) it would hand every
+  manager a unilateral pay-change lever, which D5 explicitly withholds (a manager may *propose*, never *apply*);
+  (iv) `CLAUDE.md` invariant 3 — nothing is applied until the final level approves.
+  - The pay decision on that pre-filled request is **mandatory to answer and may be "no change" with a recorded
+    reason**, exactly as D4c requires of a position change.
+  - **The step change itself does not go through the chain** — it is within-position job content, audited, with
+    a mandatory review context and the employee's acknowledgement. A **level** change does go through the chain
+    (KAN-197). **No bypass exists: the step has no chain, the money always does.**
+- **BR-11.9 The step may land before the pay, and that is the design, not a gap.** Precisely that condition —
+  *"they took the responsibility, the pay never followed"* — is what `PAY_BELOW_STEP` exists to detect. Nothing
+  forces the two into one transaction, and forcing it would block a legitimate case (the adjustment is budgeted
+  for next quarter). The two halves of A1 fit together: **the step change is allowed to move first, and the
+  correspondence check is the mechanism that makes sure the pay eventually catches up.**
+  - **BR-11.9a** Where the pre-filled `COMPENSATION_REVIEW` **cannot be created** — because the chain has no step
+    satisfiable by a `compensation:r` holder (AC-196-10), or because the initiator lacks the permission — **the
+    step change still lands** and the failure to raise the pay proposal is surfaced to the actor with the reason
+    and recorded. The employee is then correctly picked up by Check A′ as `PAY_BELOW_STEP`. **[BA call]** —
+    blocking the step change on a pay-chain misconfiguration would block job content on a money problem.
 
 ### 4.6 Behaviour while the data is partial — the surface matrix
 
@@ -1129,7 +1585,76 @@ entitlement, headcount snapshots or any prior report.
 
 ---
 
-## 7. KAN-190 — Job families, levels and steps: the configurator (W1 · R6 · D3)
+## 7. KAN-190 — Job families, levels, steps **and step expectations**: the configurator (W1 · R6 · D3 · A1)
+
+### 7.0 Amendment A1 — what changed in this story
+
+| Wave 2 criterion | Status | Replacement |
+|---|---|---|
+| **AC-190-02** `steps_count` default 5, range 1–12 | **SUPERSEDED** | **AC-190-31** — `step_count` = increments above entry, range 1–12, **no default** |
+| **AC-190-03** steps implicit `1 … steps_count`, displayed `<ordinal>.<step>` | **SUPERSEDED** | **AC-190-32** — steps run `0 … step_count`; **entry is `.0`**; count 5 → six values |
+| **AC-190-11** decreasing `steps_count` below the highest assigned | **AMENDED** wording only (`step_count`) | stands |
+| **AC-190-12** step-count change updates the marker | **AMENDED** wording only | stands |
+| **AC-190-16** `steps_count = 1` → one step | **SUPERSEDED** | **AC-190-33** — `step_count = 1` → **two** values, `.0` and `.1` |
+| **AC-190-25** configurator gated `compensation:w` | **SUPERSEDED** | **AC-190-34/35** — two gates: job content on `job_architecture:w`, money on `compensation:w` |
+| **AC-190-26** ladder reads ungated | **AMENDED** | **AC-190-36** — ladder browsing is `job_architecture:r`; the employee's own level title stays `employee_profiles` |
+| — | **NEW** | **AC-190-37 … AC-190-44** — step expectations, feature registration, the configuration guards' home |
+
+**New criteria**
+
+- **AC-190-31** A level carries **`step_count`** — an integer in **1–12** with **no default**. The configurator
+  **refuses to save a level without an explicit answer**; there is no pre-filled 5, no placeholder and no
+  "leave blank for default". *(SPM §14.3.1: the count expresses how much distance there is between this position
+  and the next one, and Trainee→Junior and Junior→Mid are genuinely different distances.)*
+- **AC-190-32** `step_count` is **the number of increments above entry**. A level with `step_count = 5` exposes
+  **six** step values — `.0 .1 .2 .3 .4 .5` — displayed `<ordinal>.<step>` (`2.0` … `2.5`, exactly the owner's
+  example). A level with `step_count = 3` exposes four. **The configurator displays the full list of step values
+  it has just created**, so an off-by-one is visible at the moment it is made rather than in a salary six months
+  later.
+- **AC-190-33** `step_count = 1` is valid and produces **two** values, `.0` and `.1` — not one.
+  `step_count = 12` produces thirteen. `0` and `13` are rejected with a field-level message.
+- **AC-190-34** **The configurator has two gates on one screen** (CC-42-7b): families, levels, titles,
+  `step_count` and **step expectations** are `@require_feature_access('job_architecture', 'w')`; the **base pay
+  point, the increment and the tolerance** are `@require_feature_access('compensation', 'w')` and are specified
+  in **KAN-206**. **There is no hardcoded role list on either** (CC-42-1).
+- **AC-190-35** The screen **reads coherently to a holder of one gate and not the other**: the section they
+  cannot write is **absent, not disabled and not broken**, and the page does not error, half-render or imply the
+  other half is missing data. Asserted for both single-gate combinations.
+- **AC-190-36** **Browsing the ladder** — families, levels, step values and step expectations — is
+  `job_architecture:r`, which **every role holds by default**. **An employee's own level title on their profile
+  or directory row remains `employee_profiles`** (CC-42-7c), so a tenant switching `job_architecture` off does
+  **not** blank the directory. Asserted both ways: switch the code off and confirm the directory still shows job
+  titles; revoke `job_architecture:r` from a role and confirm the ladder browser is absent while the directory
+  is intact.
+- **AC-190-37** **KAN-190 registers the `job_architecture` feature code in all four places** — `setup_db.py`, a
+  numbered migration, **`database/seed_rbac.sql`**, and default `role_feature_access` rows **in both** — with the
+  CC-42-7′ defaults. `TestFeatureRegistryHasNoDrift` fails if any place is missed, verified by deliberately
+  removing the seed row in a scratch branch. *(EP42 has no single "register the codes" story; each story
+  registers what it needs, and this is the first story that needs this one.)*
+- **AC-190-38** **Every `(level, step)` may carry a step expectation** — a title (mandatory, ≤ 150 chars) and a
+  description (mandatory free text), optionally a list of named responsibilities (BR-11.1). Authored under
+  `job_architecture:w`, company-scoped, every change audited with the before → after text.
+- **AC-190-39** **A step with no expectation is valid.** The ladder is usable before the content is written. The
+  step displays *"No expectations recorded for this step"* — never a blank, never a dash (CC-42-19) — and the
+  configurator shows an **authoring progress count** per level (`4 of 6 steps described`), because a three-level,
+  two-family ladder is 36 pieces of content and that is a real adoption cliff.
+- **AC-190-40** **Every employee can read the expectations of their own step and of the next one**
+  (`job_architecture:r`, BR-11.1). Asserted as a positive for the `EMPLOYEE` role: a plain employee with no other
+  grant opens the ladder and reads their step's description and the next step's.
+- **AC-190-41** **A step expectation contains no rating, score, grade, percentage, rank, traffic light or
+  met/not-met assessment**, and no field on it is aggregated, sorted, ranked or filtered across employees
+  (BR-11.3). Asserted structurally — the object exposes no such field — and on the human-walkthrough list.
+- **AC-190-42** Changing a step expectation applies to **everyone currently on that step**, from the moment of
+  the change, and writes an audit row with the before → after text. There is no versioning and no per-employee
+  copy — that is the roadmap's job (KAN-207).
+- **AC-190-43** Expectation text containing markup is stored verbatim and escaped on output through `escH()`
+  (CC-42-22); no script executes on any surface that renders a step expectation, including the employee-facing
+  one.
+- **AC-190-44** **The two configuration guards live on this screen but are specified in KAN-206** —
+  `tolerance < min(increment)/2` (AC-206-09) and the level-base-below-previous-top-step warning (AC-206-12) —
+  because both are money. The screen must surface them **at the point the choice is made**, to a holder of
+  `compensation:w`, and must not silently accept a `step_count` change that invalidates an existing tolerance
+  (AC-206-11).
 
 ### 7.1 Backlog-style summary
 
@@ -1254,7 +1779,67 @@ from a job title (that is a human mapping decision — KAN-191).
 
 ---
 
-## 8. KAN-191 — Every employee on a level; the title→level mapping (W1 · R6 · R2 · D7)
+## 8. KAN-191 — Every employee on a level **and step**; the mapping and the **fitted-step backfill** (W1 · R6 · R2 · D7 · A1)
+
+### 8.0 Amendment A1 — what changed in this story
+
+| Wave 2 criterion | Status | Replacement |
+|---|---|---|
+| **AC-191-01** assignment names (family, level, step), step within `1 … steps_count` | **AMENDED** | **AC-191-31** — step within `0 … step_count`, entry at `.0` |
+| **AC-191-03** the mapping screen maps a **title → level** | **EXTENDED** | **AC-191-32** — the mapping produces a level; the **step is fitted per person** |
+| **AC-191-04** CSV round-trip columns | **AMENDED** | **AC-191-33** — a `default_step` column is not enough; the round-trip carries the fitted step per employee |
+| **AC-191-05** one level coverage meter | **AMENDED** | **AC-191-34** — level coverage and **step-fit review progress** are two different numbers |
+| **AC-191-26** assignment gated `compensation:w` | **SUPERSEDED** | **AC-191-38** — assignment is `job_architecture:w`; it has no money in it |
+| — | **NEW** | **AC-191-31 … AC-191-42** — the fitted-step backfill, its tie rule, the review gate |
+
+**Why the gate moved here.** Check A′ has no coverage gate; what replaces it is a **human review of the fitted
+backfill**, and that review lives in this story. **KAN-191 now gates the entire equity feature** (SPM R-2 is
+worsened, and the SPM says so).
+
+**New criteria**
+
+- **AC-191-31** An assignment names `(family, level, step)` with the step within **`0 … step_count`**; **entry is
+  `.0`**. All three are mandatory and **no assignment defaults its step by omission** (BR-5.7).
+- **AC-191-32** **The backfill fits the step to the pay.** Where a compensation record is in effect, the employee
+  is placed at **the step whose configured pay point is closest to their `fte_normalised_annual`** (BR-11.4).
+  The mapping screen shows the fitted step per employee with the pay point it was fitted to and the difference,
+  and HR overrides per person.
+- **AC-191-33** **The tie rule is stated and asserted: on an exact tie the LOWER step wins.** Asserted with
+  WE-11's 64,575.00 case, which is exactly equidistant between `.1` and `.2` and must fit to **`.1`**.
+- **AC-191-34** Pay **above the top step's** pay point fits to the **top** step; pay **below the base** fits to
+  **`.0`**. Both are **flagged for review with the reason** and are not errors. Asserted with WE-11's 90,000 and
+  50,000 cases.
+- **AC-191-35** **An employee with no compensation record is placed at `.0` and flagged for review**, explicitly.
+  They are counted in the review progress and are **not evaluable** by Check A′ (BR-10.11(b)) until a record
+  exists.
+- **AC-191-36** **Fitting requires pay points to exist** (KAN-206). Where a level has no configured base pay
+  point for the employee's pay market, **no step can be fitted**: the employee is placed at `.0`, flagged with
+  the reason *"no pay point configured for this level and market"*, and the configurator surfaces the missing
+  configuration. This is a **hard sequencing consequence: KAN-206 must land before the fitted backfill is run**,
+  even though KAN-191 is in W1 and KAN-206 in W2. **Logged as CFL-42-41** — the SPM's revised build order puts
+  the story that needs the pay points a wave *before* the story that creates them.
+- **AC-191-37** **The ladder-fitted-and-reviewed gate** (BR-11.5): a `job_architecture:w` holder marks the
+  company's backfill **reviewed**, recorded with actor and timestamp and audited. **Check A′ produces no findings
+  for that company until they do**; the register shows review progress (`n of m employees confirmed`) instead.
+- **AC-191-38** Adding a level, changing a `step_count` or bulk-reassigning steps **re-opens the review for the
+  affected employees only**, not for the whole company. Asserted: after adding a level, previously-confirmed
+  employees on unaffected levels stay confirmed and Check A′ keeps running for them.
+- **AC-191-39** Level and step assignment is `@require_feature_access('job_architecture', 'w')` — **not**
+  `compensation:w`. *(Superseding AC-191-26: an assignment carries no money. Gating job content on a pay
+  permission is the coupling the fourth feature code exists to remove — CC-42-7a.)* The **fitted-step
+  computation** reads pay, so the *fitting* action additionally requires `compensation:r`; a
+  `job_architecture:w` holder without it may assign a level and step **manually** but may not run the fit, and
+  the fit control is **absent** for them.
+- **AC-191-40** **The level coverage meter and the step-fit review progress are two different numbers with two
+  different denominators**, and each names which it is (BR-6.2, A-5). Level coverage = % of ACTIVE employees with
+  a level assignment in effect. Review progress = % of level-assigned employees whose fitted step a human has
+  confirmed. An unlabelled percentage is a defect.
+- **AC-191-41** The missing/for-review list is exportable to CSV with the **reason** per row — `no level` ·
+  `no step fitted — no pay record` · `no step fitted — no pay point configured` · `fitted, awaiting review` ·
+  `fitted above top step` · `fitted below base` — and contains **no amounts** (BR-6.3).
+- **AC-191-42** The backfill's step assignments carry review context **`INITIAL_LOAD`** (BR-11.6a) — a value
+  available only to this path and never selectable by a human. Asserted: no UI offers it, and a hand-crafted API
+  call supplying it on a manual step change is refused (`400`).
 
 ### 8.1 Backlog-style summary
 
@@ -1383,10 +1968,69 @@ level-based reporting or analytics beyond the coverage meter · any pay figure (
 
 ## 9. KAN-192 — Step advancement and the promotion-eligible signal (W1 · R6 · D3.4)
 
-> **Contingent on OQ-1.** Every criterion below is written against the SPM's default — *reaching the last step is a
-> **signal**, not an automatic promotion*. If the product owner answers OQ-1 differently, AC-192-06 through
-> AC-192-14 change shape and the story needs a rules engine and a trigger that do not exist (SPM S16). This is the
-> only story in EP42 gated on a product-owner answer rather than on Wave 2 work.
+> ~~**Contingent on OQ-1.**~~ — **OQ-1 IS CLOSED. The owner CONFIRMED the default**: *"That is not an automatic
+> decision"*. AC-192-06 … AC-192-14 stand as written and are no longer contingent on anything. This story is no
+> longer the one gated on a product-owner answer — it is now the story A1 changed most.
+
+### 9.0 Amendment A1 — what changed in this story
+
+**Three additions and one narrowing. The no-automatic-roll-up ruling is confirmed, not changed.**
+
+| Wave 2 criterion | Status | Replacement |
+|---|---|---|
+| **AC-192-01/02** step advancement is an explicit action; no chain unless it carries pay | **AMENDED** | **AC-192-33 … AC-192-36** — mandatory review context; **pre-fills a `COMPENSATION_REVIEW` and never applies pay** |
+| **AC-192-06 … AC-192-10** no automatic roll-up, the marker and its clearing | **CONFIRMED by the owner** — unchanged | — |
+| **AC-192-11** the signal's recipients: *"the subject's current solid-line manager, and all `compensation:w` holders"* | **NARROWED** | **AC-192-37** — the **reporting manager alone**; HR sees it in the register |
+| **AC-192-16** advancing above `steps_count` refused | **AMENDED** wording | `step_count`, and entry at `.0` |
+| **AC-192-18** same-step no-op refused | **AMENDED** | **AC-192-40** — a same-step change with a *new review context* is a legitimate re-affirmation |
+| — | **NEW** | **AC-192-33 … AC-192-44** |
+
+**New criteria**
+
+- **AC-192-33** **A step change carries a mandatory `review_context`** — `PROBATION_REVIEW` ·
+  `MID_TERM_GOAL_REVIEW` · `PERFORMANCE_REVIEW` · `OFF_CYCLE` — plus a **review date** and an optional note
+  (BR-11.6). **Nothing is pre-selected**; submitting without one returns `422` naming the field. It is *recorded,
+  not required*: nothing enforces that a step change must occur at a review.
+- **AC-192-34** **`INITIAL_LOAD` is not selectable by a human** on this path; it belongs to the backfill
+  (AC-191-42). A hand-crafted call supplying it returns `400`.
+- **AC-192-35** **Advancing a step pre-fills a `COMPENSATION_REVIEW`** with **the new step's configured pay
+  point** as the proposed amount, and routes it through the **existing** approval chain (BR-11.8). The manager
+  no longer has to work the number out; that is the increment's value, not that nobody has to approve it.
+- **AC-192-36** **A step change NEVER writes a compensation record directly.** Asserted at the database: after a
+  step change, the number of compensation records for the subject is **unchanged**, and the only new row is a
+  `PENDING` `org_change_requests` of type `COMPENSATION_REVIEW`. **This is the highest-value assertion in the
+  story** — auto-applying the money would have zero approvers, would drive through KAN-198's four-eyes control,
+  and would hand every manager a unilateral pay-change lever that D5 explicitly withholds.
+- **AC-192-37** **The pay decision on the pre-filled request is mandatory to answer and may be "no change" with a
+  recorded reason** — exactly as D4c requires of a position change (AC-196-02).
+- **AC-192-38** **Where the pre-filled request cannot be created** — no chain step satisfiable by a
+  `compensation:r` holder (AC-196-10), or the actor lacks `compensation:w` — **the step change still lands**, the
+  failure is surfaced to the actor with the reason and recorded, and the employee is subsequently picked up by
+  Check A′ as `PAY_BELOW_STEP` (BR-11.9a). The step change is job content and is not blocked by a money
+  misconfiguration.
+- **AC-192-39** **The step may land before the pay, by design.** Asserted end-to-end: advance a step, leave the
+  pre-filled request pending, run Check A′, and confirm a **`PAY_BELOW_STEP`** finding is raised for exactly that
+  condition — *"they took the responsibility, the pay never followed"* (BR-11.9). Approving the request then
+  retires the finding as `RESOLVED` (AC-201-52).
+- **AC-192-40** **A same-step change with a new review context is permitted** and is recorded as a
+  re-affirmation, not rejected as a no-op *(amending AC-192-18)*. *"We reviewed you at the mid-term goal review
+  and you remain at 2.3"* is a real and useful record, and refusing it would push HR to invent a fake step move.
+  A same-step change with the **same** context and date remains a no-op (`400`).
+- **AC-192-41** **The top-step signal goes to the subject's reporting (solid-line) manager alone**
+  *(narrowing AC-192-11's recipient row)*. `compensation:w` holders **no longer receive a notification**; the
+  condition appears in the equity register and in the team step-distribution report instead. Asserted as a
+  negative: an HR_ADMIN with `compensation:w` receives no bell entry when an employee reaches the top step.
+- **AC-192-42** **Step position is a report, not only a countdown** (BR-5.8a). A manager's team view shows the
+  step distribution of their direct reports, so they can see who has quietly taken on scope. Subject to
+  **BR-5.5a**'s scope rule (another employee's step is visible only under the same row scope as their pay) and
+  **BR-4.19c**'s `n >= 5` floor on any rendered aggregate.
+- **AC-192-43** **`step_count` and step values follow BR-5.2′ / BR-5.5′** throughout this story: entry at `.0`,
+  values `0 … step_count`, the marker raised at `step == step_count`. Every criterion in §9 that said
+  `steps_count` reads `step_count` and every range that said `1 … n` reads `0 … n`.
+- **AC-192-44** **EP42 records that a step change happened at a review; it does not build the review**
+  (BR-11.7). No review cycle, no scheduling, no reminder, no goal, no rating, no probation entity is created by
+  this story, and the product documentation says so. Asserted as an absence: no new table, route or nav entry in
+  this story relates to reviews beyond the four context values, the date and the note.
 
 ### 9.1 Backlog-style summary
 
@@ -1676,6 +2320,38 @@ timeline) · the import (KAN-195).
 ---
 
 ## 11. KAN-194 — Who may see a salary (W2 · D5) — **nothing may render a salary before this lands**
+
+### 11.0 Amendment A1 — what changed in this story
+
+| Wave 2 criterion | Status | Replacement |
+|---|---|---|
+| **AC-194-01 … AC-194-05** three feature codes | **AMENDED** | **AC-194-45** — `job_architecture` is the fourth code and is registered in **KAN-190**, not here |
+| **AC-194-06 … AC-194-18** the response matrix | **EXTENDED** | **AC-194-46/47** — the matrix gains a **step position** column and a **pay point** column |
+| **AC-194-19 … AC-194-27** negative visibility | **EXTENDED** | **AC-194-48** — pay points and step positions join §4.8.4's surface list |
+
+- **AC-194-45** There are **four** feature codes (CC-42-7′). `job_architecture` is registered in **KAN-190** —
+  the first story that needs it — in all four places; the other three are registered here. **A test asserts all
+  four exist and carry their CC-42-7′ defaults on a fresh CI database** built from `schema.sql` + `seed_rbac.sql`
+  with migrations not replayed.
+- **AC-194-46** **The response matrix gains a `step position` column, and it is scoped as pay is** (BR-5.5a): own
+  step always `200+`; another employee's step is `200+` only for a viewer holding `compensation:r` **in scope for
+  that employee**, otherwise the field is **absent from the payload**. The **level title** stays public
+  (`employee_profiles`) and the **generic step expectations** stay public (`job_architecture:r`).
+  *(Rationale: base pay point + published increment + known step = that person's pay to within the tolerance.
+  This is the CFL-42-19 inference class arriving through a door A1 opened — CFL-42-39.)*
+- **AC-194-47** **The matrix gains a `configured pay point` column**, treated exactly as an amount: `200+amt` for
+  `compensation:r` holders, **field absent** for everyone else. A pay point is not "configuration data that
+  happens to be a number" — it is one employee's expected salary the moment you know their step.
+- **AC-194-48** **§4.8.4's surface list gains three rows**, each a negative assertion: (14) the **step position**
+  of another employee in any payload; (15) the **configured pay point / increment / tolerance** in any payload,
+  export or nav to a viewer without `compensation:r`; (16) the **step-distribution report** below `n = 5`
+  (BR-4.19c / CFL-42-38).
+- **AC-194-49** **A roadmap is not a pay surface and must not become one.** The roadmap (KAN-207) is gated
+  `job_architecture` and row-scoped to self / `DIRECT`; **it contains no amount, no pay point and no
+  compa-anything**, asserted at the payload. An employee reading their own roadmap learns what the next step
+  requires of them, **not what it pays** — unless they separately hold `compensation_self` and the pay point is
+  shown on My Pay, which is a different surface with a different gate. **[BA call]**, and it is the one place a
+  well-meaning implementer would helpfully add "and it pays €66,150".
 
 ### 11.1 Backlog-style summary
 
@@ -2162,7 +2838,44 @@ comparison in front of an approver is a design question UX has not been asked �
 
 ---
 
-## 14. KAN-197 — Promotion as a first-class request type (W3 · R4 · D4e — closes backlog open item #3 and EP38 OQ-1/CFL-7)
+## 14. KAN-197 — **`LEVEL_CHANGE`** as a first-class request type (W3 · R4 · D4e — closes backlog open item #3 and EP38 OQ-1/CFL-7)
+
+### 14.0 Wave 3 rework — the `LEVEL_CHANGE` rename (SPM Ruling on CFL-42-25)
+
+**The SPM sent this story back and he is right.** My Wave 2 criteria named the request type **`PROMOTION`** and
+carried a derived `level_direction` alongside it (BR-5.10, AC-197-09). UX found the consequence: a **demotion is
+labelled "Promotion"** in the inbox, the bell, the timeline and the audit trail — and my own mitigation could not
+reach the durable record, because an audit action reading `PROMOTION_APPLIED` for a demotion is **a lie in the
+permanent record**, which a display label cannot fix.
+
+**Ruled: the enum value is `LEVEL_CHANGE`, with a stored `direction` of `UP` / `DOWN` / `LATERAL`.** It costs
+nothing now, when nothing is built.
+
+| Wave 2 | Wave 3 |
+|---|---|
+| `request_type ∈ {TRANSFER, PROMOTION, COMPENSATION_REVIEW}` | **`request_type ∈ {TRANSFER, LEVEL_CHANGE, COMPENSATION_REVIEW}`** |
+| audit action `PROMOTION_APPLIED` | **`LEVEL_CHANGE_APPLIED`**, with `direction` in the diff (BR-9.2, BR-9.6) |
+| `level_direction` as a BA addition (BR-5.10) | **`direction` is now first-class on the request**, which is what BR-5.10 was reaching for |
+
+- **AC-197-36** Every occurrence of `PROMOTION` as a **request type, enum value, audit action or API literal** in
+  §14 and everywhere else in this document reads **`LEVEL_CHANGE`**. Specifically superseded:
+  **AC-197-01, -02, -04, -07, -08, -09, -10, -11, -13, -21, -22, -23, -24, -25** and the story's summary row —
+  their content stands unchanged, their literal changes.
+- **AC-197-37** **"Promotion" stays the user-facing word when `direction = UP`.** R4 asked for a promotion flow,
+  not for an enum literal. The inbox, the bell, the request detail and the notification read *"Promotion"* for an
+  upward move, *"Level change"* for lateral, and *"Level change (downward)"* for a demotion — never "Promotion"
+  for a demotion, on any surface.
+- **AC-197-38** **`direction` is stored on the request, not derived at display time**, and is computed at create
+  time by comparing `(ordinal, step)` before and after. It appears in the audit diff (BR-9.2) so the durable
+  record is correct without a reader having to re-derive it from two level ids that may since have been renamed.
+- **AC-197-39** The existing `org_change_requests` rows all default to `TRANSFER` (AC-197-01, unchanged) and
+  **no existing row is given a `direction`** — it is null for `TRANSFER` and `COMPENSATION_REVIEW`, and
+  mandatory for `LEVEL_CHANGE`.
+- **AC-197-40** **Step changes are not `LEVEL_CHANGE` requests and do not go through the chain** (BR-11.8). A
+  step change is within-position job content (KAN-192); a **level** change is a request. **No bypass exists: the
+  step has no chain, the money always does.** Asserted: advancing a step creates **no** `org_change_requests` row
+  of type `LEVEL_CHANGE`, and changing a level through any path other than a `LEVEL_CHANGE` request returns `409`
+  (AC-192-14, unchanged).
 
 ### 14.1 Backlog-style summary
 
@@ -2415,7 +3128,45 @@ placement-only requests (AC-198-02: not configurable, either way).
 
 ---
 
-## 16. KAN-199 — Salary bands per level × pay market (W4 · D3.5 · D1 basis)
+## 16. KAN-199 — **Pay markets** and the annualisation constants (W2 · Ruling 32 · A1)
+
+### 16.0 Wave 3 rework — the story split, and what A1 then did to the half that left
+
+**The SPM sent this story back too, and the reason was that it was two stories.** CFL-42-21 asked whether
+KAN-199 was a hard or a soft prerequisite of KAN-200, and neither answer was right:
+
+| Half | Why | Where it went |
+|---|---|---|
+| **Pay markets** — the grouping key, the currency, the annualisation constants | **Hard** prerequisite. Without it the comparison group key is undefined and `monthly_payments_per_year` / `standard_annual_hours` have nowhere to live | **Stays as KAN-199**, promoted to **Must · P1** and moved **W4 → W2** |
+| **Salary bands** — min / midpoint / max | **Soft.** The engine was correct without them via the group median | **Becomes KAN-205**, **Should · P2**, W4 — specified in **§28** |
+
+**Then A1 changed what the band half is for.** Bands are **no longer the comparison basis** — the step pay point
+is (BR-10.3). A band becomes the level's **min/max envelope**: *"is this pay sane for this level at all?"*, a
+separate and independent signal from the step-correspondence check. §28 carries that.
+
+| Wave 2 criterion | Status | Where it is now |
+|---|---|---|
+| **AC-199-01 … AC-199-07** pay markets | **Stays here**, unchanged, promoted to Must · P1 in W2 |
+| **AC-199-08 … AC-199-17** bands, out-of-band, compa-ratio | **MOVED** to KAN-205 as **AC-205-01 … AC-205-12**, and **re-purposed by A1** — the midpoint is no longer a basis |
+| **AC-199-18 … AC-199-21** currency and the FX refusal | **Stays here** — it is a pay-market property, not a band property |
+| **AC-199-22 … AC-199-27** band edge cases, deletion, failure | **MOVED** to KAN-205 (`AC-205-13 … AC-205-18`); the market-archive rule **AC-199-25** stays here |
+| **AC-199-28 … AC-199-31** permissions and tenancy | **Stays here**, and applies to KAN-205 too |
+
+**New criteria for the rescoped KAN-199**
+
+- **AC-199-32** **KAN-199 is Must · P1 in W2**, a **hard** prerequisite of KAN-193 (which needs the annualisation
+  constants — BR-2.2), of KAN-206 (pay points attach to a market) and of KAN-200 (Check B's group key). It is
+  **no longer** a Should in W4.
+- **AC-199-33** The **annualisation constants** live here: `standard_annual_hours` (default 1800, range 500–2600)
+  and `monthly_payments_per_year` (default 12, range 12–14) — BR-2.2. Both are `company_settings:w` per A-3.
+  **OQ-BA-3 (should `monthly_payments_per_year` sit on the pay market rather than the company?) is answered by
+  this story's shape and is now more pressing, not less**: Acme spans Porto (14 payments) and Hamburg (12) in one
+  company, and this story is where a per-market constant would naturally live. Build against per-company; design
+  the field so it can move to the market without a change of meaning.
+- **AC-199-34** **Pay markets are where the pay points attach** (KAN-206). A market with no configured pay points
+  is valid and matches nobody's Check A′ evaluation (BR-10.11(d)); the configurator shows which
+  (level × market) pairs are unconfigured, because that count is the real readiness measure for the equity
+  feature.
 
 ### 16.1 Backlog-style summary
 
@@ -2530,7 +3281,139 @@ raised L3 by 3%") · enforcing a band on a pay decision (AC-199-14) · communica
 
 ---
 
-## 17. KAN-200 — The pay-equity comparison engine (W4 · R5 · D1) — the arithmetic
+## 17. KAN-200 — The pay-equity engine: **Check A′** (absolute) and **Check B** (statistical) (W4 · R5 · D1 · A1)
+
+### 17.0 Amendment A1 — the substantial re-specification
+
+**Check A is withdrawn and replaced by Check A′. Check B is untouched. Getting that split wrong is the way this
+amendment fails** (§0.3).
+
+| Wave 2 criteria | Status under A1 |
+|---|---|
+| **AC-200-01 … AC-200-08** group formation | **RETAINED — for Check B only.** Check A′ forms no group. Read them as Check B's group definition; their content is unchanged |
+| **AC-200-09 … AC-200-13** coverage gates, zero denominator, company gate, k-anonymity | **RETAINED — for Check B only**, except **AC-200-13** (the `n <= 2` counts-only rule), which is **universal** and binds every display in the epic including Check A′'s register |
+| **AC-200-14 … AC-200-23** Check A — basis selection, `n >= 3`, median, ratio, thresholds, WE-4/5/6 | **SUPERSEDED IN FULL.** Replaced by **AC-200-59 … AC-200-72** |
+| **AC-200-24 … AC-200-32** Check B | **UNCHANGED AND IN FORCE.** One addition — AC-200-73 (step as a reported dimension) |
+| **AC-200-33 … AC-200-37** FTE and annualisation fixtures | **UNCHANGED.** §4.2 survives A1 entirely, and WE-1 is still the fixture for both checks |
+| **AC-200-38 … AC-200-41** configuration | **AMENDED** — the parameter list changes (AC-200-74) |
+| **AC-200-42 … AC-200-46** cadence | **AMENDED** — new triggers (AC-200-75) |
+| **AC-200-47 … AC-200-53** framing and failure | **UNCHANGED** |
+| **AC-200-54 … AC-200-58** permissions and tenancy | **UNCHANGED**, and AC-200-55's both-codes rule now also covers the pay point (AC-200-80) |
+
+#### 17.0A Check A′ — the new criteria
+
+- **AC-200-59** **The reference value is the employee's own step's configured pay point** (BR-10.3). No group, no
+  median, no peers, no band midpoint. The basis recorded on every finding is `STEP_PAY_POINT`, and it is
+  displayed — a finding whose comparator is unstated is not actionable.
+- **AC-200-60** **Pay points compound**: `pay_point(step n) = base × (1 + i)^n`, exact decimal, **no intermediate
+  rounding**, HALF_UP to 2 dp **once at the end** (BR-10.2). **WE-8 is asserted verbatim** — 60,000 base, 5%,
+  `step_count = 5` → `.0` 60,000.00 · `.1` 63,000.00 · `.2` 66,150.00 · `.3` 69,457.50 · `.4` 72,930.38 ·
+  `.5` **76,576.89** — **with the linear column asserted as the wrong answer**, so a linear implementation fails
+  loudly rather than being 2.1% wrong at the top step.
+- **AC-200-61** **WE-8b is asserted verbatim** for a 3-step level: 80,000 base, 4% → `.0` 80,000.00 ·
+  `.1` 83,200.00 · `.2` 86,528.00 · `.3` **89,989.12**. A second `step_count` is required because
+  count-5-only fixtures would not catch a hardcoded six-value assumption.
+- **AC-200-62** **Rounding happens on the final pay point, not at each step.** Asserted with a fixture whose
+  answer differs if each step is rounded before the next is derived.
+- **AC-200-63** **Deviation** = `(fte_normalised_annual − pay_point) ÷ pay_point`, HALF_UP to **3 dp**, displayed
+  as a signed percentage to 1 dp (BR-10.4).
+- **AC-200-64** **Flag when `|deviation| > tolerance` — strictly.** A deviation of exactly the tolerance is
+  **not** flagged. **WE-9 is asserted verbatim**: pay point 66,150.00, tolerance ±2.0% → 67,473.00 → +0.020 →
+  **no flag**; 67,473.01 → rounds to 0.020 → **no flag**; 67,506.08 → 0.021 → **flag**; 64,827.00 → −0.020 →
+  **no flag**; 64,000.00 → −0.032 → **`PAY_BELOW_STEP`**; 70,000.00 → +0.058 → **`PAY_ABOVE_STEP`**.
+- **AC-200-65** **No minimum group size, and n = 1 is a valid, meaningful check.** A sole employee at a step is
+  compared to their step's pay point and is flagged if they deviate. Asserted explicitly, because the withdrawn
+  `n >= 3` rule is the thing most likely to be left in by accident. *(This is what dissolves the thin-data
+  problem: Acme has 46 employees across 41 free-text titles and exactly one title with n ≥ 3.)*
+- **AC-200-66** **No coverage gate on Check A′.** Replaced by the per-employee preconditions (AC-200-67) and the
+  ladder-fitted-and-reviewed gate (AC-200-69). Asserted as a negative: a group at 40% pay coverage still produces
+  Check A′ findings for the employees who are evaluable.
+- **AC-200-67** **Per-employee preconditions, each counted and shown, never silent** (BR-10.11): a level **and
+  step** assignment in effect · a compensation record in effect · a resolvable pay market · **a configured pay
+  point for that (level, step, market)** · `ACTIVE` · currency equal to the pay point's currency · not
+  `CONTRACTOR`, not `INTERN`. An employee missing any is **"not evaluable" with the reason named** — never a
+  finding, never invisible.
+- **AC-200-68** **Two findings with asymmetric severity** (BR-10.12): **`PAY_BELOW_STEP`** (`deviation <
+  −tolerance`) is **primary**; **`PAY_ABOVE_STEP`** (`deviation > +tolerance`) is **secondary, lower severity,
+  different copy**. They are separate types with separate filters and separate default disposition categories,
+  and are **never** merged into one "out of tolerance" finding. Asserted: the two are distinguishable in the
+  payload, the register, the bell and the audit row.
+- **AC-200-69** **Check A′ produces no finding for a company until its level/step backfill is marked reviewed**
+  (BR-11.5, AC-191-37). Until then the register shows review progress. Asserted end-to-end: run the engine before
+  the mark, get zero findings and a progress state; mark it, re-run, get findings.
+- **AC-200-70** **One person, one finding — true by construction.** There is no pairwise comparison and no group
+  size at which the check degenerates (BR-10.8).
+- **AC-200-71** **A currency mismatch between the compensation record and the pay point makes the employee not
+  evaluable** — it never converts, never assumes 1:1 and never compares across currencies (BR-1.7,
+  BR-10.11(f)).
+- **AC-200-72** **The evaluation records the pay point, increment and tolerance it used** (BR-4.31). A finding
+  that does not record its reference value cannot be explained after the configuration changes, and the
+  reference value is now configuration.
+
+#### 17.0B Check B — the protections that must survive the clear-out
+
+- **AC-200-73** **Every one of AC-200-24 … AC-200-32 stands unchanged**, and the group machinery they depend on
+  (AC-200-01 … AC-200-12) stands **for Check B**. Restated as an explicit criterion because it is the thing this
+  amendment is most likely to lose:
+  **`n >= 5`** · **`>= 2` compared of each gender** · the **median arithmetic including the even-n
+  mean-of-the-two-middle-values case** (BR-4.19a) · `OTHER`/NULL **excluded and counted** · the **gender-coverage
+  sub-gate** at 80% · the **coverage gate** at 80.0% with its 79.9%/80.0% boundary · `|gap| >= threshold`
+  **inclusive** with the **direction recorded** · **WE-7 asserted verbatim in both directions and at the exact
+  5.0% boundary** · the **lawful-basis acknowledgement gate** (AC-200-25, DPO-1) · and **CFL-42-32's floor: no
+  aggregate of any kind rendered below `n = 5`, with the configurable minimums floored in the database**.
+  A test suite that passes with any of these removed has not tested Check B.
+- **AC-200-74** **Step becomes a reported dimension of Check B, not a grouping one** (BR-4.24′). The finding
+  shows the step distribution of the compared set by gender, because a gender gap inside a level is more
+  informative when you can see whether the women in it are systematically at lower steps. **The group key does
+  not change.**
+- **AC-200-75** **The step distribution is rendered only where `|compared| >= 5`** and only to holders of **both**
+  `pay_equity:r` and `compensation:r` where any value in it is invertible into pay (BR-4.24′a, BR-4.19c,
+  CFL-42-38). A distribution over two people is an aggregate below the floor, and a step plus a published base
+  and increment is a salary.
+
+#### 17.0C Configuration and cadence, amended
+
+- **AC-200-76** **The configurable parameter list changes.** Removed: Check A low bound, Check A high bound,
+  Check A minimum group size, the Check A coverage gate. Added: **the step increment** (per level, optional
+  per-step override, 0.1%–50%, **no product default**), **the tolerance** (BR-10.7b's relative default), and the
+  **base pay point** per (level × market). Retained for Check B: the gap threshold, the minimum group size, the
+  minimum per gender, the gender-coverage sub-gate, the coverage gate. Every parameter is
+  **`company_settings:w`** per amendment A-3 — **not** "PORTAL_ADMIN only", which was a role check in product
+  clothing — except the pay points, increments and tolerances, which are **`compensation:w`** because they are
+  money (CC-42-7b).
+- **AC-200-77** **`tolerance < min(increment)/2` is enforced and the configuration is refused** where it is not,
+  with a message that explains why (BR-10.7, AC-206-09). **WE-10 is asserted**, including the per-step-override
+  case and the 4%-increment case, and including that the overlapping-bands configuration is **impossible to
+  save** — not warned about.
+- **AC-200-78** **New re-evaluation triggers** (BR-4.25 amended): a **base pay point**, **increment** or
+  **tolerance** change; a **step** change; the **fitted-and-reviewed** mark being set or re-opened. The
+  backdated-record exclusion (AC-200-43 / BR-4.26) is unchanged.
+- **AC-200-79** **The re-fire arithmetic follows BR-4.29′**: `deviation < −(tolerance + 0.020)` for
+  `PAY_BELOW_STEP`, `deviation > +(tolerance + 0.020)` for `PAY_ABOVE_STEP`, and **`|gap| >= threshold + 0.020`
+  for Check B, unchanged**. A pay-point or increment change is a configuration re-fire condition, because every
+  justification measured against the old reference is stale.
+- **AC-200-80** **The both-codes rule (CFL-42-19) extends to the pay point and the deviation.** A numeric
+  deviation, a pay point or a step-distribution value renders only to a holder of **both** `pay_equity:r` and
+  `compensation:r`; to a `pay_equity:r`-only holder it renders as a **band label** (e.g. *"more than 5% below the
+  step"*), never a number. *(A deviation against a published pay point is a salary with one arithmetic step
+  removed — the same finding as the compa-ratio, on the new reference.)*
+- **AC-200-81** **The framing criteria are unchanged and still apply** (AC-200-47 … AC-200-49): the product
+  computes a measurement, does not determine whether work is of equal value, does not decide whether a gap is
+  objectively justified, and **no surface or document claims it makes a customer compliant with any
+  pay-transparency law**. A1 makes the primary check *more* absolute, which makes the temptation to over-claim
+  *greater*, not smaller.
+- **AC-200-82** **The base-only limitation is still stated on the screen** (AC-200-49), and A1 makes it slightly
+  sharper: the step pay point is a **base** pay point, so a company with material variable pay is comparing base
+  to base and the screen says so (OQ-5, still open).
+- **AC-200-83** **Check A′ is cheaper than Check A was and the tests must not assume otherwise.** The primary
+  computation is a per-employee comparison against a configured value — no percentile, no group windowing. The
+  real-DB tier (KAN-168, DEP-4) is still required, but **for Check B's group arithmetic**; Check A′ is unit-
+  testable against fixtures.
+- **AC-200-84** **The original ask is still delivered, and this is asserted rather than argued.** Two employees at
+  the **same step in the same position** are measured against **the same pay point**, so if they are paid more
+  than the tolerance apart, **at least one is flagged**. Asserted with a fixture: two employees at `2.2`, one at
+  the pay point and one 6% below, tolerance 2% → exactly one `PAY_BELOW_STEP`. The correspondence check
+  **subsumes** the dispersion check the owner originally asked for (SPM §14.1).
 
 ### 17.1 Backlog-style summary
 
@@ -2722,7 +3605,74 @@ remediation cost modelling · the flag's delivery and lifecycle (KAN-201).
 
 ---
 
-## 18. KAN-201 — Flag delivery, the queue and the lifecycle (W4 · R5 delivery · D2)
+## 18. KAN-201 — Finding delivery, the register and the lifecycle (W4 · R5 delivery · D2 · A1)
+
+### 18.0 Amendment A1 — three finding types, and a finding that carries its own remedy
+
+| Wave 2 criterion | Status | Replacement |
+|---|---|---|
+| **AC-201-07** register columns (basis, group size, measured gap) | **AMENDED** | **AC-201-47** — columns differ by finding type; group size is meaningless for Check A′ |
+| **AC-201-14** one icon, `PAY_EQUITY_FLAG_RAISED → ⚖️` | **AMENDED** | **AC-201-48** — three types, and they must be distinguishable without colour |
+| **AC-201-16** one quick action, "Review →" | **EXTENDED** | **AC-201-51** — `PAY_BELOW_STEP` additionally offers **"Propose adjustment"** |
+| **AC-201-23** justification categories | **EXTENDED** | **AC-201-50** — separate default category lists per finding type |
+| **AC-201-28/29** the anti-fatigue rule | **AMENDED** | follows **BR-4.27′ / BR-4.29′** (AC-200-79) |
+| — | **NEW** | **AC-201-47 … AC-201-58** |
+
+**New criteria**
+
+- **AC-201-47** **There are three finding types and the register treats them as three things**:
+  **`PAY_BELOW_STEP`** (primary), **`PAY_ABOVE_STEP`** (secondary, lower severity, different copy) and
+  **`GENDER_GAP`** (Check B, group-level). Each has its own filter, its own default sort position, its own copy
+  and its own disposition categories. They are **never** merged into a single "findings" list with a type column
+  and identical treatment.
+- **AC-201-48** **Columns differ by type**, because a shared column set forces meaningless cells: for
+  `PAY_BELOW_STEP`/`PAY_ABOVE_STEP` — subject, level, **step**, pay market, **pay point**, **deviation**,
+  tolerance, raised date, state, owner; for `GENDER_GAP` — group, level, pay market, **group size**, compared
+  counts by gender, measured gap, threshold, raised date, state, owner. **"Group size" is not shown on a Check A′
+  finding**: the check has no group and a blank or a `1` in that column would invite exactly the wrong reading.
+- **AC-201-49** **Icons and severity are distinguishable without colour** (WCAG 2.2 AA, CC-42-22):
+  `PAY_BELOW_STEP → ⚖️` with a "primary" label, `PAY_ABOVE_STEP → ⚖️` with a "for information" label,
+  `GENDER_GAP → ⚖️`. All three are added to `NOTIF_ICON`; **none of them is `❌`** (DEF-002) and the neutral `🔔`
+  fallback stays. **[BA call]:** the three share the icon and are separated by **label and section ordering**,
+  not by colour and not by three near-identical glyphs nobody can tell apart at 16px.
+- **AC-201-50** **Default disposition categories differ by type**, seeded and company-editable:
+  `PAY_BELOW_STEP` — *adjustment planned* · *step recorded early, pay follows at the next cycle* · *recent
+  hire, not yet at rate* · *other (text required)*; `PAY_ABOVE_STEP` — *market premium* · *red-circled legacy
+  pay* · *retention adjustment* · *step under-recorded — correct the step* · *other (text required)*;
+  `GENDER_GAP` — the Wave 2 list (seniority, tenure in role, performance, market premium, red-circled legacy pay,
+  other). A shared list would offer "market premium" as an explanation for someone being **underpaid**.
+- **AC-201-51** **`PAY_BELOW_STEP` carries its own remedy** (BR-10.13). The register offers **"Propose
+  adjustment"**, which pre-fills a `COMPENSATION_REVIEW` at **the step's configured pay point** and routes it
+  through the **existing** chain. It is a **deep link into the normal request flow, not a one-click apply** — the
+  request is an ordinary request, subject to the mandatory pay answer, to four-eyes (KAN-198) and to the
+  create-time approver-eligibility check (AC-196-10).
+- **AC-201-52** **The finding retires as `RESOLVED` when the pay lands**, not when the request is raised.
+  Asserted end-to-end across the whole chain: raise the adjustment, approve every level, confirm the compensation
+  record is written, confirm the re-evaluation finds the deviation within tolerance, confirm the finding moves to
+  `RESOLVED` and **retires from the bell of every eligible recipient** — not only the one who acted (DEF-003).
+- **AC-201-53** **If the pre-filled adjustment is rejected or cancelled, the finding stays `OPEN`** and returns
+  to the register with its original raised date. A rejected remedy is not a disposition, and the ageing clock
+  does not reset.
+- **AC-201-54** **"Propose adjustment" is absent for a user without `compensation:w`** — absent from the DOM and
+  from the payload, not disabled (BR-8.4). A `pay_equity:w`-only holder can disposition the finding and cannot
+  propose the money.
+- **AC-201-55** **No amount, pay point or deviation percentage appears in any notification body** for any finding
+  type (BR-9.1, AC-201-17 unchanged) — and A1 adds a specific trap: **the message must not name the step
+  either**, because a step plus a published ladder is a pay point (BR-5.5a, CFL-42-39). The body names the
+  subject, that a threshold was exceeded, and the type.
+- **AC-201-56** **The badge rule of CFL-42-24 is unchanged and applies to all three types**: the badge counts
+  findings **with no owner**; `[ Take ]` is a recorded, audited act that decrements the badge while the finding
+  stays open and stays in the register. `PAY_ABOVE_STEP`'s lower severity does **not** exempt it from the badge —
+  it changes its sort position and its copy, not its existence.
+- **AC-201-57** **CFL-42-27 is unchanged and now has three types to cover**: the subject of a finding may
+  **read** a finding about themselves and the **disposition controls are absent**, with the stated line. For
+  `GENDER_GAP` there is no individual subject, so the rule does not arise — but a `pay_equity` holder who is a
+  **member of the compared group** may still disposition it, and that is accepted, because a group-level finding
+  is not about them personally. **[BA call]**, stated so it is not read as an oversight.
+- **AC-201-58** **The register shows the ladder-review state when Check A′ is gated** (AC-200-69): review
+  progress, not an empty "no findings" state, and not a `GENDER_GAP`-only list presented as if it were
+  everything. *(An empty findings list at 0% ladder review reads as "we are fine", which is the D7.4 failure mode
+  in a new place.)*
 
 ### 18.1 Backlog-style summary
 
@@ -2891,7 +3841,68 @@ cross-tenant benchmarking of flag rates · a "pay equity score".
 
 ---
 
-## 19. KAN-202 — Compensation history and the audit coupling (W4 · D5.6)
+## 19. KAN-202 — Compensation **and step/roadmap** history + the audit coupling (W4 · D5.6 · A-2 · A1)
+
+### 19.0 Wave 3 rework — amendment A-2: the criteria must stop claiming a guarantee the mechanism cannot deliver
+
+**The SPM sent this story back and this is the rework that matters most, because it is the difference between an
+honest control and a false one.**
+
+**What I wrote.** BR-9.1 and **AC-202-08**, **AC-202-10** and **AC-202-14** state that *"a monetary amount is
+never written into an `audit_log` diff, metadata **or reason**"*, enforced by a `_MONEYISH_KEYS` guard, and
+AC-202-14 asserts that **holding `audit_log:r` alone never reveals an amount**.
+
+**Why it is wrong.** `_MONEYISH_KEYS` matches **keys**, exactly as `_SECRETISH_KEYS` does
+(`app/services/audit_service.py:95-98, 153-159`). **`reason` is mandatory free text a human types.** No
+key-matching guard can see inside it. UAT was right to refuse to write a pass/fail case for AC-202-14 as worded:
+I specified a guarantee the mechanism cannot give, which is **worse than specifying a weaker one**, because a
+reader takes it as an assurance and stops looking.
+
+**The replacement, and it splits into a guarantee and a design.**
+
+- **AC-202-26** — **the structural guarantee stands and is STRENGTHENED.** The **denylist becomes a per-action closed
+  allowlist** of permitted diff keys (ADR-019): a creatively-named key is refused **because it is not on the
+  list**, not because we guessed it might be money. **No amount reaches `before_state`, `after_state` or
+  `metadata`.** That part is a guarantee, it is testable, and the test asserts both directions — every permitted
+  key accepted, every other key refused. **Supersedes AC-202-10's denylist framing.**
+- **AC-202-27** — **the free-text `reason` is governed by DESIGN, not by a guard, and the criteria say so.** On
+  compensation-bearing actions, `reason` becomes a **mandatory category** from a seeded, company-editable list
+  (*Annual review · Promotion · Market adjustment · Role change · Correction · Other*) **plus optional free
+  text**. The mandatory part is therefore structured. The optional text carries a **non-blocking warning** when
+  it matches a numeric pattern — *"reasons are readable by audit-log holders who may not be able to see pay"* —
+  and is included in the compensation redaction path at erasure (§4.7.5).
+- **AC-202-28** — **no acceptance criterion may claim the guarantee covers free text.** **AC-202-14 is superseded**
+  and re-worded: *"holding `audit_log:r` alone reveals no amount **from any structured field** — diffs, metadata,
+  entity references or derived bands. Free text entered by a human is governed by AC-202-27's category-plus-
+  warning design and is **not** structurally guaranteed."* The test asserts the structured claim and **must not**
+  assert the free-text one.
+- **AC-202-29** — **the honest statement goes in the product documentation too**, not only here. A control described
+  to a customer as "amounts never appear in the audit log" that a determined user can defeat by typing is a
+  control the customer will rely on wrongly. `BUSINESS_OVERVIEW_FEATURES_AND_ACCESS.md` carries the accurate
+  form when the BA amends it in the implementation commit.
+- **AC-202-30** — **BR-9.1 is amended in the same terms.** Its sentence now reads: *"a monetary amount is never
+  written into an `audit_log` diff or `metadata`; `reason` is structured by a mandatory category and its optional
+  free text is warned, redacted at erasure, and not structurally guaranteed."* **BR-9.5's `_MONEYISH_KEYS` is
+  retained as defence in depth beneath the allowlist, not as the mechanism.**
+
+**Standing lesson, recorded because I am the one who broke it:** *a guarantee is only stated if the mechanism
+delivers it.* I will apply that test to every "never" in this document before Wave 5.
+
+### 19.0A Amendment A1 — the timeline gains the step and the roadmap
+
+- **AC-202-31** **The timeline shows pay, level/step and roadmap on one date axis** — *"how did this person get
+  here"* is one story, not three. Each step change shows its **review context**, its **date**, its actor and
+  whether a pay proposal was raised and what became of it; each roadmap version shows its target step, its author
+  and its acknowledgement.
+- **AC-202-32** **The step half of the timeline is `job_architecture:r` + row scope; the pay half is
+  `compensation:r` + row scope.** A viewer with one and not the other sees that half only, with the other
+  **absent**, and the timeline does not break, mis-align or imply missing data. An employee viewing their own
+  sees their own step, roadmap and — if `compensation_self` is enabled — their own pay.
+- **AC-202-33** **The timeline is the place a `PAY_BELOW_STEP` finding becomes explicable**: it shows the step
+  change on 12 March and the pay change on 1 July, and the gap between them is visible rather than inferred.
+  Asserted with the AC-192-39 fixture.
+- **AC-202-34** **The step/roadmap timeline contains no rating, score or assessment** (BR-11.3), and no
+  aggregation across employees. It is one person's history, not a comparison.
 
 ### 19.1 Backlog-style summary
 
@@ -2991,6 +4002,34 @@ diffing two employees' timelines.
 
 ## 20. Conflict log and defects
 
+### 20.0 The authoritative register is the SPM's, and this section is subordinate to it
+
+**In Wave 3 the SPM discovered that the BA and the Architect had independently allocated `CFL-42-8` through
+`CFL-42-13` to different conflicts, and he issued a single authoritative register (SPM §12.3) that maps every
+prior ID.** **That register governs. This section keeps its Wave 2 numbering** — the SPM's ruling is explicit
+that Wave 2 documents keep their internal numbering — but where the two disagree on what an ID means, **his
+mapping resolves it**. Three consequences worth restating here:
+
+- **CFL-42-8** (the 302 denial) → **ruled: fixed in KAN-188** alongside the resolver rewrite, as a JSON-aware
+  content-negotiated denial. **This also silently fixes EP38's "returns 403" criteria**, which I should note and
+  do.
+- **CFL-42-12** (no non-session feature resolver) → **ruled: `feature_access_for(user_id, company_id)` becomes a
+  named deliverable of KAN-188**, which is already rewriting that query. **DEP-10 closes.** It blocks KAN-196,
+  **not** KAN-194.
+- **CFL-42-14 / CFL-42-15** (self-initiation and self-approval) → **ruled: recorded against EP27 as DEF-42-4 and
+  DEF-42-5, fixed inside EP42 as KAN-203 at P0 in W0.** Subject ≠ initiator and subject ≠ decider are
+  **universal**; initiator ≠ decider is **money-scoped** and stays in KAN-198. My criteria AC-196-34, AC-197-17,
+  AC-197-20, AC-198-04, AC-192-28 and AC-192-29 are the criteria for KAN-203 and are re-homed there.
+
+**CFL-42-33 applies to every cross-tenant subject substitution in this document:** the SPM has ruled **`404`**,
+not `403`, because a `403` on a cross-tenant id is an existence oracle. Every criterion in §5–§28 that says
+`403` **for a cross-tenant subject** reads `404`; every criterion that says `403` for an **in-tenant permission
+failure** is unchanged.
+
+**CFL-42-34** — my **BR-1.6** (compare the value the UI shows) contradicted UAT's F-01 recommendation (carry
+ratios unrounded into comparisons). **Ruled: BR-1.6 wins.** The effective boundary is documented in the UI, as I
+specified. It applies unchanged to A1's tolerance comparison (AC-200-64, WE-9).
+
 ### 20.1 Conflicts carried forward from the SPM (§7.3) with the BA's position
 
 *Never resolved silently (Charter §9.3). Numbered `CFL-42-n`, continuing the SPM's sequence.*
@@ -3020,6 +4059,23 @@ diffing two employees' timelines.
 | **CFL-42-16** | **"Copy the `manager_relationships` pattern" produces the wrong answer for compensation.** A stored `is_current` flag on a future-dated record would need a scheduler to flip it, and there is none. | **Medium** | SPM D4d's steer; SPM S16 | **BA position: BR-3.2 / AC-193-13** — "current" is **computed**, never stored, for compensation and level assignments. **Architect to confirm** in the data-model ADR. |
 | **CFL-42-17** | **Two coverage numbers with different denominators.** D7 specifies "coverage"; the group key requires a level, so pay coverage and level coverage cannot share a denominator. An unlabelled "62%" is ambiguous and will be quoted at a customer. | **Medium** | SPM D7.5 vs D1's group key | **BA position: BR-4.3 / AC-195-16** — two named figures, each naming its denominator. **SPM to note**, since D7.5's example string is now insufficient. |
 
+### 20.2A New conflicts found while applying Amendment A1
+
+*Nine, and the first four are the ones I would put in front of the SPM first. None of them is a disagreement with
+A1 — they are places where A1's own statements do not yet reconcile with each other or with a Wave 3 ruling.*
+
+| ID | Conflict | Severity | Evidence | Resolution required from |
+|---|---|---|---|---|
+| **CFL-42-35** | **The fourth feature code does not do the thing it was created to do.** SPM §14.3.2 introduces `job_architecture` explicitly so *"a manager authors a roadmap for their direct reports"* — that is its stated justification. **Its seeded-defaults table in the same section gives `SOLID_LINE_MANAGER` no `w`**: `EMPLOYEE` r · every other role r · HR_ADMIN r+w · PORTAL_ADMIN r+w. Under those defaults the manager still cannot author, and the only way to let them is the `compensation:w` grant the code exists to avoid. | **High** | SPM §14.3.2, rationale vs its own defaults table | **SPM.** Seed `SOLID_LINE_MANAGER` `job_architecture:w`, row-scoped to `DIRECT`. It is a seed value, not a code change. **Blocks KAN-207** (AC-207-03). |
+| **CFL-42-36** | **`tolerance < increment/2` is under-specified against A1's own per-step override.** §14.2.1 permits a per-step increment override; §14.2.2 states the rule against *"the increment"*, singular. Where increments differ, adjacent tolerance bands overlap **at the smallest increment in the level**, so validating against the level default re-opens the exact hole the rule closes. | **High** | SPM §14.2.1 vs §14.2.2 | **SPM ratification + Architect.** Build against `tolerance < min(increment over the level) / 2` (BR-10.7a, AC-206-09). |
+| **CFL-42-37** | **The shipped default tolerance is invalid for any increment ≤ 4%.** A fixed ±2% satisfies `tolerance < increment/2` only when `increment > 4%`. A company configuring a 3% increment **cannot save the shipped default** and meets a refusal on their first attempt to configure the feature. | **Medium** | Arithmetic on SPM §14.2.2's own numbers | **SPM.** Recommended: express the default **relatively** — `tolerance = increment ÷ 4` — always valid by construction (BR-10.7b, AC-206-10). |
+| **CFL-42-38** | **A1's step-distribution report breaches the SPM's own CFL-42-32 floor.** §14.3.4 asks for step distribution in the register and the team view; CFL-42-32 rules that **no aggregate of any kind is rendered below n = 5**. A distribution over two people is such an aggregate — and once pay points exist, a step **is** a salary to within the tolerance. | **High** | SPM §14.3.4 vs SPM §12.3 CFL-42-32 | **SPM.** BA position: render the distribution only at `|compared| >= 5`, and only to holders of **both** codes where any value is invertible (BR-4.24′a, AC-200-75). |
+| **CFL-42-39** | **A1 opens a new pay-inference channel and the amended surface list has not been applied to it.** `job_architecture:r` is seeded to **every role**, and §14.3.4 makes step position visible. **Base pay point + published increment + known step = that person's pay to within the tolerance.** The SPM amended his §4.5.7 list in Wave 3 to add *inference* as a category (CFL-42-19) and A1 then created a new instance of it. | **High** | SPM §14.3.2 + §14.3.4 vs CFL-42-19 | **SPM + Architect.** BA position (BR-5.5a): own step always visible; **another employee's step scoped as their pay is**; level title and generic step expectations stay public. |
+| **CFL-42-40** | **`review_context` is mandatory on a step change, and the fitted-step backfill sets a step for up to 146 people at once.** None of A1's four contexts is true of a bulk initial load, and requiring one would be answered dishonestly. | **Low** | SPM §14.5 vs §14.2.5 | **BA position: a fifth value, `INITIAL_LOAD`**, available only to the backfill path and never selectable by a human (BR-11.6a, AC-191-42, AC-192-34). SPM to ratify. |
+| **CFL-42-41** | **The revised build order puts the story that needs pay points a wave before the story that creates them.** KAN-191's fitted-step backfill (**W1**) fits a step by comparing pay to **configured pay points**, which KAN-206 creates in **W2**. Run in W1 as ordered, the backfill can fit nothing and everyone lands at `.0` — which is precisely the alert-storm scenario §14.2.5 exists to prevent. | **High** | SPM §14.8 build order vs §14.2.5 | **SPM.** Either the fitted backfill runs after KAN-206 (a two-phase KAN-191: assign levels in W1, fit steps in W2), or KAN-206 moves to W1. BA recommends the two-phase split — it keeps W1's shippable, money-free slice intact. **AC-191-36.** |
+| **CFL-42-42** | **KAN-208's distribution requirement is unverifiable when KAN-208 is delivered.** It must shape gender so *"at least two comparison groups satisfy Check B's minimums"*. A comparison group needs a family, a level and a pay market. **KAN-208 is W0; none of those exists until W1/W2.** | **Medium** | SPM §14.6.3 vs the §14.8 build order | **SPM.** Build in W0 against the planned ladder; **move the assertion to a W1 exit gate** (AC-208-10). |
+| **CFL-42-43** | **KAN-208 changes live behaviour in a shipped feature and neither the owner's answer nor §14.6 mentions it.** `employees.gender` has exactly **one** consumer today — vacation eligibility (`app/helpers.py:223, 269-280`), documented at `docs/BUSINESS_DOCUMENTATION.md:245`. Going from **100% NULL to 100% populated changes which vacation types 146 employees are offered.** That is a behavioural change to a shipped feature, not a test-data tweak. | **High** | `app/helpers.py:223,269-280`; `psql` → 147 NULL | **SPM + UAT.** Run the vacation regression suite before and after and explain every difference; review every gender-restricted seeded vacation type against the new distribution (AC-208-15). |
+
 ### 20.3 Defects found while writing these criteria
 
 *Pre-existing, not caused by EP42, but material to it. Raised for the SPM and the Delivery Manager to route; the BA
@@ -3034,6 +4090,21 @@ does not own the defect log.*
 ---
 
 ## 21. Traceability matrix
+
+### 21.0 Amendment A1 — the rows that changed
+
+| Ask | Wave 2 | Under A1 |
+|---|---|---|
+| **R5** — flag a >5% difference to the HR responsible | KAN-200 (statistical engine) · KAN-201 · KAN-199 (bands as basis) | **KAN-206** (the pay point — the reference value) · **KAN-200** (Check A′ absolute + Check B statistical) · **KAN-201** (three finding types + the remedy) · KAN-199 (pay markets, the Check B group key) · KAN-205 (the envelope, soft). **"5%" is now a configuration input, not a detection threshold** — the detection number is the **tolerance** |
+| **R6** — job levels with steps, per company, each with its own title | KAN-190 · KAN-191 · KAN-192 | **+ KAN-207** (the roadmap — *the object the owner actually asked for*) and **+ the step expectation** in KAN-190. R6's coverage was **partial** in Wave 2 and neither of those objects existed |
+| **R4** — promotion triggers a salary review | KAN-197 · KAN-192 | Unchanged in substance; **`PROMOTION` → `LEVEL_CHANGE`** (CFL-42-25), and **a step change now also proposes a pay review** (BR-11.8), which extends R4 below the level boundary |
+| *(no ask)* | — | **KAN-208** traces to **no owner ask as a product requirement** — it is a **data enabler** for R5's Check B. Recorded so it is not mistaken for scope: it is the only EP42 story that delivers no user-facing behaviour |
+
+**R6 coverage is now Full, and it was not before.** My Wave 2 traceability recorded R6 as "Full, with one open
+point (OQ-1)". That was wrong in a way A1 exposed: the owner's sentence contained **two objects I did not
+specify** — the per-step responsibilities and the manager-authored roadmap — and a document that maps an ask to
+stories it does not fully deliver is a traceability matrix that is lying quietly. Recorded rather than corrected
+silently.
 
 ### 21.1 Forward — owner's ask → decision → story → acceptance criteria
 
@@ -3093,6 +4164,22 @@ and Check B additionally carries a lawful-basis gate the SPM did not specify (**
 | **D7** — backfill and partial-data behaviour | §4.6; AC-195-*; AC-200-09…AC-200-13 |
 | **D8** — T2/T5 and the demo safeguards | CC-42-8, CC-42-24, AC-194-04, AC-194-43, AC-194-44 |
 
+### 21.4A Amendment A1 — the contingency register, re-checked
+
+**Several contingencies died with Check A. Two closed. Three are new.**
+
+| OQ | Wave 2 status | Under A1 |
+|---|---|---|
+| **OQ-1** the roll-up | Contingent: **AC-192-06 … AC-192-14** | **CLOSED — the owner confirmed the default.** Those criteria are no longer contingent on anything. KAN-192 is no longer the story gated on a product-owner answer |
+| **OQ-3** what "5%" means | Contingent: **AC-200-24 … AC-200-32** (all of Check B) | **CLOSED by reinterpretation** — and the reinterpretation went the other way from the question. "5%" is the **increment**; Check B keeps its own separately-configured threshold, and its contingency is now **DPO-1**, not OQ-3 |
+| **OQ-BA-1** exempt the band basis from `n >= 3` | Contingent: AC-200-14, AC-200-15 | **CLOSED — MOOT.** There is no group minimum on the primary check to exempt, and no band basis. The question dissolved with the thing it was about |
+| **OQ-5** total compensation | Contingent: AC-193-01, AC-200-49 | **STILL OPEN, and slightly worse.** The step pay point is a **base** pay point, so a later "total compensation" answer changes what the **increment applies to** as well as the record's shape. It is now the last question that can force a rewrite |
+| **OQ-6** currency per pay market | Contingent: AC-199-18 … AC-199-21, AC-200-37 | **Less pressing.** An absolute per-market reference never crosses currencies. Still open for KAN-205 |
+| **DPO-1** gender purpose limitation | Contingent: all of Check B | **UNCHANGED AND STILL GATING.** KAN-208 supplies data; it does not supply lawfulness (AC-208-13) |
+| **OQ-A1-1** *(new, SPM)* is the reconciliation of the 5% what he meant? | — | Contingent: **the whole of Check A′** (AC-200-59 … AC-200-72). Default: build it as reconciled. **Low cost if he confirms; high if he meant something else, because the reference value is the epic's spine** |
+| **OQ-A1-2** *(new, SPM)* propose vs apply | — | Contingent: **AC-192-35, AC-192-36, AC-192-38, AC-192-39, BR-11.8**. Default: propose. Four independent reasons converge on it, so I would build against it with High confidence |
+| **OQ-A1-3** *(new, SPM)* EP42 records the review, does not build it | — | Contingent: **AC-192-33, AC-192-44, BR-11.7**. Default: as stated. **This is the one most likely to produce a surprise later** and it should be said out loud, not filed |
+
 ### 21.4 Criteria contingent on an unanswered question
 
 | OQ | Contingent criteria | If the answer differs |
@@ -3139,6 +4226,25 @@ against those defaults**. §21.4 maps each to the criteria it would change. The 
 **OQ-3 should be put to the owner together with DPO-1**, because "does he want the gender-gap check" and "may we
 lawfully compute it from the data we have" are one conversation, not two.
 
+### 23.1A Amendment A1 — the BA's open questions, re-checked and extended
+
+| ID | Status under A1 |
+|---|---|
+| **OQ-BA-1** exempt the band basis from `n >= 3` | **CLOSED — MOOT.** No group minimum on the primary check; no band basis (SPM §14.7 row 12) |
+| **OQ-BA-2** inserting a level mid-ladder | **OPEN, ratified for this cycle** — with the SPM's addition that the configurator says so **at the point the ladder is being defined**, not as an error six months later. A1 makes it slightly sharper: a mid-insertion would now also renumber pay points |
+| **OQ-BA-3** where `monthly_payments_per_year` lives | **OPEN and MORE pressing.** KAN-199 is now the pay-market story in W2 and is exactly where a per-market constant would live. Acme spans Porto (14 payments) and Hamburg (12) in one company. **AC-199-33** |
+| **OQ-BA-4** does the subject receive the top-step signal? | **PARTLY ANSWERED by A1** — the owner said the signal is *"indicative for the reporting manager"*, which confirms the subject is not the recipient. **The remaining half is OQ-BA-13** (does the employee see the roadmap? — yes, unambiguously) |
+| **OQ-BA-5** a "who viewed this salary" access log | **OPEN, and now wider**: it would also cover who read a colleague's step and a colleague's roadmap |
+| **OQ-BA-6** one retention clock or two | **OPEN, unchanged.** A1 adds two more retained objects (step assignments, roadmaps) to the same clock |
+| **OQ-BA-7** the CSV column named `annual_base` | **OPEN, unchanged.** Rename to `amount` |
+| **OQ-BA-8** should an approver see band context at decision time? | **RE-SHAPED.** With a computable pay point, the more useful question is whether an approver of a `COMPENSATION_REVIEW` sees **the step's pay point and the deviation** at decision time. BA recommendation: **yes for the pre-filled step adjustment** (the number is the whole point of pre-filling it), still no for a general transfer |
+| **OQ-BA-9** initiator ≠ decider | **RULED by the SPM (CFL-42-31): yes, money-scoped, in KAN-198.** Closed |
+| **OQ-BA-10** the seeded two-level default chain | **RULED by the SPM: adopted** (CFL-42-26 / AC-198-11). Closed |
+| **OQ-BA-11** DEF-42-1 fixed inside EP42 or independently | **OPEN, and now urgent**: KAN-208 makes `employment_type` correctness visible, and Check A′'s preconditions exclude on it (BR-10.11(g)) |
+| **OQ-BA-12** *(new)* Does the employee see **their own step's pay point** on My Pay? | **AC-206-17.** Default: **yes, as a plain-language position statement, never a raw deviation.** In some organisations that is exactly the transparency the owner asked for; in others it is a works-council matter (OQ-8). **Owner + DPO.** Cost if late: a copy change |
+| **OQ-BA-13** *(new)* The owner said *"mutually decided"*. Does the employee **agree**, or **acknowledge**? | **AC-207-15.** Default: **acknowledge — "I have read this"**, not "I agree". Recording "read" honestly beats recording "agreed" falsely, and a disagreement is a conversation, not a form field. **Owner**, because it is his word. Cost if late: a label and a column |
+| **OQ-BA-14** *(new)* Is the employee **notified** when a roadmap is written for them? | Default: **no notification, it appears on their profile.** Reasonable either way; it is a UX decision and I will not invent a requirement. **SPM/UX** |
+
 ### 23.2 New open questions raised by the BA
 
 | ID | Question | Owner | Recommended default *(build against this now)* | Blocks | Cost if late |
@@ -3154,6 +4260,34 @@ lawfully compute it from the data we have" are one conversation, not two.
 | **OQ-BA-9** | Should the **initiator** of a money-bearing request be barred from deciding it (initiator ≠ approver)? | **SPM** (governance policy) | **Yes** (AC-198-05). Without it, an HR_ADMIN raises a colleague's pay rise and approves it — one person, two hats. | KAN-198 | **Low** — a guard either way; the question is scope. |
 | **OQ-BA-10** | Confirm the **seeded default chain for `PROMOTION` and `COMPENSATION_REVIEW`** as two `ROLE` levels (HR_ADMIN → PORTAL_ADMIN). | **SPM** | **Confirm** (AC-198-11). Without it every tenant hits AC-198-08 on their first pay change, because the current default chain is a single HR_ADMIN level. | KAN-198 seed data | **Low** — one seed value, but it is the difference between the control working and the feature not working. |
 | **OQ-BA-11** | **DEF-42-1** (the employee importer cannot write a valid `employment_type` and fails silently) — is it fixed inside EP42 or raised as an independent defect? | **SPM + Delivery** | **Independent defect**, fixed before KAN-195 starts. EP42 depends on `employment_type` being correct but should not absorb an unrelated fix. | KAN-195 quality, KAN-200 exclusions | **Medium** — if unfixed, part-time and contractor paths are untestable through the only bulk path. |
+
+### 23.3A Definition of Ready after Amendment A1 — the deltas
+
+*The §23.3 table below stands for every story A1 did not touch. These are the changes.*
+
+| Story | DoR after A1 | What is still missing |
+|---|---|---|
+| **KAN-190** | **NOT READY** | UX's **step-expectations editor** (§6 becomes a content editor, not a structural one) · **CFL-42-35** (the manager's `w` grant is registered here) · the two-gate screen (AC-190-35). Criteria complete |
+| **KAN-191** | **NOT READY**, and it is now the **highest-leverage** unready story | **CFL-42-41** — the fitted backfill needs KAN-206's pay points, which are a wave later. Also UX's review screen at 146 people. **KAN-191 now gates the entire equity feature** (AC-191-37), so its readiness matters more than it did |
+| **KAN-192** | **NOT READY** — but **no longer gated on OQ-1**, which closed | UX for the review-context selector and for showing the pay proposal **as a proposal going to approval, never as a change that has happened**. **OQ-A1-2** carries a default. Criteria complete |
+| **KAN-194** | **NOT READY** | Unchanged, plus the fourth code's matrix rows (AC-194-46/47) and **CFL-42-39**'s step-scope resolution |
+| **KAN-197** | **NOT READY** | Unchanged. The `LEVEL_CHANGE` rename is applied (AC-197-36 … AC-197-40) and **simplifies** UX's derived-label workaround |
+| **KAN-199** | **NOT READY** | Promoted to Must · P1 in W2 and now a **hard** prerequisite of three stories. **OQ-BA-3** is more pressing than it was |
+| **KAN-200** | **NOT READY** | **DEP-4 (KAN-168) still hard-blocks it** — but **only for Check B's group arithmetic** now; Check A′ is unit-testable (AC-200-83). **OQ-A1-1**, **DPO-1** (Check B only), and UAT's new hand-computed fixtures WE-8/8b/9/10 |
+| **KAN-201** | **NOT READY** | UX for three finding types with distinct copy and severity, and for **"Propose adjustment"** as the primary path. Criteria complete |
+| **KAN-202** | **NOT READY** | DEP-8, CFL-42-2 — and the **A-2 rework is applied** (AC-202-26 … AC-202-30), which removes a criterion UAT had refused to write |
+| **KAN-205** *(new)* | **NOT READY** | Soft dependency of KAN-200 (AC-205-12), so it is not on the critical path. Criteria complete |
+| **KAN-206** *(new)* | **NOT READY** | **CFL-42-36** and **CFL-42-37** both need the SPM before the guards can be built · the Architect's ruling on computed-vs-materialised pay points (SPM §15.2.4) · UX for the guard copy, which must explain *why* a configuration is refused. Criteria complete |
+| **KAN-207** *(new)* | **NOT READY**, and it is the story I would spend the most UX time on | **CFL-42-35 blocks it outright** — without the manager's `w` grant the story cannot be built as specified · UX owns **copy that reads as expectations, not as an assessment, and does not imply a promise** · **OQ-BA-13** (acknowledge vs agree) is the owner's word to confirm. Criteria complete |
+| **KAN-208** *(new)* | **NOT READY** | **CFL-42-43** — the vacation-eligibility consequence must be understood before it runs · **CFL-42-42** — the distribution assertion has to move to a W1 gate · the Architect's deterministic migration + seed. Criteria complete |
+
+**Nothing in EP42 is Ready, and after A1 that is still correct — but the shape of what is missing has changed
+again.** In Wave 2 the answer was *"acceptance criteria are no longer the gap on any story"*. After A1 that
+remains true, and the three items that would unblock the most are now: **CFL-42-41** (the fitted backfill needs
+pay points a wave earlier than the build order provides them — it silently breaks W1's shippable slice),
+**CFL-42-35** (the fourth feature code does not grant the manager the write it exists to grant, which blocks
+KAN-207 entirely), and **CFL-42-36/37** (the configuration guard that protects the whole check is under-specified
+and its default is unsatisfiable).
 
 ### 23.3 Definition of Ready — verdict per story
 
@@ -3210,8 +4344,519 @@ The SPM's §9 register is adopted in full and not restated. These are new.
 
 ---
 
-*End of document. Owner: Business Analyst. Consolidated by the SPM in Wave 3. The amendments this document commits
-the BA to — `docs/BUSINESS_DOCUMENTATION.md` §4 (retention, and the pre-existing EP38 CFL-3 falsehood),
-`docs/BUSINESS_OVERVIEW_FEATURES_AND_ACCESS.md` (three new feature codes and the §4.8 matrix), and EP38 §4.3
-R3.6/R3.7 (the erasure enumeration) — land in the same commit as the implementation they describe, per Charter §5b
-rule 1, not in this wave.*
+### 24.1 Amendment A1 — new assumptions and unknowns
+
+| Item | Type | Impact if wrong | Validation needed | Owner |
+|---|---|---|---|---|
+| **The reconciliation of the 5% is what the owner meant** — that HR is told when someone's **pay does not match the step they are on** | **Assumption** (Medium-High confidence — it is the only reading that satisfies both of his messages, but it is a reading, not his words) | The reference value of the entire equity feature is wrong, and Check A′ is rebuilt | **OQ-A1-1** — one sentence to the owner | SPM |
+| **Increments compound rather than being linear** | **Assumption** (Medium-High) | Top-step pay points are ~2.1% wrong on a five-step level at 5% — small enough that nobody notices, large enough to matter against a ±2% tolerance | **OQ-A1-1**'s conversation; WE-8's linear column makes a wrong implementation fail loudly | SPM / UAT |
+| **A ±2%-shaped tolerance is a sensible default at all** | **Assumption** (Low confidence — no data) | Too tight and every real salary flags; too loose and the check reports nothing. It is also arithmetically constrained by the increment (CFL-42-37) | Tune against the first tenant's actual distribution; the §1.5 quality tripwire is the instrument | SPM |
+| **A step change landing before its pay change is acceptable to a tenant** | **Assumption** | If HR expects the two to be atomic, they will see the resulting `PAY_BELOW_STEP` finding as a defect in the product rather than as the signal it is. The copy has to carry this | UX's copy on the pre-filled proposal; first-tenant feedback | UX / SPM |
+| **The fitted-step backfill's "closest pay point" produces mostly-right answers** | **Assumption** (Medium) | HR reviews 146 fitted steps and rejects most of them, and the review gate becomes the adoption cliff rather than the safeguard | Run the fit against Acme's and Telia's real distributions once pay points exist — this is measurable before build | BA / UX |
+| **A manager will actually write a roadmap** | **Assumption** (Low confidence, and it is the adoption risk of KAN-207) | The most valuable object A1 adds is empty for every employee, and the transparency the owner asked for does not exist. Unlike a coverage meter, there is no mechanical backfill for authored content | First-tenant measurement: % of employees with a current roadmap. Recommend instrumenting it (it is not in §1.5 today) | SPM / UX |
+| **"Mutually decided" means acknowledge, not agree** | **Assumption** — it is the owner's phrase and I have chosen the weaker reading deliberately | Recording "agreed" when the employee merely read it is a false record about a person, which is worse than the weaker claim | **OQ-BA-13** | BA / owner |
+| **Assigning synthetic gender does not change any shipped behaviour** | **KNOWN TO BE FALSE** — it changes vacation eligibility for 146 employees (`app/helpers.py:269-280`) | A silent change to which leave types employees can request, discovered by a user | **CFL-42-43** — regression suite before and after, seeded vacation types reviewed | UAT / BA |
+| **The step count is a per-level property and not a per-transition object** | **Assumption** | The owner said *"how many level in between two positions"*, which reads as a property of the **gap** between two levels rather than of a level. Modelling it on the level works only because a level's steps always lead to the next level. If a ladder ever branches — two possible next levels — the model breaks | Confirm if any tenant has a branching ladder; not a blocker | BA / Architect |
+| **`job_architecture` reads seeded to every role is safe** | **Needs Validation** | It is safe for expectations and unsafe for step positions once pay points exist (CFL-42-39). The seeded default is right for the object it was written for and wrong for a second one that shares the code | **CFL-42-39** resolution before KAN-206 lands | SPM / Architect |
+
+---
+
+*End of document. Owner: Business Analyst. Wave 2 issued 2026-08-09; **Wave 3 reworks and Amendment A1 applied
+2026-08-09** (§0). Consolidated by the SPM.*
+
+*The amendments this document commits the BA to — `docs/BUSINESS_DOCUMENTATION.md` §4 (retention, and the
+pre-existing EP38 CFL-3 falsehood), `docs/BUSINESS_OVERVIEW_FEATURES_AND_ACCESS.md` (**four** new feature codes,
+the §4.8 matrix, the step/roadmap surfaces, the CFL-42-22 read-only-auditor limitation and the **honest** form of
+the audit guarantee per AC-202-29), and EP38 §4.3 R3.6/R3.7 (the erasure enumeration, now also covering step
+assignments and roadmaps) — land in the same commit as the implementation they describe, per Charter §5b rule 1,
+not in this wave.*
+
+---
+
+# Part B — stories added after Wave 2
+
+*§25–§28 were created by the Wave 3 reconciliation (KAN-205) and by Amendment A1 (KAN-206, KAN-207, KAN-208).
+They are appended rather than inserted so that every §5–§24 cross-reference in the earlier text still resolves.*
+
+---
+
+## 25. KAN-206 — Step pay points, the increment, the tolerance and the two configuration guards (W2 · A1 §14.2)
+
+> **New in A1.** This is now **the reference value for the entire equity feature** and a hard prerequisite of
+> KAN-200 and KAN-192 — and, in practice, of KAN-191's fitted backfill (AC-191-36 / CFL-42-41).
+
+### 25.1 Backlog-style summary
+
+| Story ID | User Story | Acceptance Criteria | Priority |
+|---|---|---|---|
+| KAN-206 | As a **customer admin**, I want each step of each level to have a defined pay point derived from a base and a company-defined increment, so that "what should this person be paid for the job they are doing" is a number the system knows rather than a judgement somebody has to make each time. | A **base pay point** per (job level × pay market) with currency and effective date; a **step increment** per level with an optional per-step override; step pay points derived by **compounding** — `base × (1+i)^n`, never linear; a **tolerance** around each pay point; **the system refuses a configuration where `tolerance < min(increment)/2` is not satisfied**, with a message explaining why; a **warning** where a level's base is below the previous level's top-step pay point; pay points are **`compensation:r` data** — an amount, not neutral configuration; every change audited and effective-dated; changing any of them re-evaluates the affected employees. | Must Have · P1 |
+
+### 25.2 Happy path
+
+- **AC-206-01** A `compensation:w` holder configures, per **(job level × pay market)**: a **base pay point**
+  (the rate at step `.0`), its **currency** (BR-1.2) and an **`effective_from`** (BR-3.8).
+- **AC-206-02** They configure a **step increment** for the level — a percentage, range **0.1%–50%**, with **no
+  product default**. *(The owner's "5%" is his example, not a shipped constant; a default increment would be
+  silently wrong for every company that has a different one, and unlike `step_count` there is no natural value.)*
+- **AC-206-03** They may configure a **per-step increment override**, so the last step of a level can be worth
+  more than the first. Absent an override, the level's increment applies to every step.
+- **AC-206-04** **Step pay points are derived by compounding**: `pay_point(n) = base × (1 + i)^n` with `n` the
+  step number and `.0` → `n = 0`. Where per-step overrides exist, each step's pay point is the **previous step's
+  uplifted by that step's own increment** — the chain compounds, it is not recomputed from the base with a
+  blended rate.
+- **AC-206-05** Arithmetic is exact decimal with **no intermediate rounding**; HALF_UP to 2 dp **once, on the
+  final pay point** (BR-1.5, BR-10.2). **AC-200-62's fixture applies here too**: rounding at each step produces a
+  different top-step value and must fail.
+- **AC-206-06** The configurator **displays the full derived table of pay points** the moment the base and
+  increment are entered — every step value with its amount — so a wrong increment or an off-by-one in
+  `step_count` is visible at the point it is made rather than in somebody's salary six months later.
+- **AC-206-07** **WE-8 and WE-8b are asserted verbatim** as fixtures (AC-200-60, AC-200-61), **with the linear
+  column asserted as the wrong answer**.
+- **AC-206-08** Pay points are **effective-dated** and follow §4.3 in full: at most one in effect for a
+  `(level, market)` pair on any date, no overlapping day, append-only, corrections are new records, errors are
+  voids. "Current" is computed, never stored (BR-3.2).
+
+### 25.3 The two configuration guards
+
+- **AC-206-09** **`tolerance < min(increment) / 2` is enforced at configuration time and a violating
+  configuration is REFUSED** — not warned, not saved-with-a-flag. The message **explains why**: *"With a 5%
+  increment and a ±5% tolerance the acceptable pay ranges for adjacent steps overlap, so every employee would be
+  'correctly paid' for some step and the check would report nothing."*
+  - **`min(increment)` is across every step of the level, including per-step overrides** (BR-10.7a /
+    **CFL-42-36**). Validating against the level's default increment while a per-step override is smaller
+    re-opens exactly the hole the rule closes. **Asserted with WE-10's per-step-override case.**
+- **AC-206-10** **The tolerance default is expressed relative to the increment — `tolerance = increment ÷ 4`**
+  (BR-10.7b / **CFL-42-37**), overridable within AC-206-09's rule. **A fixed ±2% default is invalid for any
+  increment ≤ 4%**: a company configuring a 3% increment could not save the shipped default and would meet a
+  refusal on their first attempt to configure the feature. Asserted: increment 3% → default tolerance 0.75%,
+  saves; a hand-set 2% with a 4% increment → **refused** (`2.0 < 2.0` is false).
+- **AC-206-11** **Changing `step_count`, an increment or an override re-validates the tolerance**, and a change
+  that would invalidate it is refused with the same message. A guard that only fires on the first save is not a
+  guard.
+- **AC-206-12** **The second guard is a WARNING, not a refusal**: where a level's base pay point is **below the
+  previous level's top-step pay point** — a promotion that cuts pay — the configurator says so at the point the
+  choice is made. It is a warning because red-circled and overlapping ladders are legitimate, and because
+  refusing would block a company mid-configuration with no path.
+- **AC-206-13** **Both guards are enforced server-side and cannot be bypassed** by a hand-crafted API call, and
+  the same validation runs on any import path that sets these values (**the mechanism's home is the Architect's —
+  SPM §15.2.6**; the requirement is that no path exists that writes an invalid pair).
+
+### 25.4 Visibility — a pay point is an amount
+
+- **AC-206-14** **A configured pay point is `compensation:r` data, not neutral configuration** (AC-194-47). To a
+  viewer without it the value is **absent from the payload**, not masked and not zeroed. *(A pay point plus a
+  known step is that employee's expected salary to within the tolerance — the CFL-42-19 inference class.)*
+- **AC-206-15** **The increment and the tolerance are also `compensation:r`.** A published increment plus one
+  known salary reconstructs the whole ladder.
+- **AC-206-16** **`step_count` and the step expectations remain `job_architecture`** and stay readable by
+  everyone (CC-42-7b, CC-42-7c). The two live on one screen with two gates and it reads coherently to a holder of
+  either (AC-190-35).
+- **AC-206-17** **My Pay shows the employee their own step's pay point** as a plain-language position statement
+  — *"your pay is in line with step 2.3"* / *"your pay is below the rate recorded for step 2.3"* — **not a raw
+  deviation percentage**, and with **no forward-looking language that reads as a promise** (AC-194-32). It shows
+  **no other step's pay point and no colleague's anything**. **[BA call]**, and it is the most easily misread copy
+  A1 adds. → **OQ-BA-12**: the owner should confirm employees see their own step's pay point at all, because in
+  some organisations that is exactly the transparency he asked for and in others it is a works-council matter.
+
+### 25.5 Edge, boundary, error and failure behaviour
+
+- **AC-206-18** A base pay point of `0`, negative, blank, non-numeric or with more than 2 decimals is rejected
+  before any write (BR-1.3). The sanity ceiling of BR-1.4 applies.
+- **AC-206-19** An increment of `0` is rejected — a level whose steps are worth nothing is a level with one step,
+  and the configurator says so and offers `step_count = 0`… **which is itself rejected** (range is 1–12,
+  AC-190-33), so the correct answer is a single-step level with `step_count = 1` and a real increment, or a
+  different ladder. The message says which.
+- **AC-206-20** A **(level × market)** pair with **no** configured pay point is valid; every employee on it is
+  **not evaluable** by Check A′ with the reason *"no pay point configured"* (AC-200-67), and the configurator
+  shows the count of unconfigured pairs — that count is the real readiness measure for the equity feature.
+- **AC-206-21** A pay point whose **currency differs from the employee's compensation record** makes that
+  employee not evaluable (AC-200-71). **No conversion, no 1:1** (BR-1.7).
+- **AC-206-22** Changing a base pay point, an increment, an override or a tolerance **triggers re-evaluation of
+  every affected employee** (AC-200-78) and is a **re-fire condition** for suppressed findings (BR-4.29′(c)) —
+  because every justification measured against the old reference is stale.
+- **AC-206-23** Changing a pay point **changes nobody's pay**. It changes the reference the check measures
+  against. The confirmation screen says so in plain language, because "adjust the ladder" and "give everyone a
+  rise" are one click apart in a user's mind and exactly one of them is what this does.
+- **AC-206-24** Every create, change and void writes an audit row (`PAY_BAND_CHANGED` / `PAY_EQUITY_THRESHOLD_CHANGED`
+  as appropriate) with field-level before → after, actor, mandatory reason and correlation id. **Pay-point
+  figures MAY appear in these diffs** — they are company configuration, not an individual's pay — under the same
+  stated exception as bands (AC-205-11), using keys that do not collide with `_MONEYISH_KEYS`
+  (`base_pay_point`, `step_increment`, `tolerance_pct`). **Architect confirmation required under CFL-42-2.**
+- **AC-206-25** Any failure rolls the pay point, its derived values and its audit row back together (CC-42-6).
+  Concurrent edits follow AC-190-23 (`409`, current state shown, no silent overwrite).
+- **AC-206-26** **The cost view — Should · P3.** The configurator can total the difference between current pay
+  and fitted step pay points for the company, so HR can see what adopting a ladder would cost before adopting it
+  (SPM §14.2.6). Named so it is designed for and not bolted on; it is **not** required for this story to close.
+
+### 25.6 Permissions and tenant isolation
+
+- **AC-206-27** All routes are `@require_feature_access('compensation', 'r'|'w')`; **no hardcoded role list**
+  (CC-42-1). Default write holders are HR_ADMIN and PORTAL_ADMIN.
+- **AC-206-28** An `r`-only holder sees the pay-point table read-only; every mutating endpoint returns `403` with
+  **no state change** (CC-42-10).
+- **AC-206-29** Pay points, increments and tolerances are company-scoped (`company_id = %s::uuid` only). A
+  PORTAL_ADMIN of company A sees zero of company B's, cannot attach a pay point to company B's level or market
+  (`404` per CFL-42-33), and there is **no cross-tenant pay point, benchmark or default** (CC-42-12).
+
+### 25.7 Out of scope (KAN-206)
+
+Market or benchmark data as an input to a pay point (§3.3) · automatic indexation or annual uplift of pay points
+(that is a comp-review cycle) · modelling ("what if L3 rose 3%") beyond AC-206-26's total · per-employee pay-point
+overrides (the tolerance is the flex; a genuine exception is a `PAY_ABOVE_STEP` finding dispositioned as a market
+premium) · enforcing a pay point on a pay decision (nothing hard-blocks out-of-tolerance pay — the whole point is
+that it is flagged and explained) · FX (BR-1.7, AC-206-21).
+
+---
+
+## 26. KAN-207 — The step roadmap and the employee transparency surface (W1 · R6 · A1 §14.3.3)
+
+> **New in A1, and it is the object the owner actually asked for.** *"It will be job of manager to outline next
+> level role and responsibility which will act as roadmap and transparency for the trainee what he needs to do
+> next, which could be mutually decided."* It has **no compensation dependency**, and it gives W1 a user-visible
+> outcome instead of only configuration.
+
+### 26.1 Backlog-style summary
+
+| Story ID | User Story | Acceptance Criteria | Priority |
+|---|---|---|---|
+| KAN-207 | As a **manager**, I want to write down what my report needs to do to reach their next step, and as an **employee** I want to read it, so that progression is transparent and mutually agreed rather than a conversation nobody wrote down. | The manager authors a roadmap for a **named employee** targeting a **named next step**; the **employee can read it** — that is the whole purpose; the employee **acknowledges** it with a timestamp and an unacknowledged roadmap is surfaced back to the manager; roadmaps are **versioned, never overwritten**, so "what did we agree in March" is answerable; **no ratings, no scores, no assessment** and no field the product aggregates, sorts or compares across employees; gated `job_architecture` with row scoping; an employee sees **their own and never a colleague's**, asserted at the payload. | Must Have · P1 |
+
+### 26.2 Happy path — authoring
+
+- **AC-207-01** The subject's **current solid-line manager**, or a `job_architecture:w` holder, authors a roadmap
+  for a **named employee**, **targeting a named next step** (BR-11.2). The target step defaults to the
+  employee's current step + 1 within their level, or to `.0` of the next level where they are at the top step —
+  and is **editable**, because a manager may legitimately write towards a step two away.
+- **AC-207-02** A roadmap carries: the target step, a free-text statement of what is expected of this person to
+  reach it, an optional list of named items, an optional target date, the author and the timestamp.
+- **AC-207-03** **This requires `SOLID_LINE_MANAGER` to hold `job_architecture:w`, row-scoped to their `DIRECT`
+  set.** *(CC-42-7a / **CFL-42-35**: the SPM's own seeded-defaults table in §14.3.2 gives managers `r` only,
+  which would mean the manager cannot do the thing the fourth feature code was created to let them do. This must
+  be resolved before the story is built; it is a seed value, not a code change.)*
+- **AC-207-04** Row scoping is the service-layer rule (BR-8.2), enforced **server-side**: a manager may author
+  only for employees in their `DIRECT` set; `HR_ADMIN`/`PORTAL_ADMIN` for anyone in the company. A hand-crafted
+  call for a non-report returns `403` with **no state change**.
+- **AC-207-05** Every create and every new version writes an audit row with actor, subject (employee id +
+  employee number, **never name**), target step and correlation id. **The roadmap's free text is not written into
+  the audit diff** — it is the roadmap's own content and lives in its own versioned record (the same reasoning as
+  BR-9.1, applied to a different kind of sensitive free text).
+
+### 26.3 The employee's view — the primary surface
+
+- **AC-207-06** **The employee can read their own roadmap.** Not optional, not a manager-only note — *transparency
+  is its stated purpose, and if the employee cannot see it we have not built it.* It appears on their own profile
+  alongside their step and their step's expectations (BR-11.1).
+- **AC-207-07** The employee's view shows: their current step and its expectations · the **target step and its
+  expectations** · the manager's roadmap text · the target date if set · who wrote it and when · the version
+  history · and the acknowledgement control.
+- **AC-207-08** **The employee sees their own and never a colleague's**, asserted **at the payload** (BR-8.3,
+  BR-8.4): requesting another employee's roadmap by id returns `403` (or their own), and no colleague's roadmap
+  key exists in any response the employee receives. This is the negative-visibility assertion for this story and
+  it is the one UAT must write.
+- **AC-207-09** **A roadmap contains no amount, no pay point and no compa-anything** (AC-194-49). An employee
+  reading their roadmap learns what the next step requires of them, **not what it pays**.
+- **AC-207-10** Where no roadmap exists, the employee sees an explicit empty state — *"No roadmap recorded yet"* —
+  **never a blank** (CC-42-19), and it does not imply that one is owed to them on any particular date.
+- **AC-207-11** **No forward-looking language that reads as a promise.** A roadmap describes what a step requires;
+  it does not state or imply that meeting it results in advancement, pay or a promotion. UX owns the copy
+  (SPM §15.3.2) and it is on the human-walkthrough list.
+
+### 26.4 Acknowledgement — recorded, not enforced
+
+- **AC-207-12** The employee **acknowledges** a roadmap version; the acknowledgement records the version, the
+  actor and a timestamp, and is audited.
+- **AC-207-13** **Acknowledgement is not an approval and does not gate anything.** An unacknowledged roadmap is
+  **valid, visible and in force**; nothing about the employee's step, pay or record depends on it. *(A blocking
+  gate would let a non-responsive employee freeze their own development plan — the opposite of the intent, and a
+  dark pattern in the other direction.)*
+- **AC-207-14** **An unacknowledged roadmap is surfaced back to the manager** — in their team view, not as a
+  nagging notification, and never to the employee as a chase. **[BA call]**: a system that pesters an employee to
+  agree to their manager's expectations is a coercive nudge (Charter §9.8).
+- **AC-207-15** The employee may acknowledge **without agreeing** — the control's copy is *"I have read this"*,
+  not *"I agree"*. **[BA call]**, and it matters: the owner said *"mutually decided"*, and mutual agreement
+  happens in a conversation. Recording "read" honestly is better than recording "agreed" falsely, and a
+  disagreement is a conversation, not a form field. → **OQ-BA-13** for the owner, because he used the word
+  "mutually".
+- **AC-207-16** Authoring a **new version supersedes** the acknowledgement: the new version is unacknowledged
+  until the employee acknowledges it, and the prior acknowledgement stays attached to the prior version.
+
+### 26.5 Versioning
+
+- **AC-207-17** **Roadmaps are versioned, never overwritten** (BR-11.2). Editing produces a **new version**; the
+  previous version stays readable to both the manager and the employee, with its author, timestamp,
+  acknowledgement and target step intact. *"What did we agree in March"* is the question this object exists to
+  answer.
+- **AC-207-18** There is **no delete**. A roadmap written in error is superseded by a new version with a reason,
+  not removed. **[BA call]**, consistent with the compensation record (AC-193-06) and for the same reason: a
+  record the manager can make disappear is not transparency.
+- **AC-207-19** Versions are ordered and numbered, and the **current** version is unambiguous. Only one version
+  is current at a time.
+- **AC-207-20** A roadmap survives a **step change** — reaching the target step does **not** delete or archive it;
+  it is marked **achieved** with the date, and the manager is prompted (not required) to write the next one.
+- **AC-207-21** A roadmap survives a **manager change**: the new manager inherits the ability to author the next
+  version, the prior versions keep their original author, and the employee sees the continuity.
+- **AC-207-22** A roadmap survives a **level change**: it is marked **superseded by promotion** with the date, and
+  the history remains readable.
+
+### 26.6 The "no ratings, no scores" boundary — as a testable rule
+
+- **AC-207-23** **A roadmap exposes no rating, score, grade, percentage of achievement, rank, traffic light or
+  met/not-met assessment of past performance** (BR-11.3), in any field the product provides.
+- **AC-207-24** **No field on a roadmap is aggregated, sorted, ranked, filtered or compared across employees**,
+  and no surface offers such a view. The only structured fields are the target step, the dates and the
+  acknowledgement. **This is the testable form of the boundary**: the object exposes no aggregatable field, and
+  no endpoint returns roadmaps for more than one employee ranked by anything.
+- **AC-207-25** **Why it is a rule.** Cross this line and the object becomes an employee-evaluation system —
+  GDPR Art. 22 and the EU AI Act's employee-evaluation category (Charter §1, BR-7.15/7.17) — and EP42 would have
+  built two thirds of a performance module by accident (SPM R-17). *(And the increments that get there are all
+  reasonable-sounding: "could we mark items complete?", "could we show progress?", "could we see which reports
+  are on track?")*
+- **AC-207-26** **On the human-walkthrough list, because it cannot be asserted:** *does the roadmap read as
+  expectations, or as a performance rating?* That is the §14.5 boundary holding or failing in practice, and it is
+  a Demo Readiness Gate item, not a test case.
+
+### 26.7 Edge, error and failure behaviour
+
+- **AC-207-27** A roadmap for an employee with **no current level/step assignment** is refused (`422`), directing
+  the actor to assign one first (KAN-191). There is no "roadmap from nowhere".
+- **AC-207-28** A target step that does not exist in the ladder, or is **not above** the employee's current
+  position, is refused (`422`). *(A roadmap towards a lower step is a performance conversation of a different
+  kind and this object is not it.)*
+- **AC-207-29** A roadmap for a **non-ACTIVE** employee is refused (`422`); existing roadmaps stay readable in
+  history and are closed at `exit_date`.
+- **AC-207-30** Blank statement text is refused (`400`) before any write — an empty roadmap is worse than none,
+  because the employee sees that one exists and it says nothing.
+- **AC-207-31** Text containing markup is stored verbatim and escaped on output through `escH()` (CC-42-22); no
+  script executes on either the manager's or the employee's view.
+- **AC-207-32** Concurrent authoring by a manager and an HR_ADMIN produces two versions in order, not a lost
+  update; the second author sees the first's version before theirs is saved.
+- **AC-207-33** Any failure rolls the version, the acknowledgement state and the audit row back together
+  (CC-42-6).
+
+### 26.8 Permissions per role
+
+| Role | Author a roadmap | Read a roadmap | Acknowledge |
+|---|---|---|---|
+| SYSTEM_ADMIN | Yes (company context) | Yes | n/a |
+| PORTAL_ADMIN | Yes (`job_architecture:w`) | Yes, company | n/a |
+| HR_ADMIN | Yes (`job_architecture:w`) | Yes, company | n/a |
+| **SOLID_LINE_MANAGER** | **Yes — `DIRECT` scope only** (requires CFL-42-35 to be resolved) | Own reports, and their own | Their own |
+| DOTTED_LINE_MANAGER / DEPARTMENT_HEAD / LOCATION_HEAD / HIRING_MANAGER / COMPANY_ADMIN | No | **Their own only** | Their own |
+| EMPLOYEE (the subject) | No | **Their own — always** | **Yes** |
+
+- **AC-207-34** Routes are `@require_feature_access('job_architecture', 'r'|'w')` plus row scoping (BR-8.1,
+  BR-8.2). **No hardcoded role list** (CC-42-1). Granting `job_architecture:w` to another role through the matrix
+  gives that role the authoring surface within its defined scope, with **no code change and no extra check**.
+- **AC-207-35** **A manager may not author a roadmap for themselves** (`403`, no state change) — the same family
+  as KAN-203's subject ≠ initiator rule. Writing your own development plan and calling it your manager's
+  statement is not what this object is.
+- **AC-207-36** **`job_architecture` has no `d`.** There is no delete (AC-207-18), so the action does not exist.
+
+### 26.9 Tenant isolation
+
+- **AC-207-37** Roadmaps are company-scoped; a `job_architecture:r` holder in company A sees zero of company B's
+  under every filter and every search term (CC-42-11).
+- **AC-207-38** A roadmap request for an employee in another company returns **`404`** (CFL-42-33's rule — a
+  `403` on a cross-tenant id is an existence oracle), reads nothing back and writes nothing.
+- **AC-207-39** Target-step pickers list only that company's ladder (CC-42-4, AC-190-28).
+
+### 26.10 Out of scope (KAN-207)
+
+Performance reviews, cycles, scheduling and reminders (BR-11.7) · goals, objectives, key results · ratings,
+scores, calibration, nine-boxes · review forms or templates · a probation entity, end date or outcome · manager
+notes about an employee that the employee cannot see *(deliberately excluded — a private note surface is a
+different object with different obligations and would undermine this one's entire purpose)* · development-plan
+templates or a library · learning or training recommendations · notifying the employee that a roadmap was written
+*(**[BA call]** — it appears on their profile; a notification is reasonable and is a UX decision, not a
+requirement I will invent → OQ-BA-14)* · any pay figure (AC-207-09).
+
+---
+
+## 27. KAN-208 — Synthetic gender across the seeded population (W0 · A1 §14.6)
+
+> **New in A1.** *"For the gender you can assign random gender to all employees."* `employees.gender` is NULL for
+> 100% of the seeded population (B42-09 / DEF-42-3), which is why Check B has had nothing to run on.
+> **Having the data does not make processing it lawful — DPO-1 still gates Check B** (§4.7.3).
+
+### 27.1 Backlog-style summary
+
+| Story ID | User Story | Acceptance Criteria | Priority |
+|---|---|---|---|
+| KAN-208 | As the **product team**, I want the seeded population to carry gender values, so the gender pay gap check can be built, tested and demonstrated at all. | Values assigned across the **seeded, fictional** population; delivered in the **seed files AND a migration** — never a hand edit of one developer's database; **deterministic and reproducible**; distribution **shaped, not coin-flipped**, so that at least two comparison groups can satisfy Check B's minimums; **`OTHER` present** so the excluded-and-counted path has a fixture; **no real gender data is collected and T5 is unaffected**; **DPO-1 is untouched and Check B stays gated on it**. | Must Have · P2 |
+
+### 27.2 Happy path
+
+- **AC-208-01** Every seeded employee in **Acme Corp (46)** and **Telia (100)** receives a `gender` value from
+  `MALE` · `FEMALE` · `OTHER`. The company-less SYSTEM_ADMIN record is **excluded** (CC-42-14 — it is in no
+  tenant and in no group). "Sam Cpmapny" has zero employees and is unaffected.
+- **AC-208-02** **Delivered in the seed files AND a numbered migration.** A developer database updated by hand
+  while `database/seed_data.sql` / `telia_seed.sql` stay unchanged is **exactly the DEF-004 trap** that broke CI
+  on 9 August: CI builds from `schema.sql` + the seed files and **migrations are never replayed**, so a
+  migration-only change passes on every developer machine and fails in CI, and a seed-only change fails on every
+  developer machine.
+- **AC-208-03** **A fresh CI database** built the way CI builds one — `schema.sql` + the seed files, migrations
+  not replayed — contains the gender values, and the Check B fixtures pass against it.
+- **AC-208-04** **The assignment is deterministic and reproducible**: re-running produces identical values, and
+  the rule that produced them is stated in the migration so a reader can see it was not random-per-run.
+- **AC-208-05** Values satisfy the existing CHECK constraint (`MALE`/`FEMALE`/`OTHER`,
+  `database/schema.sql:423`). No new value, no new constraint, no schema change.
+
+### 27.3 The distribution requirement — the part that decides whether the story worked
+
+- **AC-208-06** **The distribution is shaped, not uniform-random per row.** A coin flip across 146 people will
+  not reliably produce a group with **`n >= 5` and `>= 2` of each gender**, so Check B would remain
+  undemonstrable and the story would have been done without solving the problem.
+- **AC-208-07** **At least two comparison groups must satisfy Check B's minimums** — `|compared| >= 5`,
+  `>= 2` MALE, `>= 2` FEMALE, **and** the 80% gender-coverage sub-gate (BR-4.20).
+- **AC-208-08** **At least one group must produce a gap above the 5% threshold and at least one below it**, so
+  both the flagging and the not-flagging paths have a fixture. **[BA call]** — a seed where every group is clean
+  demonstrates nothing, and a seed where every group flags demonstrates alert fatigue.
+- **AC-208-09** **`OTHER` is present in the population**, because BR-4.21 requires it to be
+  **excluded-and-counted** and that path needs a fixture. At least one group must contain an `OTHER` **and still
+  satisfy the minimums**, so the exclusion is exercised without disabling the check.
+- **AC-208-10** **⚠️ AC-208-07 to AC-208-09 cannot be verified when this story is delivered, and that is a
+  sequencing problem the SPM has not seen.** A "comparison group" is
+  `(company, job_family, job_level, pay_market)`. **KAN-208 is in W0. No job family, level or pay market exists
+  until KAN-190 (W1) and KAN-199 (W2), and nobody is assigned to one until KAN-191 (W1).** At W0 there are no
+  groups, so the shaping requirement is unverifiable at the moment the story closes.
+  **Logged as CFL-42-42.** Resolution required: the distribution is **shaped against the planned seeded ladder**,
+  and the **assertion moves to a gate on KAN-191** (once employees are on levels) or **KAN-200** (once groups
+  exist) rather than being a KAN-208 acceptance criterion the team has to mark passed on faith. Build KAN-208 in
+  W0; **verify AC-208-07 … AC-208-09 at the W1 exit**.
+
+### 27.4 The limits — and they are not negotiable
+
+- **AC-208-11** **Synthetic only.** This authorises assigning values to **seeded, fictional people**. It does
+  **not** authorise collecting gender from real people, does not create an admin collection path, and does not
+  change the existing self-service path (`app/routes/employees.py:176-186`).
+- **AC-208-12** **T5 is unaffected.** T5 fires on *any real compensation value*; synthetic gender on synthetic
+  people is not that, and this story does not move the security phase (SPM D8).
+- **AC-208-13** **DPO-1 stands and Check B remains gated on it** (BR-7.1, BR-7.2, AC-200-25). The
+  purpose-limitation question — a column collected for **vacation eligibility**, reused as an input to an
+  employment-related pay check — is **untouched** by having data, and gender is a special category under GDPR
+  Art. 9 on most readings. **This story does not unblock Check B; it unblocks *building and testing* Check B.**
+  The distinction must be stated in the story and in the demo script, because "we have the data now" is exactly
+  the sentence that gets a compliance gate quietly skipped.
+- **AC-208-14** **The synthetic values are labelled as synthetic** wherever the demo-data banner appears
+  (CC-42-24), and any demo of Check B states that both the pay and the gender are fabricated.
+- **AC-208-15** **The existing vacation-eligibility behaviour must not change.** `employees.gender` is consumed
+  today by `vacation_types_for_employee` (`app/helpers.py:223, 269-280`) to filter leave types by gender rule.
+  Going from **100% NULL to 100% populated changes which vacation types 146 employees are offered** — this is a
+  **live behavioural change to a shipped feature, not a test-data tweak**, and it is the single most likely
+  regression in this story. **The vacation regression suite (`tests/ui/test_vacation_workflow.py`, 39 checks) must
+  be run before and after and any difference explained**, and any gender-restricted vacation type in the seed
+  data must be reviewed against the new distribution. **Logged as CFL-42-43** — neither the owner's answer nor
+  the SPM's §14.6 mentions this consumer, and it is the only one the column has today.
+
+### 27.5 Error, failure and tenancy
+
+- **AC-208-16** The migration is **idempotent**: re-running it does not change already-assigned values and does
+  not fail.
+- **AC-208-17** The migration **does not overwrite a non-NULL gender**. If any employee has a value by the time
+  it runs — a developer set one by hand — it is left alone and the count of skipped rows is reported.
+- **AC-208-18** A `_down` migration exists and **restores NULL for exactly the rows this migration set**, or the
+  migration is declared one-way in the runbook **before** it runs (the ADR-016 reversibility rule applied here).
+- **AC-208-19** Assignment is **company-scoped in effect**: no employee of one tenant is given a value derived
+  from another tenant's data, and the two tenants' distributions are shaped independently (CC-42-11).
+- **AC-208-20** The story writes **no audit rows** — it is a seed-data change, not a tenant action, and inventing
+  an actor for it would put a fictional person in `audit_log.actor_label`. **[BA call]**, stated so the absence is
+  deliberate rather than an omission.
+
+### 27.6 Out of scope (KAN-208)
+
+Any real gender data · an admin-facing gender collection or edit path · changing the `MALE`/`FEMALE`/`OTHER`
+enumeration or adding a non-binary taxonomy *(a real and reasonable ask; it is a schema and a DPO conversation,
+not a seed task)* · gender data for any tenant created after this story · making Check B lawful (AC-208-13) ·
+fixing the vacation-eligibility consequence beyond identifying it (AC-208-15 requires it to be **found and
+explained**; changing the vacation rules is EP-existing territory).
+
+---
+
+## 28. KAN-205 — Salary bands as the level's min/max **envelope** (W4 · Ruling 32 · A1)
+
+> **Split out of KAN-199 in Wave 3** (Ruling 32) and **re-purposed by A1**. A band is **no longer the comparison
+> basis** — the step pay point is (BR-10.3). A band answers a different and still useful question: *"is this pay
+> sane for this level at all?"*
+
+### 28.1 Backlog-style summary
+
+| Story ID | User Story | Acceptance Criteria | Priority |
+|---|---|---|---|
+| KAN-205 | As a **customer admin**, I want a minimum and maximum for each level in each pay market, so that pay which is nowhere near the level's range is visible even when it happens to sit near a step pay point. | A band is `(job_level, pay_market) → min, max, currency, effective_from`; **the midpoint is no longer a comparison basis** and is optional or absent; out-of-envelope pay is **allowed, flagged and requires a reason — never hard-blocked**; the envelope signal is **separate and independent** from Check A′'s tolerance signal; bands are `compensation:r` data; effective-dated, append-only, audited. | Should Have · P2 |
+
+### 28.2 What moved here from KAN-199, and what A1 changed about it
+
+| Was | Now |
+|---|---|
+| AC-199-08 band = min, midpoint, max, currency, effective_from | **AC-205-01** — min and max are the band; **the midpoint is optional and carries no meaning in any computation** |
+| AC-199-09 validity `min <= midpoint <= max` | **AC-205-02** — `min < max`, both `> 0`, same currency; where a midpoint is recorded, `min <= midpoint <= max` |
+| AC-199-10 effective dating | **AC-205-03**, unchanged |
+| AC-199-11 step target points as guidance | **AC-205-04** — **withdrawn as a concept.** The step **pay point** (KAN-206) is now a real value, so a "target percentile" is a second, weaker answer to the same question and would contradict it |
+| AC-199-12 compa-ratio displayed | **AC-205-05** — a **position-in-range** indicator, not a compa-ratio, and **not** a comparison basis |
+| AC-199-13 band changes audited | **AC-205-11**, unchanged |
+| AC-199-14 … AC-199-17 out-of-band allowed, flagged, reasoned | **AC-205-06 … AC-205-09**, and the independence from Check A′ is now the point |
+| AC-199-22, AC-199-23, AC-199-26, AC-199-27 edge cases and failure | **AC-205-13 … AC-205-18** |
+
+### 28.3 Criteria
+
+- **AC-205-01** A band is `(job_level, pay_market) → (min, max, currency, effective_from)`. A **midpoint is
+  optional**, is displayed if present, and is **used in no computation anywhere** — it is not a comparison basis,
+  not a default and not an input to any check.
+- **AC-205-02** Validity: `min < max`, both `> 0`, same currency, and where a midpoint is recorded
+  `min <= midpoint <= max`. Violations are rejected with a field-level message before any write.
+- **AC-205-03** Bands are effective-dated and follow §4.3: at most one in effect per `(level, market)` on any
+  date, no overlapping day, append-only, corrections are new bands, errors are voids.
+- **AC-205-04** **Step target points are withdrawn.** With a real step pay point (KAN-206), a "percentile target"
+  is a second and weaker answer to the same question, and two answers that can disagree is worse than one.
+- **AC-205-05** Where a band exists, `compensation:r` holders see a **position-in-range** indicator for an
+  employee — *"within range"*, *"below range"*, *"above range"* — and on **My Pay** it is a plain-language
+  statement, **never a raw ratio** (AC-194-29). It is **not** a comparison basis and produces no finding of its
+  own beyond AC-205-06.
+- **AC-205-06** **Out-of-envelope pay is allowed, flagged and requires a reason — never hard-blocked.**
+  Red-circled legacy pay and genuine market premiums exist; hard-blocking pushes the decision off-system, which
+  is the problem the epic started with.
+- **AC-205-07** **The envelope signal is separate and independent from Check A′'s tolerance signal**, and the two
+  must never be merged or derived from each other. An employee can be **inside the band and outside the step
+  tolerance** (they are paid a level-plausible amount, but not the amount their step says) — that is the common
+  and important case. They can be **outside the band and inside the tolerance** (the ladder's pay points sit
+  outside its own envelope, which is a **configuration** error and is surfaced as one, not as a finding about the
+  person). **[BA call]** — that second case is the one an implementer will not have thought of, and reporting it
+  as a person-level finding would blame an employee for an admin's arithmetic.
+- **AC-205-08** **A configuration check: every step pay point of a level should fall within that level's band.**
+  Where it does not, the configurator **warns at the point the choice is made** (the AC-206-12 pattern), naming
+  the steps that fall outside. Not a refusal — a company may deliberately run a narrow envelope — but never
+  silent.
+- **AC-205-09** The envelope status appears on the profile, in the move modal's context, in the approver's view
+  of a money-bearing request and in the register as an explanatory factor. It appears **nowhere** to a viewer
+  without `compensation:r`.
+- **AC-205-10** Changing a band changes nobody's pay and raises **no** retroactive finding for the change alone;
+  it re-evaluates the affected employees' envelope status and is a re-fire condition (BR-4.29′(c)).
+- **AC-205-11** Every band create, change and void writes a `PAY_BAND_CHANGED` audit row with field-level
+  before → after, actor, mandatory reason and correlation id. **Band figures may appear in the diff** — a band is
+  company configuration, not an individual's pay — under the stated exception to BR-9.1, using keys
+  (`band_min`, `band_max`) that do not collide with `_MONEYISH_KEYS`. **Architect confirmation under CFL-42-2.**
+- **AC-205-12** **KAN-205 is Should · P2 and is a SOFT dependency of KAN-200.** Check A′ is complete and correct
+  without any band, because its basis is the step pay point. A band adds a second, coarser signal. **Nothing in
+  KAN-200 waits for it** — asserted by running the full Check A′ suite against a company with no bands
+  configured at all.
+- **AC-205-13** A band for an **archived** level may exist (people are still on it); no new band may be created
+  for one.
+- **AC-205-14** A band whose currency differs from an employee's compensation record produces **no** envelope
+  status for that employee, with the reason *"currency mismatch"* — no conversion, no 1:1 (BR-1.7).
+- **AC-205-15** Deleting a band referenced by any historical evaluation is refused (`409`); **archive** is
+  offered, with the AC-190-13 semantics.
+- **AC-205-16** Every validation failure is reported before any write, at field level. Concurrent band edits
+  follow AC-190-23 (`409`, current state shown, no silent overwrite).
+- **AC-205-17** All routes are `@require_feature_access('compensation', 'r'|'w')`; **no hardcoded role list**
+  (CC-42-1). An `r`-only holder sees bands read-only and every mutating endpoint returns `403` with no state
+  change.
+- **AC-205-18** Bands are company-scoped; a PORTAL_ADMIN of company A sees zero of company B's, and there is
+  **no cross-tenant band, shared benchmark or global default** (CC-42-12). A cross-tenant id returns **`404`**
+  (CFL-42-33).
+
+### 28.4 Out of scope (KAN-205)
+
+Band derivation from market or benchmark data (§3.3) · automatic band indexation · using the band as a comparison
+basis (A1 — that is the step pay point) · step target points (AC-205-04) · enforcing a band on a pay decision
+(AC-205-06) · communicating bands to employees as ranges (pay-transparency statements are §3.3) · FX
+(AC-205-14).
