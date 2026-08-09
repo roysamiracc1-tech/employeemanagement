@@ -45,6 +45,25 @@ true.** This is the condition under which the deferral is safe; it is not a stan
 | T2 | Any **real employee PII** is loaded (replacing the synthetic seed data) | GDPR exposure; Charter §1 compliance is first-class |
 | T3 | A named customer, pilot, or prospect demo runs on non-synthetic data | Customer-Readiness gate engages |
 | T4 | Any account is created for a user outside the build team | Auth becomes a real trust boundary |
+| **T5** | **Any real (non-synthetic) compensation value is entered for any employee, in any tenant — including a single manual entry by the build team "just to see how it looks"** | **Added 2026-08-09 with EP42 (SPM decision D-005).** A single real salary is more consequential than an entire synthetic directory. **This fires at a deliberately lower bar than T2: T2 requires a data *load*, T5 requires one row.** |
+
+**Why T5, and why T2 was *not* tripped by EP42 (SPM ruling, 2026-08-09 — recorded because ducking it would have
+been easier).** Building a compensation feature and populating it with synthetic salaries for synthetic people
+does **not** load real PII. T2 is not tripped, EP42 builds in S3, and D-004's sequencing stands unchanged. What
+changes is **the loss, not the probability**: T1–T4 were written when the worst case of a trigger event was the
+exposure of names, org placement and leave dates. After EP42 the worst case of the *same* event is the exposure
+of **every employee's pay** — the data class that produces individual grievance, works-council escalation and
+press attention rather than a breach notification. A risk register that does not re-price when the asset changes
+is decorative. Hence T5, at a lower bar.
+
+**Two cheap safeguards that ride with EP42** (same logic as the existing list below — they cost nothing and do
+not churn with features): `compensation`, `compensation_self` and `pay_equity` are seeded **disabled for every
+tenant**, so R7's commercial switch doubles as a safety default; and a persistent **"Demo compensation data —
+synthetic"** banner sits on every compensation screen while the environment is demo-grade.
+
+**One consequence stated plainly:** the first time this is shown to a named prospect using their own pay figures,
+or one real payroll extract is loaded, **S5 runs first**. That is T3 and T5 applied to the feature that was just
+requested, and it is much better heard now than at the demo.
 
 **Cheap safeguards that stay in force while deferred** (these cost nothing and do not churn with features):
 KAN-152 ✅ secure runtime defaults stays; **KAN-153** (required DB config, no personal defaults) stays in the
@@ -110,6 +129,18 @@ platform") and rewards adoption + trust, not feature count.
 | **BG4** | **Complete the people-ops lifecycle.** | Org structure + leave | Onboarding/offboarding workflows, transfers, rehire, vacation balances/accruals. | **Now/Next** |
 | **BG5** | **Be enterprise-ready & connected.** | Multi-company + RBAC | SSO/OIDC, SCIM, HRIS import/export, calendar; multi-tenant scale (EP30). | SSO **Final phase** (it *is* the login work) · SCIM/HRIS/scale **Later** |
 | **BG6** | **Be usable by the whole workforce** (a11y + mobile). | All (deskless employees) | WCAG 2.2 AA on core flows; mobile self-service. | a11y **standard now, retro-fit sweep at the end** (pending Q5) / mobile **Next** |
+| **BG7** | **Pay decisions this company can defend.** *(new — 2026-08-09, EP42)* | Core HR + org structure + RBAC | Every employee on a company-defined job ladder with a current, effective-dated, auditable pay record; pay moves with position and promotion through **one** governed approval; unjustified gaps surface to a named owner before somebody else finds them. | **Now** (requirements, S1) · **Next** (build — W0 in **S2**, W1–W4 in **S3**) |
+
+**Why BG7 is a new goal rather than an extension of BG4** (SPM, 2026-08-09 — argued in full in
+`EP42_SPM_SCOPE_AND_DECISIONS.md` §1.2). BG4 is about lifecycle **events**; compensation is a **data class and a
+decision discipline** that intersects several of them. It carries a compliance regime no other goal carries (pay
+transparency, works-council consultation on job classification, and the tightest read model in the product); it
+carries a **commercial control** — R7 exists because the owner intends to expose or withhold it per tenant, and
+no other goal has packaging in its requirements; it is measured differently (coverage and defensibility, not
+process completion); and it is the first goal whose failure mode is reputational rather than operational.
+**The concession:** EP42's wave W3 (pay inside position change, level change, four-eyes) serves **BG7 and BG4
+jointly**, and it settles a debt BG4 already owed — the EP38 epic title has promised "promote" since this roadmap
+was written and no story ever carried it.
 
 Priorities use Charter P0–P4 and MoSCoW. **Under D-004 the functional backlog (BG2–BG4) is pulled forward and
 the security/login slice of BG1+BG5 is pushed to the final phase.** The Production-Ready **gate itself has not
@@ -265,6 +296,47 @@ lean (Dashboard/Org Tree/Vacation/Leave Calendar/Profile), a good mobile target.
 
 ---
 
+### BG7 — Pay decisions this company can defend — **EP42** *(added 2026-08-09)*
+
+**EP42 — Compensation, Job Architecture & Pay Equity**
+*Goal:* every employee on a company-defined job ladder with a governed, effective-dated pay record; pay decided
+together with the move that causes it; unjustified gaps found before somebody else finds them.
+*Why:* the product holds **no** compensation data of any kind, and `employees.job_title` is free text with no
+catalogue behind it. Every pay decision its users make is therefore made off-system — the largest single
+off-system intervention left in the people-ops surface, sitting inside two workflows the portal already runs end
+to end. It is the direct answer to the product owner's request of 2026-08-09 (asks **R1–R7**).
+
+**Eighteen stories in five waves.** Full detail — decisions, 532 acceptance criteria, ADR-014…023, every screen,
+and 300 test cases — lives in the five `EP42_*` deliverables in this directory and in the EP42 section of
+[`../../project-management/BACKLOG.md`](../../project-management/BACKLOG.md). Summary only here:
+
+| Wave | Stage | Delivers | Stories |
+|---|---|---|---|
+| **W0** | **S2** | Platform, plus two debts that are not EP42's fault: a **P0 Critical defect fix**, the shared-shell a11y that EP38 never landed, the tenant switch made central (R7), and effective dating (which **unblocks KAN-185**) | KAN-203 · KAN-204 · KAN-188 · KAN-189 |
+| **W1** | S3 | The job ladder, and everybody on it (**R6**) | KAN-190 · KAN-191 |
+| **W2** | S3 | Pay markets, the compensation record, the visibility model, the backfill (**R1, R2**) — **the minimum shippable slice** | KAN-199 · KAN-193 · KAN-194 · KAN-195 |
+| **W3** | S3 | Pay inside position change, level change, four-eyes on money, progression (**R3, R4**) | KAN-196 · KAN-197 · KAN-198 · KAN-192 |
+| **W4** | S3 | Pay equity: the engine, the register, bands, history (**R5**) | KAN-200 · KAN-201 · KAN-205 · KAN-202 |
+
+**Three things the roadmap must carry forward:**
+
+1. **R6 is a prerequisite of R5, and it is measured.** Acme has 46 employees across **41 distinct free-text job
+   titles**, of which exactly **one** has three or more people in it; Telia 100 across 75. A "same position"
+   comparison keyed on `job_title` produces comparison groups of size one. The ladder supplies the grouping key.
+2. **W4 is gated on KAN-168** (real-DB test tier, EP32, ⬜ not started). **SPM ruling: if KAN-168 slips, W4
+   slips** — EP42 ships through W3, satisfying six of the seven asks, and the equity engine waits. An equity
+   engine certified against mocks is not an acceptable alternative.
+3. **EP42 enlarges S4.** Roughly 18 stories, 3 feature codes, 14 new tables and ~26 endpoints all enter the S5
+   hardening sweep and the WCAG retro-fit. **The feature-freeze date moves out by the size of this epic.** That
+   is the price of the request; it is worth paying, and it should be paid knowingly.
+
+**This epic closes three long-standing open items** — backlog #3 ("promote" has no story → KAN-197, and the type
+is named `LEVEL_CHANGE` because downward moves are permitted), #4 (transfer vs the EP27 drag-and-drop boundary →
+one modal, one endpoint, one engine, three entry points), and #5 (segregation of duties → KAN-203 + KAN-198) —
+and **repays EP38** by resolving CFL-4, which is what `AC-185-07` on KAN-185 is currently blocked on.
+
+---
+
 ## E. Sequencing (revised by D-004, 2026-08-09)
 
 The old order was *harden → build*. The revised order is **build → freeze → harden**. Nothing is removed from
@@ -272,9 +344,9 @@ scope; the security/login block moves from first to last.
 
 | Stage | Goals / Epics | Exit criteria | Ties to Delivery phase (`06_*`) |
 |---|---|---|---|
-| **S1 — Requirements finalisation** *(Now)* | BA + UX + Strategist close the functional scope: EP35, EP36, EP37, EP38, EP39, EP41 written to full acceptance criteria; product owner answers Q1/Q3 (§F) | Functional scope signed off; no open "we might also…" items | Phase 1 intake |
-| **S2 — Foundation enablers** *(Now, parallel to S1)* | EP31 (KAN-166/167) · EP32 (KAN-168/170/171) · EP29 (KAN-155/156/158) · EP34 (KAN-178) · EP28 **KAN-153 only** | Schema rebuildable + versioned; real-DB test tier green; atomic writes in place (unblocks EP35-S2) | **Phase 0 (non-security half)** |
-| **S3 — Build the functional product** *(Now/Next)* | BG2 EP35 + EP36 · BG4 EP38 (S2/S3 first) + EP39 · BG3 EP37 (S1/S2) · BG6 EP41 | All finalised requirements implemented; pytest + regression flow test green per `CLAUDE.md`; **a11y applied as a standard to new screens** | Phase 1 — MVP/GA-lite |
+| **S1 — Requirements finalisation** *(Now)* | BA + UX + Strategist close the functional scope: EP35, EP36, EP37, EP38, EP39, EP41 written to full acceptance criteria; **EP42 — done, three waves, 2026-08-09**; product owner answers Q1/Q3 (§F) and EP42's OQ-1/3/5/9 | Functional scope signed off; no open "we might also…" items. **For EP42 specifically, S1 closes when the four gates in `EP42_SPM_SCOPE_AND_DECISIONS.md` §13.1 clear** | Phase 1 intake |
+| **S2 — Foundation enablers** *(Now, parallel to S1)* | EP31 (KAN-166/167) · EP32 (KAN-168/170/171) · EP29 (KAN-155 ✅/156/158) · EP34 (KAN-178) · EP28 **KAN-153 only** · **EP42 W0 (KAN-203 · KAN-204 · KAN-188 · KAN-189)** | Schema rebuildable + versioned; real-DB test tier green; atomic writes in place (**KAN-155 ✅ done**); **the tenant feature switch resolved centrally; the P0 self-approval defect closed; the shared-shell a11y landed; KAN-185 unblocked**. **KAN-168 is now P0 here — it hard-blocks EP42 W4** | **Phase 0 (non-security half)** |
+| **S3 — Build the functional product** *(Now/Next)* | BG2 EP35 + EP36 · BG4 EP38 (S2/S3 first) + EP39 · BG3 EP37 (S1/S2) · BG6 EP41 · **BG7 EP42 W1–W4** | All finalised requirements implemented; pytest + regression flow test green per `CLAUDE.md`; **a11y applied as a standard to new screens**. **EP42 W2 is its minimum shippable slice; W4 does not open until KAN-168 has landed** | Phase 1 — MVP/GA-lite |
 | **S4 — Feature freeze** | No new endpoints or DOM builders queued | Written freeze declared by SPM | Gate into S5 |
 | **S5 — Security, login & hardening sweep** *(FINAL — D-004)* | **EP28 in full** (KAN-148 auth via **EP40-S1 SSO**, KAN-149 CSRF, KAN-150+173 escaping, KAN-151 sanitisation) · EP33 a11y retro-fit sweep (pending Q5) | Production Readiness checklist green; UAT signs off flagship flows; **only now can the Production gate go GO** | **Phase 2 — Production Readiness → Phase 3 — Customer Launch** |
 | **Later (grow & scale)** | BG3 depth (EP37-S3/S4) · BG4 rehire (EP38-S4) · BG5 SCIM/HRIS (EP40-S2/S3) · EP30 scale · any **compliance-gated AI** | — | Phase 4 → Phase 5 |
@@ -294,7 +366,8 @@ regardless of where S3 has got to.
 | Q3 | Is competency-intelligence (BG3) the intended wedge vs generic HRIS? | The product's own copy + dashboard say **yes** — invest in EP37 as the differentiator. **Now blocking S1**: functional scope can't be frozen until this is settled. | Strategist to RICE-rank vs BG4 — **needed to close S1**. |
 | Q4 | Any AI ambitions? | **Defer** behind EU AI Act / GDPR Art. 22 gate (D-003). Do not enter this cycle. | Compliance/DPO validation when raised. |
 | **Q5** | **New (D-004):** does accessibility (EP33 KAN-174/175) move to the final sweep with security, or stay a per-screen "Now" requirement? | **Move the retro-fit sweep to S5** (it shares code with the escaping work — KAN-172/173), **but apply WCAG 2.2 AA as a design standard to every new screen built in S3** so the sweep stays small. The gate is unchanged either way. | **Product owner decision** — I have not moved it unilaterally. |
-| **Q6** | **New (D-004):** who confirms the environment stays demo-grade (localhost/private network, synthetic data only) for the duration of S1–S4? | Assign an owner. The whole deferral rests on triggers T1–T4 staying false; unowned, that assumption rots silently. | **Delivery/Release Manager** to own as a standing risk-register entry. |
+| **Q6** | **New (D-004):** who confirms the environment stays demo-grade (localhost/private network, synthetic data only) for the duration of S1–S4? | Assign an owner. The whole deferral rests on triggers T1–T4 **and now T5** staying false; unowned, that assumption rots silently. | **Delivery/Release Manager** to own as a standing risk-register entry. **T5 extends this ownership to "no real pay figure, ever, including one".** |
+| **Q7** | **New (EP42, 2026-08-09):** nine questions on compensation, job levels and pay equity — the level roll-up (**OQ-1**), the visibility matrix (**OQ-2**), what "5%" means (**OQ-3**), the example ladder (**OQ-4**), **total compensation (OQ-5)**, multi-currency (**OQ-6**), default exposure (**OQ-7**), works councils (**OQ-8**), segregation of duties (**OQ-9**). | **All nine carry a recommended default the team builds against today, so none of them blocks.** Full text in `EP42_SPM_SCOPE_AND_DECISIONS.md` §6 and §12.8. **Ask OQ-5 first** — it is the only one whose late answer forces a rewrite. Put **OQ-3 with DPO-1** in one conversation, and note that `employees.gender` is NULL for 100% of the seeded population, so the gender-gap check currently has no data to run on. | **Product owner** (OQ-1…9) · **DPO/legal** (DPO-1, DPO-2 and five launch items). |
 
 ---
 
@@ -315,8 +388,24 @@ regardless of where S3 has got to.
    "Next" ranking entirely — it is scheduled in S5. AI stays out of scope.
 6. **Engineering (Architect):** keep the standing rule — **new DOM code uses the existing `escH()` helper**. Do
    not start KAN-148/149/151; do proceed with KAN-153, KAN-155, KAN-166/167, KAN-168, KAN-178.
-7. **SPM (me):** confirm **Q1, Q3, Q5, Q6** with the business; declare the S4 feature freeze in writing when S3
+7. **SPM (me):** confirm **Q1, Q3, Q5, Q6, Q7** with the business; declare the S4 feature freeze in writing when S3
    completes; then convene the S5 hardening phase.
+
+**Added 2026-08-09 — EP42 (BG7).** Full tasking, by wave and by role, is in
+`EP42_SPM_SCOPE_AND_DECISIONS.md` §13. The four items that belong on *this* plan:
+
+8. **Delivery/Release Mgr:** **schedule KAN-168 with a date, inside S2** — it hard-blocks EP42 W4, and if it
+   cannot be committed to then W4 is descoped from this cycle **now** rather than discovered later. Add **T5** and
+   EP42 risks **R-13** (KAN-188 blacks out both tenants, CI green throughout), **R-14** (the four-eyes control
+   ships and does nothing) and **R-15** (the gender-gap check has no data) to the Risk Register with owners.
+9. **Senior Architect:** publish the amended **ADR-016** first — it gates EP42 W1 — and reword `CLAUDE.md`'s
+   org-change invariant 2 in the same commit as KAN-203, because **the headline invariant is right and the code
+   is wrong**: today an HR_ADMIN can raise a position change for themselves and approve it.
+10. **Engineering:** **KAN-203 (P0) and DEF-42-1 start immediately** — both are pre-existing defects with no EP42
+    dependency. Nothing else in EP42 starts until the §13.1 gates clear.
+11. **Standing gate:** **a compensation demo without the "the visibility model is unenforceable under demo auth"
+    disclosure in its written script is NO-GO.** The visibility model is a *correctness* control, not a security
+    control, until KAN-148 lands.
 
 *All engineering obeys `CLAUDE.md` — feature-access model, company scoping, org-change invariants, and the
 regression flow-test discipline. Nothing is "done" until pytest + the regression flow test pass.*
