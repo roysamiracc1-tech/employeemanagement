@@ -19,6 +19,26 @@
 </head>
 <body>
 
+<!-- ── Shared ARIA live regions (KAN-204 · shell primitive 2 of 3) ──────────
+     THE ONLY live regions in the product. Announced through `announce()` below;
+     no screen may declare its own — ten private live regions is the duplication
+     D-004 exists to prevent, and nested/competing regions are also a genuine
+     screen-reader bug, not just untidy.
+
+     Placed first in <body> so they are in the DOM before any script runs: a
+     live region injected at the same moment as its text is not reliably
+     announced, because there was no prior state for the change to be measured
+     against. `.sr-only` keeps them off-screen but readable, and NOT
+     `display:none`/`hidden`, which removes them from the accessibility tree
+     entirely and silences them.
+
+     Two, not one, because the distinction is behavioural: `polite` waits for a
+     pause in what the user is already hearing, `assertive` interrupts. An error
+     that interrupts is correct; a "saved" confirmation that interrupts is rude.
+--------------------------------------------------------------------------- -->
+<span id="live-status" class="sr-only" role="status"  aria-live="polite"></span>
+<span id="live-alert"  class="sr-only" role="alert"   aria-live="assertive"></span>
+
 <!-- ── Sidebar ─────────────────────────────────────────── -->
 <aside class="sidebar" id="sidebar">
   <div class="sidebar-logo">
@@ -660,6 +680,36 @@ async function quickApproveOrgChange(reqId, triggerEl) {
 
 function escH(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── announce(msg, level) — shell primitive 3 of 3 (KAN-204 · EP33 debt) ──────
+// Speak `msg` to assistive technology through the shared live regions at the top
+// of <body>. Call it wherever a change is visible but silent: a save, an error,
+// a filter that changed the row count, an empty state, a step that advanced.
+//
+//   announce('Saved.')                       → polite  (waits for a pause)
+//   announce('Pick at least one change.', 'assertive')  → interrupts
+//
+// `level` is 'polite' (default) or 'assertive'. Reserve assertive for something
+// the user must deal with now — an error or a data loss. Everything else is
+// polite; an announcement that interrupts a screen-reader user mid-sentence to
+// say "loaded" is worse than saying nothing.
+//
+// A screen reader only announces a CHANGE to the region's text, so re-sending a
+// string that is already there would be silent. The repeat case (the same
+// validation error twice, which is exactly when a user needs to hear it again)
+// clears first and re-sets on a later tick; the ordinary case stays synchronous,
+// so it is observable to a test immediately.
+function announce(msg, level) {
+  const el = document.getElementById(level === 'assertive' ? 'live-alert' : 'live-status');
+  if (!el) return;                         // never break a flow over an announcement
+  const text = (msg === null || msg === undefined) ? '' : String(msg);
+  if (text && el.textContent === text) {
+    el.textContent = '';
+    setTimeout(function () { el.textContent = text; }, 60);
+    return;
+  }
+  el.textContent = text;
 }
 
 // Poll badge count every 60 s on all pages

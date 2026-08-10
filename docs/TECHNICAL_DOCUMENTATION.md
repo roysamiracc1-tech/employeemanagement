@@ -558,6 +558,103 @@ Toggle calls `POST /api/user/theme` → updates `users.theme_preference` → upd
 
 ---
 
+## 8b. Shell Accessibility Primitives (KAN-204 · tagged **EP33**)
+
+Three primitives the whole product shares. **A new screen's accessibility should be a call to
+one of these, not a tenth private reimplementation** — that duplication is what D-004 exists to
+prevent, and EP42 alone adds about ten surfaces.
+
+Tagged **EP33** because this is EP33's debt: EP38 was believed to have delivered it and had not
+(UX verified three of nine shell fixes). Delivered in W0 so the EP42 screens have something to
+call. `TestShellFocusVisibility`, `TestShellLiveRegions` and `TestShellReducedMotion` in
+`tests/test_ui_ux.py` fail if any of it is removed or reimplemented locally.
+
+### 1. Focus visibility — `:focus-visible` (WCAG 2.4.7)
+
+One token, one rule, in `static/css/style.css`:
+
+```css
+:root                { --focus-ring: #2563eb; }   /* light */
+[data-theme="dark"]  { --focus-ring: #60a5fa; }   /* lighter — 3:1 on #0f172a */
+
+:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+```
+
+**The rule is deliberately the last thing in the stylesheet, and that is load-bearing.**
+`:focus-visible` carries one class-worth of specificity (0,1,0) — identical to `.search-input`,
+`select.filter-sel` and `.rows-select`, each of which sets `outline: none`. It beats them by
+**source order alone**. Move it up the file and those three controls silently lose their focus
+ring again. A test asserts the ordering, and asserts no new `outline: none` appears after it.
+
+- `:focus-visible`, not `:focus` — a mouse click must not leave a ring behind.
+- Two per-component rings (`.row-menu-btn`, `.row-menu-list > *`) are 0,2,0 and still win. They
+  are tuned to sit inside a tight menu; leave them.
+- Don't add a screen-local focus style. If a control needs different treatment, adjust the
+  offset, not the colour.
+
+### 2. Shared ARIA live regions — the only two in the product
+
+Declared once, first in `<body>` in `templates/base.html`:
+
+```html
+<span id="live-status" class="sr-only" role="status" aria-live="polite"></span>
+<span id="live-alert"  class="sr-only" role="alert"  aria-live="assertive"></span>
+```
+
+- **First in `<body>` on purpose.** A live region injected at the same moment as its text is not
+  reliably announced — there was no prior state for the change to be measured against.
+- **`.sr-only`, never `display:none` or `hidden`.** Those remove the element from the
+  accessibility tree, which silences it. It looks like it works and announces nothing.
+- **Two, not one**, because the difference is behavioural, not cosmetic: `polite` waits for a
+  pause in current speech; `assertive` interrupts.
+- **No screen may declare its own.** A grep-assert over `templates/` fails the build if a second
+  pair appears. The move dialog owned the product's first pair and was migrated here; that file
+  is included on three pages, so a private pair would have meant competing copies.
+
+### 3. `announce(msg, level)` — the way to reach them
+
+Defined once in `templates/base.html`. Call it wherever something changes visibly but silently:
+
+```js
+announce('Position change submitted for approval.');            // polite (default)
+announce('Pick at least one change.', 'assertive');             // interrupts
+```
+
+| Rule | Why |
+|---|---|
+| Default is `polite` | An announcement that cuts a screen-reader user off mid-sentence to say "loaded" is worse than silence. Reserve `assertive` for errors and data loss. |
+| Never throws | A missing region returns early. An announcement must not break the flow that was announcing. |
+| Re-announces a repeat | A screen reader only speaks a *change*, so re-sending identical text would be silent — which is wrong for the same validation error twice, exactly when the user needs to hear it again. That path clears and re-sets on a later tick; a new message is set synchronously and is observable to a test immediately. |
+
+**Announce these:** a save, an error, a filter that changed the row count, an empty state, an
+approval step advancing. Current callers: the shared move dialog (status + errors) and the
+directory (result count and empty state, guarded on a *changed* count so paging stays quiet).
+
+### 4. Reduced motion — `prefers-reduced-motion` (WCAG 2.3.3)
+
+A universal block at the foot of the stylesheet, covering all ~57 transitions and every keyframe
+animation at once, so no screen has to remember:
+
+```css
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+```
+
+- **`.01ms`, not `0s`.** A zero duration fires no `transitionend` / `animationend`, so any code
+  waiting on one would hang for ever.
+- It matters most for the three **infinite** animations — `pulse`, `anniv-sway`,
+  `anniv-pulse-scale`. A permanently throbbing badge is the exact trigger this query exists for.
+- **Motion only.** Colour, outline and tint cues are untouched, including the org tree's
+  drag-and-drop dashed outline — nothing communicated by movement alone is lost.
+
+---
+
 ## 9. Security Considerations
 
 | Area | Implementation |

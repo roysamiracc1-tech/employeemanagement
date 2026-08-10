@@ -865,6 +865,108 @@ def run_all(playwright):
     except Exception as e:
         fail("DEF-001 · Decided request leaves the bell's approvals area", str(e))
 
+    # ── 19 · Shell accessibility primitives (KAN-204) ──────────────
+    # `tests/test_ui_ux.py` asserts the CSS and markup are PRESENT. These check
+    # they actually take effect in a real engine — the focus rule works by source
+    # order against several `outline: none` declarations, and a specificity
+    # argument that is right on paper and wrong in the browser is worth nothing.
+    section("19 · Shell accessibility (KAN-204)")
+
+    page.goto(BASE + "/directory")
+    page.wait_for_load_state("networkidle")
+
+    def ring_on(selector, label):
+        """Focus the element the way a keyboard user does, then read the ring."""
+        try:
+            el = page.query_selector(selector)
+            assert el, f"{label}: {selector} not on the page"
+            # `:focus-visible` only matches keyboard-initiated focus, so a
+            # .click() would prove nothing here — the element must be tabbed to.
+            page.evaluate("(s) => document.querySelector(s).focus()", selector)
+            style = page.evaluate("""(s) => {
+              const c = getComputedStyle(document.querySelector(s));
+              return {w: c.outlineWidth, st: c.outlineStyle, col: c.outlineColor};
+            }""", selector)
+            assert page.evaluate(
+                "(s) => document.querySelector(s).matches(':focus-visible')", selector), \
+                f"{label}: element does not match :focus-visible when focused"
+            assert style["st"] != "none", f"{label}: outline-style is none"
+            assert float(style["w"].replace("px", "")) >= 2, \
+                f"{label}: ring is {style['w']}, expected >= 2px"
+            ok(f"Focus ring is visible on {label}")
+        except Exception as e:
+            fail(f"Focus ring is visible on {label}", str(e))
+
+    # The search box is the case that matters: `.search-input` sets
+    # `outline: none` at the SAME specificity, so this is the source-order proof.
+    ring_on(".search-input", "the directory search box (beats `outline: none`)")
+    ring_on(".sidebar a", "a sidebar nav link")
+    ring_on(".bell-btn", "the notification bell")
+
+    try:
+        # Exactly one pair of live regions, and both reachable + non-hidden.
+        counts = page.evaluate("""() => ({
+          polite: document.querySelectorAll('[aria-live=polite]').length,
+          assertive: document.querySelectorAll('[aria-live=assertive]').length,
+          statusHidden: (() => { const e = document.getElementById('live-status');
+            if (!e) return 'missing';
+            const c = getComputedStyle(e);
+            return c.display === 'none' || c.visibility === 'hidden' ? 'hidden' : 'ok'; })()
+        })""")
+        assert counts["polite"] == 1, f"expected 1 polite region, found {counts['polite']}"
+        assert counts["assertive"] == 1, f"expected 1 assertive region, found {counts['assertive']}"
+        assert counts["statusHidden"] == "ok", \
+            f"the polite region is {counts['statusHidden']} — display:none silences it"
+        ok("Exactly one live-region pair, present and not display:none")
+    except Exception as e:
+        fail("Exactly one live-region pair, present and not display:none", str(e))
+
+    try:
+        # announce() reaches the region, and the default is polite.
+        page.evaluate("() => announce('Twelve employees found.')")
+        assert page.evaluate("() => document.getElementById('live-status').textContent") \
+            == 'Twelve employees found.', "a polite announcement did not land"
+        page.evaluate("() => announce('Something went wrong.', 'assertive')")
+        assert page.evaluate("() => document.getElementById('live-alert').textContent") \
+            == 'Something went wrong.', "an assertive announcement did not land"
+        ok("announce() reaches both regions and defaults to polite")
+    except Exception as e:
+        fail("announce() reaches both regions and defaults to polite", str(e))
+
+    try:
+        # The directory's own empty state announces — filter to nonsense.
+        page.fill(".search-input", "zzzz-no-such-person-zzzz")
+        page.wait_for_timeout(600)
+        spoken = page.evaluate("() => document.getElementById('live-status').textContent")
+        assert 'No employees found' in spoken, \
+            f"the empty state was silent; region held {spoken!r}"
+        ok("Directory empty state is announced, not just drawn")
+    except Exception as e:
+        fail("Directory empty state is announced, not just drawn", str(e))
+
+    try:
+        # Reduced motion, in an engine that is actually honouring the query.
+        rm = browser.new_context(reduced_motion="reduce")
+        rp = rm.new_page()
+        rp.goto(BASE + "/login")
+        rp.wait_for_load_state("networkidle")
+        dur = rp.evaluate("""() => {
+          const d = document.createElement('div');
+          d.style.transition = 'opacity 400ms';
+          document.body.appendChild(d);
+          const v = getComputedStyle(d).transitionDuration;
+          d.remove();
+          return v;
+        }""")
+        # Near-zero, but deliberately NOT 0s — a 0s transition fires no
+        # `transitionend`, and code awaiting one would hang for ever.
+        assert dur not in ("0.4s", "400ms"), f"transition not reduced: {dur}"
+        assert dur != "0s", f"duration collapsed to exactly 0s: {dur}"
+        ok("prefers-reduced-motion shortens transitions without reaching 0s")
+        rm.close()
+    except Exception as e:
+        fail("prefers-reduced-motion shortens transitions without reaching 0s", str(e))
+
     browser.close()
 
 # ── Summary ───────────────────────────────────────────────────

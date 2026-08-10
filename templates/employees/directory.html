@@ -346,8 +346,21 @@ function pagesToShow(c,t){
   return [1,'…',c-1,c,c+1,'…',t];
 }
 
+// Filtering is a silent change: rows appear and vanish with nothing spoken, so
+// a screen-reader user searching the directory gets no confirmation that their
+// query did anything. Announced politely — it must queue behind whatever the
+// user is already hearing, never interrupt their own typing. Guarded on a
+// CHANGED count so paging through a stable result set stays quiet (KAN-204).
+let lastAnnouncedCount = null;
+
 function renderPage(){
   const tbody=document.getElementById('employee-table-body');
+  if(lastAnnouncedCount !== filtered.length){
+    lastAnnouncedCount = filtered.length;
+    announce(filtered.length
+      ? `${filtered.length} employee${filtered.length===1?'':'s'} found.`
+      : 'No employees found.');
+  }
   if(!filtered.length){
     tbody.innerHTML=`<tr class="empty-row"><td colspan="${DIR_COLS}">No employees found.</td></tr>`;
     ['top','bottom'].forEach(s=>document.getElementById(`pagination-bar-${s}`).style.display='none');

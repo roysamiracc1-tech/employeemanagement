@@ -86,14 +86,17 @@ before confirming, so nothing silently breaks. This is in addition to `pytest`. 
 
 1. Ensure the app is running on `http://localhost:8000` (`python run.py`) against the seeded dev DB.
 2. Run both headless browser regression suites and confirm **0 failures**:
-   - `python tests/ui/test_browser.py` — 93 checks across login, admin, org tree, search, vacation
+   - `python tests/ui/test_browser.py` — 100 checks across login, admin, org tree, search, vacation
      calendar, bell, dark mode, directory, Portal-Admin scoping, restricted access, mobile, redirects,
-     the Transfer… entry point (KAN-185), and **bell content** — that an approval awaiting you is
-     actionable there, wears the right icon, and leaves once decided (DEF-001/2/3).
+     the Transfer… entry point (KAN-185), **bell content** — that an approval awaiting you is
+     actionable there, wears the right icon, and leaves once decided (DEF-001/2/3) — and the
+     **shell accessibility primitives** (KAN-204): a focus ring that survives the `outline: none`
+     declarations above it, exactly one live-region pair, `announce()` reaching both, and
+     `prefers-reduced-motion` honoured in an engine that actually applies the query.
    - `python tests/ui/test_vacation_workflow.py` — 39 checks: the full submit → approve → reject →
      history → dashboard vacation workflow. It resets the leave it created on start-up, so it is
      safe to re-run — do not "fix" an `Exceeds annual limit` failure by relaxing the limit.
-3. Report the pass counts (e.g. "browser 93/93, vacation 39/39") alongside the `pytest` result.
+3. Report the pass counts (e.g. "browser 100/100, vacation 39/39") alongside the `pytest` result.
 4. If a regression suite fails, **investigate whether it's a real regression or a stale assertion** —
    drive the specific flow in a browser and check console/page errors before deciding. Fix real
    regressions; correct genuinely stale assertions (and say which). Never delete a check to go green.

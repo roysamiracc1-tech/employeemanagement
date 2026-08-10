@@ -21,6 +21,10 @@
   --table-row-hover: #f8fafc;
   --co-header-bg: transparent;
   --co-footer-bg: transparent;
+  /* Shell accessibility primitive 1 of 3 (KAN-204 · EP33 debt). One token, so
+     every focus ring in the product is the same ring — see the global
+     `:focus-visible` rule at the foot of this file for why it lives there. */
+  --focus-ring: #2563eb;
 }
 
 /* ── Dark theme ──────────────────────────────────────────── */
@@ -37,6 +41,10 @@
   --table-row-hover: #162032;
   --co-header-bg: rgba(255,255,255,.04);
   --co-footer-bg: rgba(255,255,255,.04);
+  /* Lighter than the light-theme ring: #2563eb on a #0f172a surface is close to
+     failing WCAG 1.4.11's 3:1 for a non-text indicator, and a focus ring you
+     have to hunt for is the same defect as no focus ring. */
+  --focus-ring: #60a5fa;
 }
 [data-theme="dark"] body { color-scheme: dark; }
 [data-theme="dark"] .topbar { background: var(--topbar-bg); }
@@ -1943,3 +1951,72 @@ select.filter-sel:focus { border-color: var(--primary); }
 [data-theme="dark"] .an-card-hdr  { background: #1e293b; color: #f1f5f9; }
 [data-theme="dark"] .an-table th  { background: #0f172a; }
 [data-theme="dark"] .an-table tr:hover td { background: #263548; }
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   SHELL ACCESSIBILITY PRIMITIVES (KAN-204 · EP33 debt)
+
+   Three primitives the whole product shares, so that a new screen's
+   accessibility is a call to something that already exists rather than ten
+   private reimplementations. Documented in TECHNICAL_DOCUMENTATION.md §  —
+   the third (`announce()`) is JS and lives in templates/base.html.
+
+   THESE RULES ARE DELIBERATELY LAST IN THE FILE. Both must beat declarations
+   written above them, and they do it by source order at equal specificity
+   rather than by `!important` or inflated selectors:
+
+     • `:focus-visible` is one class-worth of specificity (0,1,0) — exactly the
+       same as `.search-input`, `select.filter-sel` and `.rows-select`, each of
+       which sets `outline: none`. Moving this rule higher up the file silently
+       returns those three controls to having no visible focus. It is not a
+       formatting preference; it is what makes the rule work.
+     • The two deliberate per-component rings (`.row-menu-btn:focus-visible`,
+       `.row-menu-list > *:focus-visible`) are 0,2,0 and so still win. They are
+       tuned to sit inside a tight menu; leave them alone.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── 1. Focus visibility — WCAG 2.4.7 on the SHELL, not per screen ──────────
+   `:focus-visible` rather than `:focus`, so a mouse click on a button does not
+   leave a ring behind while keyboard traversal always shows one. Applied to
+   everything focusable, including anything a screen gives `tabindex` to.       */
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  /* Rounded to follow the control it traces; harmless on square elements. */
+  border-radius: 3px;
+}
+/* Inputs already carry a focus glow, and an outline 2px outside a full-width
+   field can clip against its container. Tuck it in and keep both cues. */
+.search-input:focus-visible,
+.form-control:focus-visible,
+select.filter-sel:focus-visible,
+.rows-select:focus-visible {
+  outline-offset: 0;
+}
+/* Sidebar and topbar sit on dark navy in BOTH themes, where the light-theme
+   token is too low-contrast to find. Fixed colour on purpose, not a token. */
+.sidebar :focus-visible,
+.sidebar-logo :focus-visible {
+  outline-color: #93c5fd;
+}
+
+/* ── 2. Reduced motion — WCAG 2.3.3, honoured shell-wide ────────────────────
+   Covers all ~57 transitions and every keyframe animation in one place, so no
+   screen has to remember. This matters most for the three INFINITE animations
+   (`pulse`, `anniv-sway`, `anniv-pulse-scale`) — a permanently throbbing badge
+   is the exact trigger this media query exists for — and for the org tree's
+   drag affordance. Motion is removed; colour and outline cues are untouched,
+   so nothing that was communicated by movement alone is lost.
+
+   Near-zero rather than `none`: a 0s duration skips `transitionend` /
+   `animationend` events, and code that waits on one would hang for ever.       */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+  /* The drag-and-drop affordance keeps its dashed outline and tint — those are
+     not motion — but loses the opacity fade while a card is in flight. */
+  .ft-card.ft-dragging { opacity: .45; }
+}

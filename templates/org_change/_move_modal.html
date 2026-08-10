@@ -102,8 +102,11 @@
   </div>
 </div>
 
-<span id="mv-live-status" aria-live="polite" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap"></span>
-<span id="mv-live-alert" aria-live="assertive" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap"></span>
+<!-- This dialog used to carry its own pair of live regions here. They were the
+     first ones in the product and became the shell's (KAN-204): they now live in
+     templates/base.html and are reached through `announce()`. Do not add them
+     back — this file is included on three pages, so a private pair would be
+     three competing copies on any page that includes it twice. -->
 
 <script>
 // ── Request Position Change dialog — shared by drag-and-drop and Transfer… ────
@@ -114,12 +117,17 @@ function mvEl(id) { return document.getElementById(id); }
 function mvOpt(v, l, sel, dis) {
   return `<option value="${escH(v)}"${sel ? ' selected' : ''}${dis ? ' disabled' : ''}>${escH(l)}</option>`;
 }
-function mvSay(msg)   { mvEl('mv-live-status').textContent = msg || ''; }
-function mvClearErr()  { const e = mvEl('mv-error'); e.style.display = 'none'; e.textContent = ''; mvEl('mv-live-alert').textContent = ''; }
+// Status and errors both go through the shell's `announce()` (base.html) rather
+// than this dialog's own live regions. `mvSay`/`mvErr` are kept as the dialog's
+// vocabulary — they also show the error visually, which announcing does not.
+function mvSay(msg)   { announce(msg || '', 'polite'); }
+function mvClearErr()  { const e = mvEl('mv-error'); e.style.display = 'none'; e.textContent = ''; announce('', 'assertive'); }
 function mvErr(msg)    {
   const e = mvEl('mv-error');
   e.textContent = msg; e.style.display = '';
-  mvEl('mv-live-alert').textContent = msg;
+  // Assertive: every caller is a validation failure or a failed submit, which
+  // is the case that must interrupt rather than queue behind other speech.
+  announce(msg, 'assertive');
 }
 
 // ── Panels ────────────────────────────────────────────────────────────────────
