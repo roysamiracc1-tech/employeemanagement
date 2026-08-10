@@ -58,7 +58,7 @@
 | EP34 | Architecture & Structure | KAN-178 · KAN-179 · KAN-180 · KAN-181 · KAN-182 | ⬜ Planned |
 | EP38 | Employee Lifecycle Workflows | KAN-187 · KAN-183 · KAN-184 · KAN-185 · KAN-186 | 🟡 In progress · **first roadmap growth epic in the backlog** (BG4) — build stage **S3** (D-004); ✅ KAN-187 (audit), 🟡 KAN-185 (transfer); KAN-186 is **Later** |
 | EP42 | Compensation, Job Architecture & Pay Equity | **W0** KAN-203 · KAN-204 · KAN-188 · KAN-189 · **W1** KAN-190 · KAN-191 · KAN-207 · **W2** KAN-199 · KAN-206 · KAN-210 · KAN-193 · KAN-194 · KAN-218 · KAN-195 · KAN-209 · **W3** KAN-196 · KAN-197 · KAN-198 · KAN-192 · **W4** KAN-200 · KAN-201 · KAN-202 · *(conditional)* KAN-208 | ⬜ Planned · **BG7** — W0 builds in **S2**, W1–W4 in **S3** (D-004). **23 stories in 5 waves** (A1 · Wave-5 · A2 · A3 · **A4–A6**). **⚠ A6 overturned the pay/step model**: the job decides the step, the step decides base pay, **pay never decides the step**. KAN-218 (additional pay) is new, KAN-209 is repurposed as the pay reconciliation, KAN-205 moved to Later, KAN-208 is conditional. Carries **KAN-203, a P0 Critical pre-existing defect fix** — **✅ landed 10 Aug 2026, DEF-42-4 + DEF-42-5 closed** — and **unblocks KAN-185** |
-| EP44 | Performance Management **(⚠ sequencing open — D-008)** | **P0** KAN-219 · KAN-220 · **P1** KAN-221 · KAN-222 · KAN-223 · **P2** KAN-224 · KAN-225 · KAN-226 · KAN-227 · KAN-228 · **P3** KAN-229 · KAN-230 · KAN-231 · KAN-232 · **P4** KAN-233 · KAN-234 · KAN-235 · KAN-236 · KAN-237 · **P5** KAN-238 · KAN-239 · KAN-240 | ⬜ Planned · **BG7** · **entered by A4/A5** — the owner chose full performance management over the 2-story input, **accepting the delay in his own words** (Decision D-006). **22 stories**, stage **S3**, **sequenced after EP42 and before EP43**. Outline depth — entering **S1**, not build. Carries the **EU AI Act / GDPR Art. 22 gate as stories (KAN-232, KAN-240), not notes**, and works-council inspectability (KAN-238) |
+| EP44 | Performance Management **(D-008: Option C — P0–P2 run PARALLEL to EP42 W1–W3)** | **P0** KAN-219 · KAN-220 · **P1** KAN-221 · KAN-222 · KAN-223 · **P2** KAN-224 · KAN-225 · KAN-226 · KAN-227 · KAN-228 · **P3** KAN-229 · KAN-230 · KAN-231 · KAN-232 · **P4** KAN-233 · KAN-234 · KAN-235 · KAN-236 · KAN-237 · **P5** KAN-238 · KAN-239 · KAN-240 | ⬜ Planned · **BG7** · **entered by A4/A5** — the owner chose full performance management over the 2-story input, **accepting the delay in his own words** (Decision D-006). **22 stories**, stage **S3**, **sequenced after EP42 and before EP43**. Outline depth — entering **S1**, not build. Carries the **EU AI Act / GDPR Art. 22 gate as stories (KAN-232, KAN-240), not notes**, and works-council inspectability (KAN-238) |
 | EP43 | Annual Compensation Review Cycle | KAN-216 · KAN-211 · KAN-213 · KAN-214 · KAN-215 | ⬜ Planned · **BG7** · new in A2, **reduced by A6 from 7 stories to 5**. KAN-212 withdrawn (merged into KAN-216 and EP42's rate schedule); KAN-217 withdrawn (superseded by EP44). A6 collapsed the per-employee hike percentage, so this is now a **round-management** epic, not a differentiation one. **Sequenced last**, stage **S3**. **The natural descope if S3 runs long** |
 
 > **EP28–EP34** are sourced from the architecture review in [`docs/ARCHITECTURE_REVIEW.md`](../ARCHITECTURE_REVIEW.md)
@@ -1116,11 +1116,11 @@ file carries the numbered, individually testable criteria.
 6. **The access model cannot express "read company-wide, write nothing"** — a read-only auditor or works-council
    representative has no clean grant. **Accepted as a named product limitation for this cycle**; no fourth
    feature code and no `scope` column, because changing the platform's access model deserves its own decision
-   rather than arriving as a side-effect of EP42. Revisit if OQ-8 comes back "yes".
+   rather than arriving as a side-effect of EP42. OQ-8 came back **"no"** (10 Aug 2026), so there is nothing to revisit.
 
 ---
 
-## SEQUENCING OPTION PAPER — where performance management goes (D-008, **open, for the owner**)
+## SEQUENCING — where performance management goes (**Decision D-008 — RESOLVED: Option C**)
 
 > **Raised 10 Aug 2026.** The owner challenged the sequencing directly: *"You said yesterday to implement
 > Level base people alignment and then aligning that to promotion you need finalise implement the performance
@@ -1182,16 +1182,41 @@ exercise has to start now** — which needs the owner's confirmation of the 22-s
 because A4–A6 were expensive precisely when specification ran ahead of agreement; C is the one option that
 requires opening it early, and that is a real risk, not a formality.
 
-### Recommendation
+### ✅ DECISION — 10 Aug 2026 — the owner chose **Option C**
+
+> His words: *"option c is my choice"* — asked and answered with the three options, the two corrections and
+> the capacity cost in front of him.
+
+**What this authorises, and it is more than a reordering:**
+
+1. **EP44's requirements exercise OPENS NOW.** Option C is the only option that requires it early, and the
+   paper said so before he chose. **Choosing C is therefore the confirmation the S1 gate was waiting for**
+   (`PRODUCT_ROADMAP` §S1: *"EP44 does not enter its requirements exercise until the owner confirms the
+   22-story shape"*). The BA starts P0–P2 acceptance criteria; the gate's purpose — that specification does
+   not run ahead of agreement — is satisfied by the agreement, not bypassed.
+2. **Two parallel tracks in S3**, not one: EP42 W1→W2→W3→W4 on the critical path, and EP44 **P0–P2**
+   (KAN-219 · KAN-220 · KAN-221 · KAN-222 · KAN-223 · then P2) beside it. They share no tables — cycles,
+   goals and assessments against the ladder and the pay record — so the parallelism is real and not a
+   scheduling fiction.
+3. **KAN-192 does not start until a review cycle can be closed.** That is the whole point of the choice, and
+   it is now a **sequencing constraint, not an aspiration**: KAN-192 is the last story in W3 and must land
+   *after* EP44 can produce a closed cycle for its `review_context`. If the EP44 track slips, **KAN-192
+   waits** — the alternative is shipping the seam the owner objected to.
+4. **Capacity: +1 SNR +1 MID for ~8–10 weeks.** Approved by the choice. If it does not materialise, this
+   reverts to **Option A, not B** — that fallback stands and does not need re-deciding.
+
+**Expected: hike cycle in ~26–30 weeks** rather than ~30–36, because EP44 overlaps instead of queueing.
+
+### Recommendation *(as put to the owner, retained for the record)*
 
 **Option C, and it is a budget decision, not a technical one** — the binding constraint is people, which is
 the owner's call and not engineering's. If the extra capacity is not available, **take A rather than B**: with
 one team, closing a recording gap is not worth slipping two money controls by a quarter.
 
-**Also unchanged by any option, and still the highest-value unanswered question in the programme: OQ-8,
-works councils.** Performance-related pay with calibration across Germany and the Nordics is plausibly
-market-gating. It blocks no engineering and it can block a launch, and it gets more expensive the more that
-is built on top of it.
+**OQ-8 (works councils) — ✅ ANSWERED by the owner, 10 Aug 2026: NO.** Asked whether performance-related pay
+with calibration across Germany and the Nordics needs works-council consultation; his answer was *"no"*. It is
+therefore **not a launch blocker** and comes off the Customer-Readiness checklist as a gate. See the OQ-8 entry
+in the open-questions register for what that does and does not settle.
 
 ---
 
@@ -1279,14 +1304,32 @@ epic outline has been agreed with the owner is how the last three amendments bec
 > measure, report, **never auto-correct**. **Flagged for DPO/legal validation (Charter §9.7); nothing here is
 > legal advice.**
 >
-> **(2) Works councils — OQ-8 escalates a third time and is now plausibly market-gating.** Performance
-> management with calibration, feeding pay, across Germany and four Nordic countries — which is exactly where
-> the seed data lives — is close to the definition of a co-determination matter. A launch consideration in A2,
-> a design input in A3, **plausibly a gating dependency for those markets under A4.** The concrete
-> consequence is **KAN-238**: the policy — the rating scale, the review forms, the calibration rules and the
-> rating-to-pay mapping — must be **versioned, auditable and inspectable without exposing any individual's
-> data**, because a council may need to review and agree it *before* the first cycle operates. **A launch
-> blocker, not a build blocker**, and it belongs on the Customer-Readiness checklist.
+> **(2) Works councils — OQ-8 — ✅ CLOSED BY THE OWNER, 10 Aug 2026: NO.**
+>
+> *Question put:* does performance-related pay with calibration, across Germany and the Nordics, need
+> works-council consultation? *His answer:* **"no"**. Escalated three times (A2 launch consideration → A3
+> design input → A4 plausibly market-gating) and now settled.
+>
+> *Effect:* **not a launch blocker.** It comes off the Customer-Readiness checklist as a gate, and no market
+> is held pending consultation. Nothing was built on the "yes" branch, so nothing is wasted.
+>
+> **Recorded as a product-owner determination, not as legal advice, and the distinction is deliberate.** The
+> team asked a question with a legal dimension and the owner answered it in his capacity as owner; that is
+> his call to make and it is not re-litigated here. What the record must not do is *imply* the question was
+> validated by counsel, because Charter §9.7 routes exactly this to DPO/legal and nobody there has been
+> asked. If that validation is ever wanted, this entry is the thing to hand them — the question, the answer,
+> the date and who gave it.
+>
+> **What this does NOT settle, so it is not read as wider than it is:**
+> - **KAN-232 and KAN-240 stand untouched.** The **EU AI Act / GDPR Art. 22** boundary — no automated
+>   decision about a person without a human in it, bias measured and reported and never auto-corrected — is
+>   a different body of law with a different answer. It was never part of OQ-8.
+> - **KAN-238 loses its justification but not necessarily its value.** It exists so a council could inspect
+>   the policy — the rating scale, review forms, calibration rules and rating-to-pay mapping — before the
+>   first cycle runs. With no consultation required, that rationale is gone; but *versioned and auditable*
+>   policy is independently needed by KAN-232/240. **It must therefore be re-justified on that basis or
+>   descoped on purpose** when EP44's requirements exercise reaches P5 — not quietly carried on a reason
+>   that no longer applies.
 
 **Three boundaries EP44 inherits and may not weaken:**
 
@@ -1330,7 +1373,7 @@ after it. **P3 gates P4's pay seam:** KAN-235 does not ship before KAN-232.
    asked for *"a detailed performance requirement implementation"* and he will get one — but the last three
    amendments cost what they cost because specification ran ahead of agreement on shape. **The shape is 22
    stories in six waves with the compliance gate inside the build; confirm, then specify.**
-2. **OQ-8 (works councils) is now the highest-value unanswered question in the programme.** It was a launch
+2. **OQ-8 (works councils) — ✅ ANSWERED "no" by the owner on 10 Aug 2026; the paragraph below is the state before that.** It was a launch
    consideration in A2, a design input in A3, and under A4 it is plausibly **market-gating** for Germany and
    the Nordics, where the seed data lives. Not a build blocker; **a launch blocker**, and discovering it during
    a rollout stops the rollout.
