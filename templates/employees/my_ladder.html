@@ -1,0 +1,233 @@
+{% extends 'base.html' %}
+{% block title %}My ladder — HR Portal{% endblock %}
+{% block page_title %}My ladder{% endblock %}
+
+{#
+  KAN-207 — the employee's own view, and the object the owner actually asked for.
+
+  Two different things live here and the difference is the whole story:
+    • the step EXPECTATION (KAN-190) — what step 1.2 means *here*, for anybody
+    • the ROADMAP (KAN-207)          — what *you specifically* need to do next
+
+  ⚠ THREE THINGS THIS SCREEN MUST NOT DO:
+    1. It must not show a rating, score, readiness or likelihood. A roadmap is a
+       statement of expectations; a scored judgement about a person is a
+       different legal object (GDPR Art. 22 / EU AI Act) with different
+       obligations.
+    2. It must not say "agreed" or "accepted". The button reads
+       "Confirm we discussed this" and the state reads "Discussed on 14 March" —
+       recording agreement when somebody merely read it is a false record about
+       a person (CFL-42-50).
+    3. It must not show pay. Nothing pay-shaped is sent to this page.
+
+  DISCLOSURE-OFF RENDERING (A2 option (b)). Where the company does not display
+  steps, the employee STILL sees their role, their job family and every level's
+  expectations — the roadmap simply reads "what the next set of expectations
+  looks like", with no step number and no "you are here" marker. Hiding the
+  roadmap too would discard the transparency the owner asked for twice in order
+  to hide a label.
+#}
+
+{% block content %}
+<div class="page">
+
+  {% if not has_context %}
+  <div class="card" style="max-width:560px;margin:40px auto;padding:32px;text-align:center">
+    <h2 style="font-size:1rem;font-weight:700;margin:0 0 8px">Nothing to show yet</h2>
+    <p style="font-size:.86rem;color:var(--muted);margin:0">
+      Your company has not set up its job ladder yet.
+    </p>
+  </div>
+  {% else %}
+
+  {# ── Where I am ──────────────────────────────────────────────────────────── #}
+  {% if where and where.current %}
+  <div class="card" style="padding:20px;margin-bottom:16px">
+    <div style="font-size:.74rem;color:var(--muted);text-transform:uppercase;
+                letter-spacing:.04em;margin-bottom:6px">My role</div>
+    <h2 style="font-size:1.05rem;font-weight:700;margin:0 0 4px">{{ where.current.title }}</h2>
+    <p style="font-size:.84rem;color:var(--muted);margin:0">
+      {# Job family is an EXPLICIT part of what this shows — the owner named it. #}
+      {{ where.current.family_name }}
+      {% if shows_step and where.current.step_no is not none %}
+        · <span style="font-family:ui-monospace,monospace">{{ where.current.ordinal }}.{{ where.current.step_no }}</span>
+      {% endif %}
+    </p>
+  </div>
+  {% endif %}
+
+  {# ── My roadmap ──────────────────────────────────────────────────────────── #}
+  {% if roadmap %}
+  <div class="card" style="padding:0;margin-bottom:16px;overflow:hidden">
+    <div style="padding:16px 20px;background:var(--table-head);border-bottom:1px solid var(--border)">
+      <h2 style="font-size:.95rem;font-weight:700;margin:0 0 4px">{{ roadmap.target_heading }}</h2>
+      <p style="font-size:.78rem;color:var(--muted);margin:0">
+        Written by {{ roadmap.authored_by_label }} · {{ roadmap.review_context_label }}
+        {% if roadmap.review_date %} · {{ fmt_period(roadmap.review_date, none).replace('since ', '') }}{% endif %}
+      </p>
+    </div>
+    <div style="padding:20px;font-size:.88rem;line-height:1.7;white-space:pre-wrap">{{ roadmap.content }}</div>
+
+    <div style="padding:14px 20px;border-top:1px solid var(--border);background:var(--bg);
+                display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+      {% if roadmap.acknowledged %}
+      {# ⚠ "Discussed", never "agreed" (CFL-42-50). #}
+      <span style="font-size:.82rem;color:#047857;font-weight:600">
+        ✓ Discussed on {{ fmt_period(roadmap.acknowledged_at, none).replace('since ', '') }}
+      </span>
+      <span style="font-size:.76rem;color:var(--muted)">
+        This records that the conversation happened — not that you agreed with it.
+      </span>
+      {% else %}
+      <div>
+        <button class="btn btn-primary btn-sm" id="rm-confirm" onclick="rmConfirm()">
+          Confirm we discussed this
+        </button>
+        <div style="font-size:.76rem;color:var(--muted);margin-top:6px;max-width:520px;line-height:1.5">
+          This only records that you and your manager talked about it. It is
+          <strong>not</strong> agreement with the content, and nothing is waiting on you —
+          this roadmap is already live.
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% elif where and where.target %}
+  <div class="card" style="padding:28px;margin-bottom:16px;text-align:center">
+    <h2 style="font-size:.95rem;font-weight:700;margin:0 0 8px">No roadmap written yet</h2>
+    <p style="font-size:.85rem;color:var(--muted);margin:0;line-height:1.6;max-width:520px;
+              margin-left:auto;margin-right:auto">
+      Your manager writes what your next step needs from you. Until then, the
+      expectations for every step are below — those apply to everybody at that step.
+    </p>
+  </div>
+  {% elif where and where.reason %}
+  <div class="card" style="padding:24px;margin-bottom:16px">
+    <p style="font-size:.85rem;color:var(--muted);margin:0;line-height:1.6">{{ where.reason }}</p>
+  </div>
+  {% endif %}
+
+  {# ── What we agreed before ───────────────────────────────────────────────── #}
+  {% if history %}
+  <details class="card" style="padding:16px 20px;margin-bottom:16px">
+    {# Versioned, not overwritten — "what did we agree in March" is the question
+       this object exists to answer. #}
+    <summary style="font-size:.88rem;font-weight:600;cursor:pointer">
+      Earlier roadmaps ({{ history | length }})
+    </summary>
+    {% for h in history %}
+    <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
+      <div style="font-size:.78rem;color:var(--muted);margin-bottom:6px">
+        {{ h.target_heading }} · {{ h.review_context_label }} ·
+        written by {{ h.authored_by_label }}
+        {% if h.acknowledged %} · discussed{% endif %}
+      </div>
+      <div style="font-size:.84rem;line-height:1.65;white-space:pre-wrap;color:var(--muted)">{{ h.content }}</div>
+    </div>
+    {% endfor %}
+  </details>
+  {% endif %}
+
+  {# ── The ladder itself — readable either way ─────────────────────────────── #}
+  <div class="card" style="padding:18px 20px">
+    <h2 style="font-size:.95rem;font-weight:700;margin:0 0 6px">The whole ladder</h2>
+    <p style="font-size:.82rem;color:var(--muted);margin:0 0 14px;line-height:1.55">
+      Every level in your company and what each step expects. This is the same for
+      everybody — your roadmap above is the part written for you.
+    </p>
+    {% for f in ladder %}
+    <div style="margin-top:12px">
+      <div style="font-weight:700;font-size:.86rem;margin-bottom:6px">{{ f.name }}</div>
+      {% for l in f.levels %}
+      <div style="padding:8px 0;border-top:1px solid var(--border);display:flex;
+                  gap:12px;align-items:baseline;flex-wrap:wrap">
+        <span style="font-weight:600;font-size:.84rem;min-width:220px">{{ l.title }}</span>
+        <span style="font-size:.78rem;color:var(--muted)">
+          {% if shows_step %}
+            {{ l.step_total }} step{{ '' if l.step_total == 1 else 's' }}
+          {% endif %}
+          {% if l.authored_steps == 0 %}Expectations not yet defined{% endif %}
+        </span>
+        {% if l.authored_steps %}
+        <button class="btn btn-ghost btn-sm" style="margin-left:auto"
+                onclick="rmSteps('{{ l.id }}', '{{ l.title | e }}')">Read the expectations</button>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+
+{# ── Expectations reader ─────────────────────────────────────────────────── #}
+<div id="rm-steps-modal" class="modal-overlay open" style="display:none"
+     role="dialog" aria-modal="true" aria-labelledby="rm-steps-title">
+  <div class="modal" style="padding:26px;width:660px;max-width:94vw;max-height:86vh;
+       display:flex;flex-direction:column">
+    <h3 id="rm-steps-title" style="font-size:.95rem;font-weight:700;margin:0 0 12px"></h3>
+    <div id="rm-steps-body" style="overflow:auto;flex:1"></div>
+    <div style="display:flex;justify-content:flex-end;margin-top:16px">
+      <button class="btn btn-ghost btn-sm" onclick="rmClose()">Close</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const RM_SHOWS_STEP = {{ shows_step | tojson }};
+const RM_ME = {{ (session.get('employee_id') or '') | tojson }};
+let rmOpener = null;
+
+function rmEl(id) { return document.getElementById(id); }
+
+async function rmConfirm() {
+  const btn = rmEl('rm-confirm');
+  btn.disabled = true; btn.textContent = 'Recording…';
+  let res, data;
+  try {
+    res = await fetch(`/api/roadmap/${encodeURIComponent(RM_ME)}/confirm-discussed`,
+                      { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: '{}' });
+    data = await res.json();
+  } catch (_) {
+    btn.disabled = false; btn.textContent = 'Confirm we discussed this';
+    announce('That did not save. Nothing has been recorded — try again.', 'assertive');
+    return;
+  }
+  if (!res.ok) {
+    btn.disabled = false; btn.textContent = 'Confirm we discussed this';
+    announce(data.error || 'That did not save.', 'assertive');
+    return;
+  }
+  // Deliberate wording in the announcement too — it records a conversation.
+  announce('Recorded that you discussed this with your manager.');
+  location.reload();
+}
+
+async function rmSteps(levelId, title) {
+  const res = await fetch(`/api/job-architecture/levels/${encodeURIComponent(levelId)}/steps`);
+  const data = await res.json();
+  if (!res.ok) { announce(data.error || 'Could not load the expectations.', 'assertive'); return; }
+  rmEl('rm-steps-title').textContent = title;
+  rmEl('rm-steps-body').innerHTML = (data.steps || []).filter(s => s.authored).map(s => `
+    <div style="padding:12px 0;border-top:1px solid var(--border)">
+      <div style="font-weight:600;font-size:.85rem;margin-bottom:4px">
+        ${RM_SHOWS_STEP ? escH(s.label) + ' — ' : ''}${escH(s.summary)}
+      </div>
+      <div style="font-size:.83rem;line-height:1.65;white-space:pre-wrap">${escH(s.description || '')}</div>
+    </div>`).join('') ||
+    `<p style="font-size:.84rem;color:var(--muted)">Expectations not yet defined for this level.</p>`;
+  rmOpener = document.activeElement;
+  rmEl('rm-steps-modal').style.display = 'flex';
+  document.addEventListener('keydown', rmKeydown);
+}
+function rmClose() {
+  rmEl('rm-steps-modal').style.display = 'none';
+  document.removeEventListener('keydown', rmKeydown);
+  if (rmOpener && rmOpener.focus) rmOpener.focus();
+}
+function rmKeydown(e) { if (e.key === 'Escape') rmClose(); }
+</script>
+{% endblock %}

@@ -433,7 +433,6 @@ def test_analytics_sa_company_context(app, admin_co):
     c = make_client(app, ['SYSTEM_ADMIN'], admin_co=admin_co)
     feature_map = {'reports': {'r': True, 'w': True, 'd': True}}
     with patch('app.auth._load_feature_access', return_value=feature_map), \
-         patch('app.routes.analytics._analytics_enabled', return_value=True), \
          patch('app.services.analytics_service.get_overview', return_value={
              'totals': {}, 'dau': [], 'top_pages': [], 'feature_adoption': [], 'bulk_import': {}
          }):

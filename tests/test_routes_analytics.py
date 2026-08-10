@@ -5,6 +5,7 @@ All service calls and DB interactions are mocked.
 import json
 import pytest
 from unittest.mock import patch, MagicMock
+from tests.conftest import FakeTransaction, tenant_feature_off, tenant_feature_on
 
 # ── sample payloads the service would return ─────────────────────────────────
 
@@ -161,7 +162,7 @@ class TestAnalyticsOverview:
             assert len(d['feature_adoption']) == 1
 
     def test_overview_portal_admin_uses_own_company(self, portal_admin_client):
-        with patch('app.routes.analytics._analytics_enabled', return_value=True), \
+        with tenant_feature_on(), \
              patch('app.services.analytics_service.get_overview',
                    return_value=_OVERVIEW) as mock_svc:
             r = portal_admin_client.get('/api/analytics/overview?range=30d')
@@ -179,7 +180,7 @@ class TestAnalyticsOverview:
 
 class TestAnalyticsVacation:
     def test_vacation_returns_kpis(self, portal_admin_client):
-        with patch('app.routes.analytics._analytics_enabled', return_value=True), \
+        with tenant_feature_on(), \
              patch('app.services.analytics_service.get_vacation_analytics',
                    return_value=_VACATION):
             r = portal_admin_client.get('/api/analytics/vacation?range=30d')
@@ -189,14 +190,14 @@ class TestAnalyticsVacation:
             assert d['kpis']['approval_rate'] == 77.8
 
     def test_vacation_group_by_passed_to_service(self, portal_admin_client):
-        with patch('app.routes.analytics._analytics_enabled', return_value=True), \
+        with tenant_feature_on(), \
              patch('app.services.analytics_service.get_vacation_analytics',
                    return_value=_VACATION) as mock_svc:
             portal_admin_client.get('/api/analytics/vacation?range=30d&group_by=department')
             assert mock_svc.call_args[0][3] == 'department'
 
     def test_vacation_hr_admin_allowed(self, hr_client):
-        with patch('app.routes.analytics._analytics_enabled', return_value=True), \
+        with tenant_feature_on(), \
              patch('app.services.analytics_service.get_vacation_analytics',
                    return_value=_VACATION):
             r = hr_client.get('/api/analytics/vacation?range=30d')
@@ -207,7 +208,7 @@ class TestAnalyticsVacation:
 
 class TestAnalyticsSkills:
     def test_skills_returns_completeness(self, portal_admin_client):
-        with patch('app.routes.analytics._analytics_enabled', return_value=True), \
+        with tenant_feature_on(), \
              patch('app.services.analytics_service.get_skills_analytics',
                    return_value=_SKILLS):
             r = portal_admin_client.get('/api/analytics/skills?range=30d')
@@ -217,7 +218,7 @@ class TestAnalyticsSkills:
             assert d['kpis']['validation_rate_pct'] == 60.0
 
     def test_skills_drilldown_has_employee_names(self, portal_admin_client):
-        with patch('app.routes.analytics._analytics_enabled', return_value=True), \
+        with tenant_feature_on(), \
              patch('app.services.analytics_service.get_skills_analytics',
                    return_value=_SKILLS):
             r = portal_admin_client.get('/api/analytics/skills?range=30d')
@@ -229,7 +230,7 @@ class TestAnalyticsSkills:
 
 class TestAnalyticsOrg:
     def test_org_returns_headcount_kpis(self, portal_admin_client):
-        with patch('app.routes.analytics._analytics_enabled', return_value=True), \
+        with tenant_feature_on(), \
              patch('app.services.analytics_service.get_org_analytics',
                    return_value=_ORG):
             r = portal_admin_client.get('/api/analytics/org?range=30d')
@@ -240,7 +241,7 @@ class TestAnalyticsOrg:
             assert d['kpis']['max_depth'] == 4
 
     def test_org_includes_page_view_stats(self, portal_admin_client):
-        with patch('app.routes.analytics._analytics_enabled', return_value=True), \
+        with tenant_feature_on(), \
              patch('app.services.analytics_service.get_org_analytics',
                    return_value=_ORG):
             r = portal_admin_client.get('/api/analytics/org?range=30d')
@@ -252,7 +253,7 @@ class TestAnalyticsOrg:
 
 class TestAnalyticsSearch:
     def test_search_returns_zero_result_rate(self, portal_admin_client):
-        with patch('app.routes.analytics._analytics_enabled', return_value=True), \
+        with tenant_feature_on(), \
              patch('app.services.analytics_service.get_search_analytics',
                    return_value=_SEARCH):
             r = portal_admin_client.get('/api/analytics/search?range=30d')
@@ -261,7 +262,7 @@ class TestAnalyticsSearch:
             assert d['kpis']['zero_result_rate'] == 8.0
 
     def test_search_zero_results_list(self, portal_admin_client):
-        with patch('app.routes.analytics._analytics_enabled', return_value=True), \
+        with tenant_feature_on(), \
              patch('app.services.analytics_service.get_search_analytics',
                    return_value=_SEARCH):
             r = portal_admin_client.get('/api/analytics/search?range=30d')
@@ -273,7 +274,7 @@ class TestAnalyticsSearch:
 
 class TestAnalyticsExport:
     def test_csv_export_vacation_returns_csv(self, portal_admin_client):
-        with patch('app.routes.analytics._analytics_enabled', return_value=True), \
+        with tenant_feature_on(), \
              patch('app.services.analytics_service.get_vacation_analytics',
                    return_value=_VACATION):
             r = portal_admin_client.get(
@@ -283,7 +284,7 @@ class TestAnalyticsExport:
             assert b'Sven Becker' in r.data
 
     def test_csv_export_search_returns_csv(self, portal_admin_client):
-        with patch('app.routes.analytics._analytics_enabled', return_value=True), \
+        with tenant_feature_on(), \
              patch('app.services.analytics_service.get_search_analytics',
                    return_value=_SEARCH):
             r = portal_admin_client.get(
@@ -300,7 +301,7 @@ class TestAnalyticsExport:
 
 class TestAnalyticsDateParsing:
     def test_custom_date_range_accepted(self, portal_admin_client):
-        with patch('app.routes.analytics._analytics_enabled', return_value=True), \
+        with tenant_feature_on(), \
              patch('app.services.analytics_service.get_overview',
                    return_value=_OVERVIEW) as mock_svc:
             portal_admin_client.get(
@@ -311,7 +312,7 @@ class TestAnalyticsDateParsing:
             assert call_end   == datetime.date(2026, 3, 31)
 
     def test_invalid_custom_dates_fall_back_to_30d(self, portal_admin_client):
-        with patch('app.routes.analytics._analytics_enabled', return_value=True), \
+        with tenant_feature_on(), \
              patch('app.services.analytics_service.get_overview',
                    return_value=_OVERVIEW) as mock_svc:
             import datetime
@@ -329,18 +330,23 @@ class TestAnalyticsFeatureGate:
     and SYSTEM_ADMIN always has access regardless."""
 
     def test_portal_admin_blocked_when_feature_disabled(self, portal_admin_client):
-        with patch('app.routes.analytics._analytics_enabled', return_value=False):
+        with tenant_feature_off('reports'):
             r = portal_admin_client.get('/api/analytics/overview?range=30d')
             assert r.status_code == 403
-            assert 'not enabled' in json.loads(r.data)['error'].lower()
+            # An API caller cannot render a screen, so the tenant-off refusal is
+            # JSON with a machine-readable reason — distinguishable from a plain
+            # permissions denial, which is the whole point of KAN-188.
+            body = json.loads(r.data)
+            assert body['reason'] == 'tenant_feature_disabled'
+            assert 'not switched on' in body['error'].lower()
 
     def test_hr_admin_blocked_when_feature_disabled(self, hr_client):
-        with patch('app.routes.analytics._analytics_enabled', return_value=False):
+        with tenant_feature_off('reports'):
             r = hr_client.get('/api/analytics/vacation?range=30d')
             assert r.status_code == 403
 
     def test_portal_admin_allowed_when_feature_enabled(self, portal_admin_client):
-        with patch('app.routes.analytics._analytics_enabled', return_value=True), \
+        with tenant_feature_on(), \
              patch('app.services.analytics_service.get_overview',
                    return_value=_OVERVIEW):
             r = portal_admin_client.get('/api/analytics/overview?range=30d')
@@ -348,7 +354,7 @@ class TestAnalyticsFeatureGate:
 
     def test_system_admin_always_allowed_even_when_feature_disabled(self, admin_client):
         """SYSTEM_ADMIN bypasses the gate — they manage the toggle."""
-        with patch('app.routes.analytics._analytics_enabled', return_value=False), \
+        with tenant_feature_off('reports'), \
              patch('app.services.analytics_service.get_overview',
                    return_value=_OVERVIEW):
             r = admin_client.get('/api/analytics/overview?company_id=co-001&range=30d')
@@ -363,7 +369,7 @@ class TestAnalyticsFeatureGate:
             '/api/analytics/search?range=30d',
             '/api/analytics/export/csv?section=vacation&range=30d',
         ]
-        with patch('app.routes.analytics._analytics_enabled', return_value=False):
+        with tenant_feature_off('reports'):
             for ep in endpoints:
                 r = portal_admin_client.get(ep)
                 assert r.status_code == 403, f'{ep} should return 403 when feature disabled'
@@ -390,11 +396,17 @@ class TestFeatureToggleAPI:
             assert r.status_code == 400
 
     def test_toggle_enable_returns_ok(self, admin_client):
+        # Real UUIDs: the toggle now writes an audit row (KAN-188) and
+        # audit_log's columns are UUID-typed, so `audit_service` rejects a
+        # placeholder like 'co-001'. That strictness is the point — it is what
+        # stops an unattributable row being written.
         with patch('app.routes.analytics.query',
-                   return_value={'id': 'feat-001'}), \
-             patch('app.routes.analytics.execute'):
+                   return_value={'id': '00000000-0000-0000-0000-0000000000f1'}), \
+             patch('app.routes.analytics.execute'), \
+             patch('app.routes.analytics.transaction', FakeTransaction()), \
+             patch('app.routes.analytics.audit_service') as aud:
             r = admin_client.post(
-                '/api/admin/company-features/co-001/toggle',
+                '/api/admin/company-features/00000000-0000-0000-0000-0000000000c1/toggle',
                 data=json.dumps({'feature_code': 'reports', 'enabled': True}),
                 content_type='application/json',
             )
@@ -403,13 +415,22 @@ class TestFeatureToggleAPI:
             assert d['ok'] is True
             assert d['enabled'] is True
             assert d['feature_code'] == 'reports'
+            # A tenant switch changes access for an entire company in one click.
+            aud.record.assert_called_once()
+            assert aud.record.call_args.args[0] == 'COMPANY_FEATURE_ENABLED'
 
     def test_toggle_disable_returns_ok(self, admin_client):
+        # Real UUIDs: the toggle now writes an audit row (KAN-188) and
+        # audit_log's columns are UUID-typed, so `audit_service` rejects a
+        # placeholder like 'co-001'. That strictness is the point — it is what
+        # stops an unattributable row being written.
         with patch('app.routes.analytics.query',
-                   return_value={'id': 'feat-001'}), \
-             patch('app.routes.analytics.execute'):
+                   return_value={'id': '00000000-0000-0000-0000-0000000000f1'}), \
+             patch('app.routes.analytics.execute'), \
+             patch('app.routes.analytics.transaction', FakeTransaction()), \
+             patch('app.routes.analytics.audit_service') as aud:
             r = admin_client.post(
-                '/api/admin/company-features/co-001/toggle',
+                '/api/admin/company-features/00000000-0000-0000-0000-0000000000c1/toggle',
                 data=json.dumps({'feature_code': 'reports', 'enabled': False}),
                 content_type='application/json',
             )

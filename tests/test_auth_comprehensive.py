@@ -6,7 +6,7 @@ session role variations.
 """
 import pytest
 from unittest.mock import patch, MagicMock
-from tests.conftest import _set_session
+from tests.conftest import _set_session, tenant_on_role_denied
 
 FAKE_COMPANY_ID = '00000000-0000-0000-0000-000000000001'
 
@@ -426,7 +426,8 @@ def test_load_feature_access_unknown_roles(app, roles):
 def test_require_feature_access_with_no_feature_map(app, role):
     """require_feature_access redirects when feature map is empty."""
     c = make_client(app, [role])
-    with patch('app.auth._load_feature_access', return_value={}):
+    with tenant_on_role_denied(), \
+         patch('app.auth._load_feature_access', return_value={}):
         r = c.get('/admin/skills-intelligence')
     assert r.status_code in (302, 308)
 
@@ -437,8 +438,7 @@ def test_require_feature_access_with_full_map(app, role):
     c = make_client(app, [role])
     full_map = {f: {'r': True, 'w': True, 'd': True} for f in FEATURE_CODES}
     with patch('app.auth._load_feature_access', return_value=full_map), \
-         patch('app.routes.skills_intelligence.query', return_value=[]), \
-         patch('app.routes.skills_intelligence._si_enabled', return_value=True):
+         patch('app.routes.skills_intelligence.query', return_value=[]):
         r = c.get('/admin/skills-intelligence')
     assert r.status_code not in [500]
 

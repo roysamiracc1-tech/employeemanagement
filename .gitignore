@@ -18,6 +18,9 @@ env/
 .idea/
 *.swp
 
+# Claude Code temporary worktrees
+.claude/worktrees/
+
 # OS
 .DS_Store
 Thumbs.db

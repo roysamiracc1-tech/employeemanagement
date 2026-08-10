@@ -7,9 +7,10 @@ from flask import session, request, jsonify, render_template, Response
 
 from app import app
 from app.auth import login_required, require_roles, require_feature_access
-from app.db import query, execute
+from app.db import query, execute, transaction
 from app.services.company_scope import current_company_id
 from app.services import analytics_service as svc
+from app.services import audit_service
 
 _ROLES = ('SYSTEM_ADMIN', 'PORTAL_ADMIN', 'HR_ADMIN')
 _FEATURE_CODE = 'reports'
@@ -17,32 +18,20 @@ _FEATURE_CODE = 'reports'
 
 # ── feature gate ──────────────────────────────────────────────────────────────
 
-def _analytics_enabled(company_id: str) -> bool:
-    """Return True if the Analytics feature is enabled for company_id."""
-    if not company_id:
-        return False
-    row = query("""
-        SELECT cf.is_enabled
-        FROM company_features cf
-        JOIN portal_features pf ON pf.id = cf.feature_id
-        WHERE cf.company_id = %s::uuid AND pf.code = %s
-    """, (company_id, _FEATURE_CODE), one=True)
-    return bool(row and row['is_enabled'])
-
-
-def _check_analytics_access(company_id: str):
-    """For PORTAL_ADMIN / HR_ADMIN: block if feature not enabled.
-    SYSTEM_ADMIN always has access (they manage the toggle).
-    Returns a Response to return early, or None if access is allowed.
-    """
-    if 'SYSTEM_ADMIN' in session.get('roles', []):
-        return None   # super admin always allowed
-    if not _analytics_enabled(company_id):
-        return jsonify({
-            'error': 'Analytics is not enabled for your company. '
-                     'Contact your Super Admin to activate this feature.'
-        }), 403
-    return None
+# `_analytics_enabled` and `_check_analytics_access` were DELETED by KAN-188.
+#
+# They were the second, near-verbatim copy of a hand-rolled tenant switch (the
+# first lived in `skills_intelligence.py`) — a per-feature read of
+# `company_features.is_enabled` bolted on beside the real permission system.
+# Two implementations of one idea, and every other feature in the product had
+# neither.
+#
+# `@require_feature_access(_FEATURE_CODE)` now carries the tenant switch itself:
+# effective access is `tenant switch AND role grant`, resolved in one place
+# (`app/auth.py`). The refusal is also better than what this returned — a bare
+# 403 telling the user to "contact your Super Admin" gave them no way to tell
+# "my company does not have this" apart from "my role may not use it". The
+# decorator renders the explanatory off-state screen for the first.
 
 # ── date parsing helpers ──────────────────────────────────────────────────────
 
@@ -115,20 +104,48 @@ def api_toggle_company_feature(company_id):
     if not feature:
         return jsonify({'error': 'Unknown feature code'}), 400
 
-    execute("""
-        INSERT INTO company_features (company_id, feature_id, is_enabled, enabled_at, enabled_by)
-        VALUES (%s::uuid, %s::uuid, %s, CASE WHEN %s THEN NOW() ELSE NULL END, %s::uuid)
-        ON CONFLICT (company_id, feature_id) DO UPDATE
-          SET is_enabled = EXCLUDED.is_enabled,
-              enabled_at = EXCLUDED.enabled_at,
-              enabled_by = EXCLUDED.enabled_by
-    """, (company_id, feature['id'], enabled, enabled, session['user_id']))
+    # What it was before, so the audit row records a transition and not just an
+    # end state. "Disabled" is only meaningful against "was enabled".
+    prev = query("""
+        SELECT is_enabled FROM company_features
+        WHERE company_id = %s::uuid AND feature_id = %s::uuid
+    """, (company_id, feature['id']), one=True)
+    was = None if prev is None else bool(prev.get('is_enabled'))
 
-    if enabled_for_hr is not None:
+    # ADR-006 / KAN-188: the toggle and its audit row are ONE unit of work. A
+    # switch that flipped with no record of who flipped it is exactly the
+    # question this audit exists to answer, so it must not be able to commit
+    # alone. `record()` joins this transaction rather than opening its own.
+    with transaction():
         execute("""
-            UPDATE company_features SET enabled_for_hr = %s
-            WHERE company_id = %s::uuid AND feature_id = %s::uuid
-        """, (bool(enabled_for_hr), company_id, feature['id']))
+            INSERT INTO company_features (company_id, feature_id, is_enabled, enabled_at, enabled_by)
+            VALUES (%s::uuid, %s::uuid, %s, CASE WHEN %s THEN NOW() ELSE NULL END, %s::uuid)
+            ON CONFLICT (company_id, feature_id) DO UPDATE
+              SET is_enabled = EXCLUDED.is_enabled,
+                  enabled_at = EXCLUDED.enabled_at,
+                  enabled_by = EXCLUDED.enabled_by
+        """, (company_id, feature['id'], enabled, enabled, session['user_id']))
+
+        if enabled_for_hr is not None:
+            execute("""
+                UPDATE company_features SET enabled_for_hr = %s
+                WHERE company_id = %s::uuid AND feature_id = %s::uuid
+            """, (bool(enabled_for_hr), company_id, feature['id']))
+
+        audit_service.record(
+            'COMPANY_FEATURE_ENABLED' if enabled else 'COMPANY_FEATURE_DISABLED',
+            'company_feature', str(feature['id']),
+            company_id=company_id,
+            actor={'user_id': session.get('user_id'),
+                   'employee_id': session.get('employee_id'),
+                   'roles': session.get('roles', [])},
+            reason=(f"Feature '{feature_code}' turned "
+                    f"{'ON' if enabled else 'OFF'} for this company "
+                    f"(was {'ON' if was else 'OFF' if was is not None else 'unset'})."),
+            retention_class='SECURITY',
+            metadata={'feature_code': feature_code,
+                      'was_enabled': was, 'now_enabled': enabled},
+        )
 
     return jsonify({'ok': True, 'company_id': company_id,
                     'feature_code': feature_code, 'enabled': enabled})
@@ -179,9 +196,6 @@ def admin_analytics():
         companies = [{'id': r['id'], 'name': r['name'],
                       'analytics_enabled': r['id'] in enabled_ids}
                      for r in rows]
-    # For non-SA: block if feature not enabled
-    if not is_sa and not _analytics_enabled(company_id):
-        return render_template('admin/analytics_locked.html')
     return render_template('admin/analytics.html', companies=companies,
                            is_sa=is_sa)
 
@@ -194,9 +208,6 @@ def api_analytics_overview():
     company_id, emp_ids, is_scoped = _resolve_scope()
     if not company_id and emp_ids is None:
         return jsonify({'error': 'Select a company'}), 400
-    blocked = _check_analytics_access(company_id)
-    if blocked:
-        return blocked
     start, end = _parse_range()
     data = svc.get_overview(company_id, start, end, emp_ids=emp_ids)
     return jsonify({**data, '_scoped': is_scoped})
@@ -210,9 +221,6 @@ def api_analytics_vacation():
     company_id, emp_ids, is_scoped = _resolve_scope()
     if not company_id and emp_ids is None:
         return jsonify({'error': 'Select a company'}), 400
-    blocked = _check_analytics_access(company_id)
-    if blocked:
-        return blocked
     start, end = _parse_range()
     group_by   = request.args.get('group_by', 'company')
     data = svc.get_vacation_analytics(company_id, start, end, group_by, emp_ids=emp_ids)
@@ -227,9 +235,6 @@ def api_analytics_skills():
     company_id, emp_ids, is_scoped = _resolve_scope()
     if not company_id and emp_ids is None:
         return jsonify({'error': 'Select a company'}), 400
-    blocked = _check_analytics_access(company_id)
-    if blocked:
-        return blocked
     start, end = _parse_range()
     data = svc.get_skills_analytics(company_id, start, end, emp_ids=emp_ids)
     return jsonify({**data, '_scoped': is_scoped})
@@ -243,9 +248,6 @@ def api_analytics_org():
     company_id, emp_ids, is_scoped = _resolve_scope()
     if not company_id and emp_ids is None:
         return jsonify({'error': 'Select a company'}), 400
-    blocked = _check_analytics_access(company_id)
-    if blocked:
-        return blocked
     start, end = _parse_range()
     data = svc.get_org_analytics(company_id, start, end, emp_ids=emp_ids)
     return jsonify({**data, '_scoped': is_scoped})
@@ -259,9 +261,6 @@ def api_analytics_search():
     company_id, emp_ids, is_scoped = _resolve_scope()
     if not company_id and emp_ids is None:
         return jsonify({'error': 'Select a company'}), 400
-    blocked = _check_analytics_access(company_id)
-    if blocked:
-        return blocked
     start, end = _parse_range()
     data = svc.get_search_analytics(company_id, start, end, emp_ids=emp_ids)
     return jsonify({**data, '_scoped': is_scoped})
@@ -276,9 +275,6 @@ def api_analytics_export_csv():
     company_id, emp_ids, is_scoped = _resolve_scope()
     if not company_id and emp_ids is None:
         return jsonify({'error': 'Select a company'}), 400
-    blocked = _check_analytics_access(company_id)
-    if blocked:
-        return blocked
 
     section = request.args.get('section', 'vacation')
     start, end = _parse_range()

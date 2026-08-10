@@ -245,6 +245,12 @@ Changes take effect immediately without a restart. The `SYSTEM_ADMIN` row is alw
 | Theme preference | Stored per user account; not sensitive |
 | Gender | Optional field; used only for vacation eligibility filtering; stored as `MALE/FEMALE/OTHER` |
 
+**Security posture (as of the architecture review):** sessions use signed cookies with HttpOnly + SameSite,
+and Secure cookies + fail-fast secret handling are enforced in production; employee-supplied text (names,
+skills) is escaped before display to prevent script injection. Before any real deployment, the outstanding
+items are proper authentication and CSRF protection — tracked as **EP28 (Security Hardening)** in the Jira
+backlog and detailed in `docs/ARCHITECTURE_REVIEW.md`.
+
 ---
 
 ## 5. Metrics & Reporting

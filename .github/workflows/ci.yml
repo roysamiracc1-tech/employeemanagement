@@ -1,0 +1,119 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  # ── Full test suite against a real Postgres ──────────────────────────────────
+  # ~3.7k tests fully mock the DB; ~800 render full pages that fire incidental
+  # unmocked queries (feature-access, nav) and so need a live schema + the RBAC
+  # seed (roles/features/grants). tests/ui/* are standalone Playwright E2E scripts
+  # (live server + browser, no collectable pytest items) — excluded here.
+  tests:
+    name: Test suite (schema + RBAC seed)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: '5432'
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: employee
+      SECRET_KEY: ci-secret
+      APP_ENV: development
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Build database (schema + RBAC seed)
+        run: |
+          export PGPASSWORD=postgres
+          psql -h localhost -U postgres -d postgres -c "CREATE DATABASE employee;"
+          psql -h localhost -U postgres -d employee -c 'CREATE EXTENSION IF NOT EXISTS "uuid-ossp";'
+          psql -h localhost -U postgres -d employee -v ON_ERROR_STOP=1 -f database/schema.sql
+          psql -h localhost -U postgres -d employee -v ON_ERROR_STOP=1 -f database/seed_rbac.sql
+      - name: Run pytest
+        run: python -m pytest -q --ignore=tests/ui
+
+  # ── Schema reproducibility + app-boot smoke test ─────────────────────────────
+  # Builds a fresh DB from database/schema.sql ALONE (no seed) and boots the app
+  # against it. Catches schema drift the tests can't — e.g. a feature enabled in
+  # nav whose backing tables are missing from schema.sql. (Review F9 / KAN-165/169.)
+  schema-and-boot:
+    name: Fresh-DB schema + app boot
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: '5432'
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: employee_ci
+      SECRET_KEY: ci-secret
+      APP_ENV: development
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Create database + extension
+        run: |
+          export PGPASSWORD=postgres
+          psql -h localhost -U postgres -d postgres -c "CREATE DATABASE employee_ci;"
+          psql -h localhost -U postgres -d employee_ci -c 'CREATE EXTENSION IF NOT EXISTS "uuid-ossp";'
+      - name: Apply authoritative schema
+        run: |
+          export PGPASSWORD=postgres
+          psql -h localhost -U postgres -d employee_ci -v ON_ERROR_STOP=1 -f database/schema.sql
+      - name: Assert core + org_change tables exist
+        run: |
+          export PGPASSWORD=postgres
+          for t in companies employees vacation_requests user_notifications page_views \
+                   org_change_workflows org_change_workflow_steps org_change_requests org_change_approvals; do
+            psql -h localhost -U postgres -d employee_ci -tAc \
+              "SELECT to_regclass('public.$t')" | grep -qx "$t" \
+              || { echo "MISSING TABLE: $t"; exit 1; }
+          done
+          echo "All expected tables present."
+      - name: Boot the app against the fresh DB (real queries)
+        run: |
+          python -c "
+          from app import app
+          c = app.test_client()
+          r = c.get('/login')          # runs real DB queries against the fresh schema
+          assert r.status_code == 200, r.status_code
+          print('App booted and /login rendered against fresh schema — OK')
+          "

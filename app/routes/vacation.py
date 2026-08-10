@@ -3,7 +3,7 @@ import datetime
 from flask import session, redirect, url_for, request, render_template, flash, jsonify
 
 from app import app
-from app.db import query, execute, insert_returning, to_dict
+from app.db import query, execute, insert_returning, to_dict, transaction
 from app.auth import login_required, require_roles
 from app.helpers import (vacation_types_for_employee, employee_solid_manager,
                           used_days, rule_label)
@@ -79,18 +79,21 @@ def admin_vacation_type_new():
             flash('Company and name are required.', 'error')
             return redirect(url_for('admin_vacation_type_new'))
 
-        vt = insert_returning("""
-            INSERT INTO vacation_types (company_id, name, description, max_days_per_year, is_paid, color)
-            VALUES (%s::uuid,%s,%s,%s,%s,%s) RETURNING id::text
-        """, (company_id, name, desc, int(max_days) if max_days else None, is_paid, color))
+        # ADR-006: type + locations + rules are one unit of work. A failure on any
+        # row must leave no vacation type behind at all.
+        with transaction():
+            vt = insert_returning("""
+                INSERT INTO vacation_types (company_id, name, description, max_days_per_year, is_paid, color)
+                VALUES (%s::uuid,%s,%s,%s,%s,%s) RETURNING id::text
+            """, (company_id, name, desc, int(max_days) if max_days else None, is_paid, color))
 
-        for lid in loc_ids:
-            execute("INSERT INTO vacation_type_locations VALUES (%s::uuid,%s::uuid)", (vt['id'], lid))
+            for lid in loc_ids:
+                execute("INSERT INTO vacation_type_locations VALUES (%s::uuid,%s::uuid)", (vt['id'], lid))
 
-        for rt, rv in zip(request.form.getlist('rule_type'), request.form.getlist('rule_value')):
-            if rt and rv:
-                execute("INSERT INTO vacation_type_rules (vacation_type_id,rule_type,rule_value) VALUES (%s::uuid,%s,%s)",
-                        (vt['id'], rt, rv))
+            for rt, rv in zip(request.form.getlist('rule_type'), request.form.getlist('rule_value')):
+                if rt and rv:
+                    execute("INSERT INTO vacation_type_rules (vacation_type_id,rule_type,rule_value) VALUES (%s::uuid,%s,%s)",
+                            (vt['id'], rt, rv))
 
         flash(f'Vacation type "{name}" created.', 'success')
         return redirect(url_for('admin_vacation_types'))
@@ -134,20 +137,24 @@ def admin_vacation_type_edit(vt_id):
         is_active = request.form.get('is_active') == '1'
         loc_ids   = request.form.getlist('location_ids')
 
-        execute("""
-            UPDATE vacation_types SET name=%s, description=%s, max_days_per_year=%s,
-                is_paid=%s, color=%s, is_active=%s WHERE id=%s::uuid
-        """, (name, desc, int(max_days) if max_days else None, is_paid, color, is_active, vt_id))
+        # ADR-006: the edit replaces locations and rules wholesale. Without a single
+        # boundary a mid-loop failure would leave the type with its old rows deleted
+        # and only some of the new ones written.
+        with transaction():
+            execute("""
+                UPDATE vacation_types SET name=%s, description=%s, max_days_per_year=%s,
+                    is_paid=%s, color=%s, is_active=%s WHERE id=%s::uuid
+            """, (name, desc, int(max_days) if max_days else None, is_paid, color, is_active, vt_id))
 
-        execute("DELETE FROM vacation_type_locations WHERE vacation_type_id=%s::uuid", (vt_id,))
-        for lid in loc_ids:
-            execute("INSERT INTO vacation_type_locations VALUES (%s::uuid,%s::uuid)", (vt_id, lid))
+            execute("DELETE FROM vacation_type_locations WHERE vacation_type_id=%s::uuid", (vt_id,))
+            for lid in loc_ids:
+                execute("INSERT INTO vacation_type_locations VALUES (%s::uuid,%s::uuid)", (vt_id, lid))
 
-        execute("DELETE FROM vacation_type_rules WHERE vacation_type_id=%s::uuid", (vt_id,))
-        for rt, rv in zip(request.form.getlist('rule_type'), request.form.getlist('rule_value')):
-            if rt and rv:
-                execute("INSERT INTO vacation_type_rules (vacation_type_id,rule_type,rule_value) VALUES (%s::uuid,%s,%s)",
-                        (vt_id, rt, rv))
+            execute("DELETE FROM vacation_type_rules WHERE vacation_type_id=%s::uuid", (vt_id,))
+            for rt, rv in zip(request.form.getlist('rule_type'), request.form.getlist('rule_value')):
+                if rt and rv:
+                    execute("INSERT INTO vacation_type_rules (vacation_type_id,rule_type,rule_value) VALUES (%s::uuid,%s,%s)",
+                            (vt_id, rt, rv))
 
         flash(f'"{name}" updated.', 'success')
         return redirect(url_for('admin_vacation_types'))

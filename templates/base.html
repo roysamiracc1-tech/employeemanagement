@@ -19,6 +19,26 @@
 </head>
 <body>
 
+<!-- ── Shared ARIA live regions (KAN-204 · shell primitive 2 of 3) ──────────
+     THE ONLY live regions in the product. Announced through `announce()` below;
+     no screen may declare its own — ten private live regions is the duplication
+     D-004 exists to prevent, and nested/competing regions are also a genuine
+     screen-reader bug, not just untidy.
+
+     Placed first in <body> so they are in the DOM before any script runs: a
+     live region injected at the same moment as its text is not reliably
+     announced, because there was no prior state for the change to be measured
+     against. `.sr-only` keeps them off-screen but readable, and NOT
+     `display:none`/`hidden`, which removes them from the accessibility tree
+     entirely and silences them.
+
+     Two, not one, because the distinction is behavioural: `polite` waits for a
+     pause in what the user is already hearing, `assertive` interrupts. An error
+     that interrupts is correct; a "saved" confirmation that interrupts is rude.
+--------------------------------------------------------------------------- -->
+<span id="live-status" class="sr-only" role="status"  aria-live="polite"></span>
+<span id="live-alert"  class="sr-only" role="alert"   aria-live="assertive"></span>
+
 <!-- ── Sidebar ─────────────────────────────────────────── -->
 <aside class="sidebar" id="sidebar">
   <div class="sidebar-logo">
@@ -76,6 +96,34 @@
       </svg>
       <span class="nav-label">Org Tree</span>
     </a>
+
+    {# KAN-207 — the employee's own view of the ladder. Main nav and gated on
+       READ (seeded to every role): "visible to the employee — not optional",
+       because transparency is the entire stated purpose. #}
+    {% if has_feature_access('job_architecture') %}
+    <a href="{{ url_for('my_ladder') }}"
+       class="nav-link {% if request.endpoint == 'my_ladder' %}active{% endif %}">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path d="M4 20h16"/><path d="M7 20V9m5 11V5m5 15v-7"/>
+      </svg>
+      <span class="nav-label">My Ladder</span>
+    </a>
+    {% endif %}
+
+    {# KAN-191 — a manager assesses their OWN reports' steps. `job_architecture:w`
+       is exactly this grant: authoring for your own people, never the ladder.
+       Deliberately OUTSIDE the org_change block: steps have nothing to do with
+       position changes, and nesting it there would hide it for any tenant with
+       org_change switched off. #}
+    {% if has_feature_access('job_architecture', 'w') %}
+    <a href="{{ url_for('my_team_steps') }}"
+       class="nav-link {% if request.endpoint == 'my_team_steps' %}active{% endif %}">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path d="M4 18h4v-5H4zM10 18h4V9h-4zM16 18h4V5h-4z"/>
+      </svg>
+      <span class="nav-label">Team Steps</span>
+    </a>
+    {% endif %}
 
     {% if has_feature_access('org_change') %}
     <a href="{{ url_for('org_change_inbox') }}"
@@ -198,6 +246,43 @@
     </a>
     {% endif %}
     {% endif %}
+    {# EP44 — review rounds. `performance:w` is ADMIN (open/configure/close) and
+       is HR + Portal only: a line manager must not open or close the company's
+       annual round. #}
+    {% if has_feature_access('performance', 'w') %}
+    <a href="{{ url_for('admin_performance_cycles') }}"
+       class="nav-link {% if request.endpoint == 'admin_performance_cycles' %}active{% endif %}">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>
+      </svg>
+      <span class="nav-label">Review Rounds</span>
+    </a>
+    {% endif %}
+
+    {# KAN-190 — gated on READING the ladder, not on configuring it. `r` is
+       seeded to every role because an employee must be able to read their own
+       step and the next one; the editing affordances inside are gated
+       separately on `org_structure:w`. #}
+    {% if has_feature_access('job_architecture') %}
+    <a href="{{ url_for('admin_job_architecture') }}"
+       class="nav-link {% if request.endpoint == 'admin_job_architecture' %}active{% endif %}">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path d="M4 19h4v-6H4zM10 19h4V9h-4zM16 19h4V5h-4z"/>
+      </svg>
+      <span class="nav-label">Job Architecture</span>
+    </a>
+    {% endif %}
+    {# KAN-191 — the mapping project. `org_structure:w`, same gate as the ladder
+       configurator: it is a company-wide decision, not a per-report one. #}
+    {% if has_feature_access('org_structure', 'w') and has_feature_access('job_architecture') %}
+    <a href="{{ url_for('admin_job_mapping') }}"
+       class="nav-link {% if request.endpoint == 'admin_job_mapping' %}active{% endif %}">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path d="M3 6h7M3 12h7M3 18h7"/><path d="M14 8l3 3 4-5"/>
+      </svg>
+      <span class="nav-label">Place on Ladder</span>
+    </a>
+    {% endif %}
     {% if has_feature_access('reports') %}
     <a href="{{ url_for('admin_analytics') }}"
        class="nav-link {% if request.endpoint == 'admin_analytics' %}active{% endif %}">
@@ -296,6 +381,19 @@
           </div>
           <div id="bell-list"><p class="bell-empty">Loading…</p></div>
           <div class="bell-divider" id="bell-divider" style="display:none"></div>
+          {% endif %}
+
+          <!-- Section A2: position changes awaiting MY decision (DEF-001).
+               Feature-gated, never role-gated (CLAUDE.md access-control rule 2).
+               An approval the user must act on belongs here, next to vacation —
+               not as a read-only line in My Notifications. -->
+          {% if has_feature_access('org_change') %}
+          <div class="bell-drop-hdr" id="bell-oc-hdr" style="display:none">
+            <span style="font-weight:700;font-size:.85rem">Position Changes</span>
+            <a href="{{ url_for('org_change_inbox') }}" style="font-size:.74rem;color:var(--primary)">View all →</a>
+          </div>
+          <div id="bell-oc-list"></div>
+          <div class="bell-divider" id="bell-oc-divider" style="display:none"></div>
           {% endif %}
 
           <!-- Section B: my in-app notifications (everyone) -->
@@ -402,17 +500,21 @@ async function loadBellCount() {
     const badge = document.getElementById('bell-badge');
     if (!badge) return;
 
-    // Fetch both counts in parallel
-    const [pendingRes, notifRes] = await Promise.all([
+    // Fetch every count in parallel. Position changes are counted here too:
+    // the badge must mean "things waiting for me", and an approval the badge
+    // stays silent about is an approval nobody does (DEF-001).
+    const [pendingRes, ocRes, notifRes] = await Promise.all([
       fetch('/api/vacation/pending-count').catch(() => null),
+      fetch('/api/org-change/pending-count').catch(() => null),
       fetch('/api/my-notifications').catch(() => null),
     ]);
 
-    let pending = 0, notifCount = 0;
-    if (pendingRes?.ok) { const d = await pendingRes.json(); pending = d.count || 0; }
+    let pending = 0, ocPending = 0, notifCount = 0;
+    if (pendingRes?.ok) { const d = await pendingRes.json(); pending   = d.count || 0; }
+    if (ocRes?.ok)      { const d = await ocRes.json();      ocPending = d.count || 0; }
     if (notifRes?.ok)   { const d = await notifRes.json();   notifCount = d.count || 0; }
 
-    const total = pending + notifCount;
+    const total = pending + ocPending + notifCount;
     if (total > 0) {
       badge.textContent = total > 99 ? '99+' : total;
       badge.style.display = 'flex';
@@ -455,6 +557,43 @@ async function loadBellList() {
     }
   }
 
+  // ── Section A2: position changes awaiting MY decision (DEF-001) ──────────
+  // Same treatment vacation gets: the item itself, and the two buttons that
+  // decide it. Approve is a one-click quick action; Reject deliberately hands
+  // off to the review dialog because a rejection needs a reason.
+  const ocList = document.getElementById('bell-oc-list');
+  const ocHdr  = document.getElementById('bell-oc-hdr');
+  const ocDiv  = document.getElementById('bell-oc-divider');
+  if (ocList) {
+    try {
+      const res = await fetch('/api/org-change/pending');
+      const data = res.ok ? await res.json() : [];
+      if (data.length) {
+        if (ocHdr) ocHdr.style.display = '';
+        if (ocDiv) ocDiv.style.display = '';
+        ocList.innerHTML = data.map(r => `
+          <div class="bell-item" id="bell-oc-${r.id}">
+            <div class="bell-item-top">
+              <span class="bell-item-name">${escH(r.employee_name)}</span>
+              <span class="bell-item-type" style="background:#3b82f620;color:#3b82f6">Level ${r.current_step} / ${r.total_steps}</span>
+            </div>
+            <div class="bell-item-dates">${escH(ocSummary(r))} · raised by ${escH(r.requested_by_name)}</div>
+            <div class="bell-item-actions">
+              <button class="bell-approve" onclick="quickApproveOrgChange('${r.id}', this)">✓ Approve</button>
+              <a class="bell-reject" href="/org-change?review=${encodeURIComponent(r.id)}&action=reject"
+                 style="text-decoration:none;text-align:center">✗ Reject</a>
+            </div>
+          </div>`).join('');
+      } else {
+        if (ocHdr) ocHdr.style.display = 'none';
+        if (ocDiv) ocDiv.style.display = 'none';
+        ocList.innerHTML = '';
+      }
+    } catch (_) {
+      ocList.innerHTML = '<p class="bell-empty">Error loading.</p>';
+    }
+  }
+
   // ── Section B: my in-app notifications (everyone) ────────────────────────
   const notifList = document.getElementById('bell-notif-list');
   const notifHdr  = document.getElementById('bell-notif-hdr');
@@ -470,7 +609,7 @@ async function loadBellList() {
           notifList.innerHTML = notifications.map(n => `
             <div class="bell-item bell-notif-item" id="bell-notif-${n.id}">
               <div class="bell-item-top">
-                <span class="bell-notif-icon">${n.event_type === 'VACATION_APPROVED' ? '✅' : '❌'}</span>
+                <span class="bell-notif-icon">${notifIcon(n.event_type)}</span>
                 <span class="bell-item-name" style="font-size:.83rem">${escH(n.message)}</span>
               </div>
               <div class="bell-item-dates" style="margin-top:2px">${escH(String(n.created_at||'').slice(0,16).replace('T',' '))}</div>
@@ -545,8 +684,97 @@ async function quickReview(reqId, action, triggerEl, note) {
   }
 }
 
+// ── Notification icons (DEF-002) ────────────────────────────────────────────
+// This used to read `event_type === 'VACATION_APPROVED' ? '✅' : '❌'`, so every
+// event on the system except one rendered as a red cross — an approval, a
+// receipt, and a request still awaiting a decision all looked like refusals.
+// The icon states the OUTCOME, and an event with no outcome yet must not claim
+// one. Unknown events fall back to neutral, never to ❌.
+const NOTIF_ICON = {
+  // Decided — an outcome really happened
+  VACATION_APPROVED:      '✅',
+  VACATION_REJECTED:      '❌',
+  VACATION_CANCELLED:     '🚫',
+  ORG_CHANGE_APPROVED:    '✅',
+  ORG_CHANGE_REJECTED:    '❌',
+  // In flight — no outcome yet, so no outcome icon
+  VACATION_REQUESTED:     '⏳',
+  ORG_CHANGE_REQUESTED:   '⏳',
+  ORG_CHANGE_SUBMITTED:   '📨',
+  ORG_CHANGE_STEP_APPROVED: '⏳',
+  // Informational
+  EMPLOYEE_CREATED:       '👤',
+  SKILL_VALIDATED:        '⭐',
+};
+function notifIcon(eventType) { return NOTIF_ICON[eventType] || '🔔'; }
+
+// ── Position-change quick actions in the bell (DEF-001) ─────────────────────
+
+// "BU → Integrated Logistic · mgr → Ana Costa" — only the dimensions that
+// actually change, so the approver can decide without opening anything.
+function ocSummary(r) {
+  const parts = [];
+  if (r.to_manager && r.to_manager !== r.from_manager) parts.push('mgr → ' + r.to_manager);
+  if (r.to_bu  && r.to_bu  !== r.from_bu)  parts.push('BU → '   + r.to_bu);
+  if (r.to_fu  && r.to_fu  !== r.from_fu)  parts.push('unit → ' + r.to_fu);
+  if (r.to_loc && r.to_loc !== r.from_loc) parts.push('loc → '  + r.to_loc);
+  return parts.join(' · ') || 'No change';
+}
+
+// Approve only. Reject is a link to the review dialog on purpose: a rejection
+// ends the whole request at every level, and doing that without a recorded
+// reason is not a decision anybody can audit later.
+async function quickApproveOrgChange(reqId, triggerEl) {
+  if (triggerEl) { triggerEl.disabled = true; triggerEl.textContent = '…'; }
+  try {
+    const res = await fetch(`/api/org-change/${reqId}/decide`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ action: 'approve', note: null }),
+    });
+    if (!res.ok) { if (triggerEl) { triggerEl.disabled=false; triggerEl.textContent='✓ Approve'; } return; }
+    document.getElementById(`bell-oc-${reqId}`)?.remove();
+    _bellLoaded = false;
+    await loadBellCount();
+    // The Position Changes page defines this; refresh it if we are standing on it.
+    if (typeof init === 'function') init();
+  } catch (_) {
+    if (triggerEl) { triggerEl.disabled = false; triggerEl.textContent = '✓ Approve'; }
+  }
+}
+
 function escH(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── announce(msg, level) — shell primitive 3 of 3 (KAN-204 · EP33 debt) ──────
+// Speak `msg` to assistive technology through the shared live regions at the top
+// of <body>. Call it wherever a change is visible but silent: a save, an error,
+// a filter that changed the row count, an empty state, a step that advanced.
+//
+//   announce('Saved.')                       → polite  (waits for a pause)
+//   announce('Pick at least one change.', 'assertive')  → interrupts
+//
+// `level` is 'polite' (default) or 'assertive'. Reserve assertive for something
+// the user must deal with now — an error or a data loss. Everything else is
+// polite; an announcement that interrupts a screen-reader user mid-sentence to
+// say "loaded" is worse than saying nothing.
+//
+// A screen reader only announces a CHANGE to the region's text, so re-sending a
+// string that is already there would be silent. The repeat case (the same
+// validation error twice, which is exactly when a user needs to hear it again)
+// clears first and re-sets on a later tick; the ordinary case stays synchronous,
+// so it is observable to a test immediately.
+function announce(msg, level) {
+  const el = document.getElementById(level === 'assertive' ? 'live-alert' : 'live-status');
+  if (!el) return;                         // never break a flow over an announcement
+  const text = (msg === null || msg === undefined) ? '' : String(msg);
+  if (text && el.textContent === text) {
+    el.textContent = '';
+    setTimeout(function () { el.textContent = text; }, 60);
+    return;
+  }
+  el.textContent = text;
 }
 
 // Poll badge count every 60 s on all pages

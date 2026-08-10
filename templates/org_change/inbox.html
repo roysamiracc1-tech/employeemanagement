@@ -163,6 +163,9 @@ function openReview(id, action) {
   document.getElementById('rv-diff').innerHTML     = diffHtml(r);
   document.getElementById('rv-note').value = '';
   document.getElementById('review-modal').style.display = 'flex';
+  // Arriving with intent to reject: put the cursor in the reason box, because
+  // that is the field that decision needs.
+  if (action === 'reject') document.getElementById('rv-note').focus();
 }
 function closeReview() { document.getElementById('review-modal').style.display = 'none'; }
 
@@ -178,10 +181,25 @@ async function submitReview(action) {
 }
 
 // ── Init ─────────────────────────────────────────────────────────────────────
+// Deep link from the notification bell: /org-change?review=<id>[&action=reject]
+// (DEF-001). Rejecting from the bell hands off to here so a reason can be
+// recorded — the request dies at every level, so an unexplained rejection is
+// not something anyone can audit afterwards.
+function openReviewFromQuery() {
+  const p  = new URLSearchParams(location.search);
+  const id = p.get('review');
+  if (!id) return;
+  // Only opens if the request is genuinely still awaiting THIS user — a stale
+  // link (already decided, or someone else's) must not open a dead dialog.
+  if (pendingData.some(r => r.id === id)) openReview(id, p.get('action') || undefined);
+  history.replaceState({}, '', location.pathname);
+}
+
 async function init() {
   await Promise.all([loadPending(), loadMine()]);
   document.getElementById('oc-subtitle').textContent =
     `${pendingData.length} awaiting your approval · ${mineData.length} raised by you`;
+  openReviewFromQuery();
 }
 init();
 </script>

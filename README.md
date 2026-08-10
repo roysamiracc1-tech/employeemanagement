@@ -9,16 +9,56 @@ A multi-tenant, role-based HR management web application built with **Flask** an
 | Resource | URL |
 |----------|-----|
 | **GitHub Repository** | https://github.com/roysamiracc1-tech/employeemanagement |
-| **Jira Board** | https://roysamiracc1-1777144763345.atlassian.net/jira/software/projects/KAN/boards |
-| **Confluence Space** | https://roysamiracc1-1777144763345.atlassian.net/wiki/spaces/EmployeeMa |
 
-### Confluence Documentation Pages
+### Documentation
 
-| Page | Link |
-|------|------|
-| Technical Documentation | https://roysamiracc1-1777144763345.atlassian.net/wiki/spaces/EmployeeMa/pages/360451 |
-| Business Documentation | https://roysamiracc1-1777144763345.atlassian.net/wiki/spaces/EmployeeMa/pages/327683 |
-| Jira Epics & User Stories | https://roysamiracc1-1777144763345.atlassian.net/wiki/spaces/EmployeeMa/pages/393217 |
+All business, technical, and project-management documentation lives in this repository as markdown.
+**Jira and Confluence were retired on 8 August 2026** — see
+[`docs/project-management/README.md`](docs/project-management/README.md) for how documentation and the
+backlog are maintained now.
+
+| Document | Path |
+|----------|------|
+| Business documentation | [`docs/BUSINESS_DOCUMENTATION.md`](docs/BUSINESS_DOCUMENTATION.md) |
+| Business overview, features & access rights | [`docs/BUSINESS_OVERVIEW_FEATURES_AND_ACCESS.md`](docs/BUSINESS_OVERVIEW_FEATURES_AND_ACCESS.md) |
+| Technical documentation | [`docs/TECHNICAL_DOCUMENTATION.md`](docs/TECHNICAL_DOCUMENTATION.md) |
+| Product backlog (epics & user stories) | [`docs/project-management/BACKLOG.md`](docs/project-management/BACKLOG.md) |
+| Product roadmap | [`docs/product-team/deliverables/PRODUCT_ROADMAP_GOALS_EPICS_STORIES.md`](docs/product-team/deliverables/PRODUCT_ROADMAP_GOALS_EPICS_STORIES.md) |
+| Architecture review | [`docs/ARCHITECTURE_REVIEW.md`](docs/ARCHITECTURE_REVIEW.md) |
+| Confluence archive (frozen) | [`docs/archive/confluence-export/`](docs/archive/confluence-export/) |
+
+---
+
+## Product & Engineering Team — Governance
+
+Work on the HR Portal is run by **two connected AI-persona orgs** — a **Product org** and an **Engineering
+org** — defined under [`docs/product-team/`](docs/product-team/). The **Senior Product Manager (SPM)** and the
+**Senior Architect** are peer leads: product owns *what/why/priority*, engineering owns *how/feasibility*, and
+a release is gated **jointly** on the Architect's technical-readiness verdict and DevOps's production-readiness
+evidence.
+
+**Chain of responsibility:**
+
+```
+Senior Product Manager (SPM)  ◄──peer leads · joint gate──►  Senior Architect
+   ├─ Business Analyst          → gaps, requirements, traceability      ├─ Senior Software Engineer → hard/cross-cutting features, review
+   ├─ UX / Product Designer     → journeys, design specs, a11y          ├─ Mid-Level Engineer       → well-scoped features, escalate early
+   ├─ UAT Lead                  → validation, test cases, sign-off      └─ Senior DevOps Engineer   → CI/CD, infra, observability, release
+   ├─ Delivery / Release Mgr    → roadmap, readiness, release gate
+   └─ Product Strategist        → opportunities, prioritisation, North Star
+```
+
+| File | Purpose |
+|------|---------|
+| [`00_README.md`](docs/product-team/00_README.md) | How the two orgs work + how each role maps to this repo's docs |
+| [`01_TEAM_CHARTER.md`](docs/product-team/01_TEAM_CHARTER.md) | Shared backbone (load with every role, both orgs) |
+| [`02`–`07`](docs/product-team/) | Product org — SPM + five specialists |
+| [`08_ENGINEERING_CHARTER.md`](docs/product-team/08_ENGINEERING_CHARTER.md) · [`09`–`12`](docs/product-team/) | Engineering backbone + Architect, Senior/Mid engineers, DevOps |
+| [`deliverables/`](docs/product-team/deliverables/) | **Produced for this project** — SPM kickoff, product roadmap (goals→epics→stories), and the Architect's knowledge-transfer + technical task breakdown |
+
+Both orgs read the existing `docs/` (business, technical, Jira backlog, architecture review) as source
+material — see the "reads first" table in [`00_README.md`](docs/product-team/00_README.md). All engineering
+changes still obey the invariants in [`CLAUDE.md`](CLAUDE.md).
 
 ---
 
@@ -68,7 +108,11 @@ employeemanagement/
 ├── docs/
 │   ├── TECHNICAL_DOCUMENTATION.md
 │   ├── BUSINESS_DOCUMENTATION.md
-│   └── JIRA_EPICS_AND_STORIES.md
+│   ├── BUSINESS_OVERVIEW_FEATURES_AND_ACCESS.md
+│   ├── ARCHITECTURE_REVIEW.md
+│   ├── project-management/       # backlog + how docs are maintained
+│   ├── product-team/             # product & engineering persona orgs
+│   └── archive/confluence-export/  # frozen Confluence snapshots
 ├── run.py
 └── requirements.txt
 ```
@@ -90,17 +134,28 @@ pip install -r requirements.txt
 
 ### 3. Set up the database
 
+`database/schema.sql` is the **authoritative, complete schema** (a `pg_dump --schema-only`
+baseline of all 47 tables, indexes, functions and triggers — regenerate with
+`pg_dump -d employee --schema-only --no-owner --no-privileges -f database/schema.sql`).
+Build a fresh database from it, then seed roles/features:
+
 ```bash
 psql -U postgres -c "CREATE DATABASE employee;"
 psql -U postgres -d employee -c "CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\";"
-psql -U postgres -d employee -f database/schema_v2.sql
-psql -U postgres -d employee -f database/seed_data.sql
+psql -U postgres -d employee -f database/schema.sql   # full structure (canonical)
+python scripts/setup_db.py                             # seed roles, portal features, demo data
 ```
+
+> `database/schema_v2.sql` and the numbered files in `database/migrations/` are **historical**
+> — the current structure is already captured in `database/schema.sql`, so a fresh database
+> should not replay the migrations. Add new schema changes as a new numbered migration **and**
+> regenerate `schema.sql`.
 
 ### 4. Configure environment
 
 ```bash
-export SECRET_KEY=your-secret-key
+export APP_ENV=development          # 'production' enables secure cookies + requires SECRET_KEY, forces debug off
+export SECRET_KEY=your-secret-key   # REQUIRED when APP_ENV=production (app fails fast if unset)
 export PGHOST=localhost
 export PGPORT=5432
 export PGDATABASE=employee
@@ -119,8 +174,25 @@ Open **http://localhost:8000**
 ### Production
 
 ```bash
+export APP_ENV=production
+export SECRET_KEY=<random-256-bit-string>
 gunicorn -w 4 -b 0.0.0.0:8000 "app:app"
 ```
+
+---
+
+## Testing & CI
+
+```bash
+python -m pytest -q                        # ~4,500 tests (needs the seeded dev DB running)
+python tests/ui/test_browser.py            # browser regression suite (live server on :8000)
+python tests/ui/test_vacation_workflow.py  # vacation-workflow regression
+```
+
+**GitHub Actions** (`.github/workflows/ci.yml`) runs on every push/PR: a **test job** (builds Postgres from
+`database/schema.sql` + `database/seed_rbac.sql`, runs pytest) and a **fresh-DB schema + app-boot job** that
+catches schema drift. See `docs/TECHNICAL_DOCUMENTATION.md` §11 and the improvement backlog in
+`docs/ARCHITECTURE_REVIEW.md`.
 
 ---
 
@@ -138,12 +210,16 @@ gunicorn -w 4 -b 0.0.0.0:8000 "app:app"
 
 ---
 
-## Jira Project — KAN
+## Backlog — Foundational Epics
 
-10 Epics · 52 User Stories — all tracked at:
-https://roysamiracc1-1777144763345.atlassian.net/jira/software/projects/KAN/boards
+The first 10 epics (52 user stories) that built the portal. The full backlog — all 34 epics
+including the in-flight architecture-hardening work — is in
+[`docs/project-management/BACKLOG.md`](docs/project-management/BACKLOG.md).
 
-| Epic | Key | Stories |
+`KAN-###` are local story IDs, not links. They came from a Jira project that was retired on
+8 August 2026.
+
+| Epic | ID | Stories |
 |------|-----|---------|
 | Authentication & Session Management | KAN-2 | KAN-12 to KAN-15 |
 | Role-Based Access Control | KAN-3 | KAN-16 to KAN-19 |

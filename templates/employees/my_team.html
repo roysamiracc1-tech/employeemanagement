@@ -90,19 +90,19 @@ function buildCard(emp){
   const validatedCerts = certs.filter(c=>c.status==='VERIFIED').length;
 
   return `
-  <div class="team-card" data-name="${emp.full_name.toLowerCase()}" data-title="${(emp.job_title||'').toLowerCase()}">
+  <div class="team-card" data-name="${escH(emp.full_name.toLowerCase())}" data-title="${escH((emp.job_title||'').toLowerCase())}">
     <div class="team-card-header">
-      <div class="avatar" style="background:${avatarColor(emp.full_name)}">${initials(emp.full_name)}</div>
+      <div class="avatar" style="background:${avatarColor(emp.full_name)}">${escH(initials(emp.full_name))}</div>
       <div class="team-card-info">
-        <div class="tc-name">${emp.full_name}${anniversaryBadge(emp.join_date)}</div>
-        <div class="tc-title">${emp.job_title||'—'}</div>
+        <div class="tc-name">${escH(emp.full_name)}${anniversaryBadge(emp.join_date)}</div>
+        <div class="tc-title">${escH(emp.job_title||'—')}</div>
       </div>
     </div>
 
     <div class="team-card-meta">
-      ${emp.location?`<span class="badge badge-gray" style="font-size:.68rem">📍 ${emp.location}</span>`:''}
-      ${emp.business_unit?`<span class="badge badge-blue" style="font-size:.68rem">${emp.business_unit}</span>`:''}
-      ${emp.functional_unit?`<span class="badge badge-purple" style="font-size:.68rem">${emp.functional_unit}</span>`:''}
+      ${emp.location?`<span class="badge badge-gray" style="font-size:.68rem">📍 ${escH(emp.location)}</span>`:''}
+      ${emp.business_unit?`<span class="badge badge-blue" style="font-size:.68rem">${escH(emp.business_unit)}</span>`:''}
+      ${emp.functional_unit?`<span class="badge badge-purple" style="font-size:.68rem">${escH(emp.functional_unit)}</span>`:''}
     </div>
 
     ${displaySkills.length ? `
@@ -113,7 +113,7 @@ function buildCard(emp){
           const order = s.val_order||s.self_order||0;
           const isValidated = s.val_order>0;
           return `<div class="skill-rating">
-            <span class="skill-name" title="${s.skill}">${s.skill}</span>
+            <span class="skill-name" title="${escH(s.skill)}">${escH(s.skill)}</span>
             <div class="skill-bar-track">
               <div class="skill-bar-fill ${isValidated?'validated':''}" style="width:${order*25}%"></div>
             </div>

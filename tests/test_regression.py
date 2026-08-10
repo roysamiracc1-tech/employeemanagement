@@ -11,6 +11,7 @@ import pytest
 from unittest.mock import patch, MagicMock, call
 
 from app import app as flask_app
+from tests.conftest import tenant_feature_off, tenant_feature_on
 
 
 # ── shared UUIDs ──────────────────────────────────────────────────────────────
@@ -344,7 +345,6 @@ class TestFeatureAccessEnforcement:
         feature_map = {'skills_intelligence': {'r': True, 'w': False, 'd': False}}
 
         with patch('app.auth._load_feature_access', return_value=feature_map), \
-             patch('app.routes.skills_intelligence._si_enabled', return_value=True), \
              patch('app.routes.skills_intelligence.query', return_value=[]):
             r = client.get('/admin/skills-intelligence')
             assert r.status_code == 200, (
@@ -560,8 +560,6 @@ class TestSkillsIntelligenceScoping:
         feature_map = {'skills_intelligence': {'r': True, 'w': True, 'd': True}}
 
         with patch('app.auth._load_feature_access', return_value=feature_map), \
-             patch('app.routes.skills_intelligence._check_si_company_access',
-                   return_value=(True, None)), \
              patch('app.routes.skills_intelligence.svc.get_kpi_summary',
                    return_value=fake_kpi):
             r = client.get(f'/api/admin/skills-intelligence/kpi?company_id={FAKE_COMPANY_ID}')
@@ -583,7 +581,6 @@ class TestSkillsIntelligenceScoping:
         feature_map = {'skills_intelligence': {'r': True, 'w': False, 'd': False}}
 
         with patch('app.auth._load_feature_access', return_value=feature_map), \
-             patch('app.routes.skills_intelligence._si_enabled', return_value=True), \
              patch('app.routes.skills_intelligence.query', return_value=[]):
             r = client.get('/admin/skills-intelligence')
             assert r.status_code == 200, (
@@ -631,7 +628,6 @@ class TestNoLegacyHrBlocking:
         feature_map = {'skills_intelligence': {'r': True, 'w': False, 'd': False}}
 
         with patch('app.auth._load_feature_access', return_value=feature_map), \
-             patch('app.routes.skills_intelligence._si_enabled', return_value=True), \
              patch('app.routes.skills_intelligence.query', return_value=[]):
             r = client.get('/admin/skills-intelligence')
             assert r.status_code == 200, (
@@ -639,72 +635,53 @@ class TestNoLegacyHrBlocking:
                 "role_feature_access grants skills_intelligence read access."
             )
 
-    def test_check_si_company_access_has_no_hr_check(self, app):
+    # The three tests below used to drive `_check_si_company_access`, which
+    # KAN-188 DELETED — it was a hand-rolled per-feature tenant switch beside the
+    # real permission system. The PROPERTIES they guarded are unchanged and still
+    # matter, so they are re-pointed at the central resolver rather than removed:
+    # company enablement gates access, role-level sub-flags never do, and
+    # SYSTEM_ADMIN is not locked out by the switch they administer.
+
+    def test_the_tenant_switch_is_the_gate_and_no_hr_sub_flag_is(self, app):
+        """Company enablement gates access. An HR-specific sub-flag never does.
+
+        The legacy bug was a SECOND, role-shaped condition beside the permission
+        tables. Its modern equivalent would be `enabled_for_hr` gaining a reader,
+        so this asserts the resolver's SQL consults the two access tables and the
+        tenant switch — and nothing role-specific beyond them.
         """
-        _check_si_company_access must return (True, None) for HR_ADMIN when
-        _si_enabled returns True. It must not contain any HR-role-specific
-        conditional that would return False/403 for HR_ADMIN.
+        import inspect
+        import importlib
+        auth = importlib.import_module('app.auth')
+        src = inspect.getsource(auth._load_feature_access)
+        assert 'company_features' in src, 'the tenant switch is not in the resolver'
+        assert 'role_feature_access' in src and 'company_role_feature_access' in src
+        assert 'enabled_for_hr' not in src, (
+            'enabled_for_hr has gained a reader in the resolver — that is the '
+            'legacy HR sub-flag returning (TD-17)')
+
+    def test_hr_admin_is_blocked_only_by_the_company_switch(self, app):
+        """Feature off for the company -> HR_ADMIN refused, for that reason."""
+        client = _make_client(app, ['HR_ADMIN'])
+        with tenant_feature_off('skills_intelligence'), \
+             patch('app.routes.skills_intelligence.query', return_value=[]):
+            r = client.get('/admin/skills-intelligence')
+        # The explanatory screen, not a 403 and not a silent bounce (KAN-188).
+        assert r.status_code == 200
+        assert b'switched on' in r.data, 'the off state does not explain itself'
+
+    def test_system_admin_is_not_locked_out_by_the_switch(self, app):
+        """SA administers the toggle, so the toggle must not be able to trap them.
+
+        Without this a mis-toggle would be unrecoverable through the UI.
         """
-        with app.app_context():
-            with app.test_request_context():
-                from flask import session as flask_session
-                flask_session['roles'] = ['HR_ADMIN']
-                flask_session['company_id'] = FAKE_COMPANY_ID
-                flask_session['user_id'] = FAKE_USER_ID
-
-                from app.routes.skills_intelligence import _check_si_company_access
-
-                with patch('app.routes.skills_intelligence._si_enabled', return_value=True):
-                    ok, err = _check_si_company_access(FAKE_COMPANY_ID)
-                    assert ok is True, (
-                        "_check_si_company_access must return True for HR_ADMIN "
-                        "when the feature is enabled. An HR-specific secondary check "
-                        "would reintroduce the legacy blocking bug."
-                    )
-                    assert err is None, \
-                        "_check_si_company_access must return None error for HR_ADMIN."
-
-    def test_check_si_company_access_returns_false_when_disabled(self, app):
-        """
-        _check_si_company_access must return (False, error_response) when the
-        feature is not enabled for the company — regardless of role. This is the
-        correct gate: company enablement, not role-level sub-flags.
-        """
-        with app.app_context():
-            with app.test_request_context():
-                from flask import session as flask_session
-                flask_session['roles'] = ['HR_ADMIN']
-                flask_session['company_id'] = FAKE_COMPANY_ID
-                flask_session['user_id'] = FAKE_USER_ID
-
-                from app.routes.skills_intelligence import _check_si_company_access
-
-                with patch('app.routes.skills_intelligence._si_enabled', return_value=False):
-                    ok, err = _check_si_company_access(FAKE_COMPANY_ID)
-                    assert ok is False, \
-                        "_check_si_company_access must block when feature is disabled."
-                    assert err is not None, \
-                        "_check_si_company_access must return an error response tuple."
-
-    def test_check_si_company_access_system_admin_always_passes(self, app):
-        """
-        SYSTEM_ADMIN must always pass _check_si_company_access, even when
-        _si_enabled returns False. SA is the one who manages the toggle so
-        they must not be locked out by it.
-        """
-        with app.app_context():
-            with app.test_request_context():
-                from flask import session as flask_session
-                flask_session['roles'] = ['SYSTEM_ADMIN']
-                flask_session['user_id'] = FAKE_USER_ID
-
-                from app.routes.skills_intelligence import _check_si_company_access
-
-                with patch('app.routes.skills_intelligence._si_enabled', return_value=False):
-                    ok, err = _check_si_company_access(FAKE_COMPANY_ID)
-                    assert ok is True, \
-                        "SYSTEM_ADMIN must pass _check_si_company_access unconditionally."
-                    assert err is None
+        client = _make_client(app, ['SYSTEM_ADMIN'])
+        with tenant_feature_off('skills_intelligence'), \
+             patch('app.routes.skills_intelligence.query', return_value=[]):
+            r = client.get('/admin/skills-intelligence')
+        assert r.status_code == 200
+        assert b'switched on' not in r.data, (
+            'SYSTEM_ADMIN was shown the off-state screen instead of the feature')
 
 
 # =============================================================================
@@ -933,7 +910,6 @@ class TestAnalyticsScoping:
         }
 
         with patch('app.auth._load_feature_access', return_value=feature_map), \
-             patch('app.routes.analytics._analytics_enabled', return_value=True), \
              patch('app.services.company_scope.resolve_report_scope',
                    return_value=scoped_ids), \
              patch('app.services.analytics_service.get_overview',
@@ -964,7 +940,6 @@ class TestAnalyticsScoping:
         }
 
         with patch('app.auth._load_feature_access', return_value=feature_map), \
-             patch('app.routes.analytics._analytics_enabled', return_value=True), \
              patch('app.services.analytics_service.get_overview',
                    return_value=fake_overview):
             r = client.get('/api/analytics/overview?range=30d')
@@ -1303,3 +1278,241 @@ class TestSessionAndCompanyIsolation:
             assert len(captured_execute_params) == 1
             assert FAKE_ROLE_ID in captured_execute_params[0], \
                 "_assign_role must insert the company-specific role id."
+
+
+# ── Feature-registry drift (CI failure, 9 Aug 2026) ───────────────────────────
+
+class TestFeatureRegistryHasNoDrift:
+    """Every feature the code gates on must exist in `portal_features`.
+
+    THE BUG THIS GUARDS: `database/migrations/08_audit_log.sql` registered the
+    `audit_log` feature with an INSERT. A fresh database is built from
+    `schema.sql` (structure only) plus `seed_rbac.sql` — migrations are NOT
+    replayed — and the feature row is DATA, so a schema-only dump cannot carry
+    it. The row was never added to `seed_rbac.sql`, so CI's database had the
+    audit_log TABLE but no audit_log FEATURE, and every developer machine passed
+    because the migration had been applied there by hand.
+
+    A feature code that no `portal_features` row backs is not a cosmetic gap:
+    `@require_feature_access` on it denies everyone except SYSTEM_ADMIN, so the
+    feature silently disappears for the roles that should have it.
+
+    Runs against whatever database is configured, so it fails on a CI-style
+    fresh build exactly as it would in production.
+    """
+
+    def _registered_codes(self):
+        from app.db import query, close_db
+        with flask_app.test_request_context():
+            try:
+                rows = query('SELECT code FROM portal_features')
+            except Exception as e:                      # pragma: no cover - no DB configured
+                pytest.skip(f'no live database available: {e}')
+            finally:
+                close_db(None)
+        return {r['code'] for r in rows}
+
+    def test_every_migration_seeded_feature_survives_a_fresh_build(self):
+        """The exact invariant that broke: migration-seeded rows must be in the seed.
+
+        A fresh database replays no migrations, so any feature a migration
+        registers has to be repeated in `seed_rbac.sql` or it simply does not
+        exist outside the machines where that migration was run by hand.
+        """
+        import re, pathlib
+        root = pathlib.Path(__file__).resolve().parent.parent
+        block = re.compile(r"INSERT\s+INTO\s+(?:public\.)?portal_features\b(.*?);", re.S | re.I)
+        declared = {}
+        for path in sorted((root / 'database' / 'migrations').glob('*.sql')):
+            if path.name.endswith('_down.sql'):
+                continue
+            for body in block.findall(path.read_text(encoding='utf-8', errors='ignore')):
+                _, _, values = body.partition('VALUES')
+                for code in re.findall(r"\(\s*'([a-z0-9_]+)'", values):
+                    declared.setdefault(code, set()).add(path.name)
+        assert declared, 'found no feature inserts in any migration — the scanner is broken'
+
+        missing = {c: sorted(f) for c, f in declared.items() if c not in self._registered_codes()}
+        assert not missing, (
+            f'these features are registered by a migration but are absent from a fresh '
+            f'schema.sql + seed_rbac.sql build: {missing}. Add the row to '
+            f'database/seed_rbac.sql — CI and every new environment never replay migrations.')
+
+    def test_every_gated_feature_is_registered(self):
+        """A second, narrower drift: gating on a code no row backs.
+
+        `@require_feature_access('x')` where no `portal_features` row has code
+        `x` denies everyone except SYSTEM_ADMIN, so the feature vanishes for the
+        roles that should have it — silently, with no error anywhere.
+        """
+        import re, pathlib
+        root = pathlib.Path(__file__).resolve().parent.parent
+        pattern = re.compile(r"""(?:require_feature_access|has_feature_access)\(\s*['"]([a-z0-9_]+)['"]""")
+        declared = set()
+        for sub in ('app', 'templates'):
+            for path in (root / sub).rglob('*'):
+                if path.suffix in ('.py', '.html') and path.is_file():
+                    declared |= set(pattern.findall(path.read_text(encoding='utf-8', errors='ignore')))
+        assert declared, 'found no feature gates at all — the scanner is broken, not the code'
+        missing = sorted(declared - self._registered_codes())
+        assert not missing, (
+            f'these feature codes are gated on in the app but have no portal_features row: '
+            f'{missing}. If a migration seeds the row, it must also be added to '
+            f'database/seed_rbac.sql — a fresh database never replays migrations.')
+
+
+# =============================================================================
+# KAN-188 — the tenant feature switch has exactly ONE implementation
+#
+# The story deleted two hand-rolled per-feature tenant switches (`_si_enabled`
+# in skills_intelligence.py, `_analytics_enabled` in analytics.py). They were
+# the same idea written twice, beside the real permission system, and every
+# other feature simply went without. These tests make a third copy impossible
+# to add quietly.
+# =============================================================================
+
+class TestTenantSwitchHasOneImplementation:
+
+    ALLOWED = {
+        # The resolver — the one place effective access is decided.
+        'app/auth.py',
+        # The SYSTEM_ADMIN toggle + the admin Feature Access surface that reads
+        # it back to render the switches. Both are ABOUT the switch rather than
+        # consumers of it.
+        'app/routes/analytics.py',
+        # The `enabled_for_hr` write (TD-17 — no consumer; removal path named).
+        'app/routes/skills_intelligence.py',
+    }
+
+    def _files_reading_company_features(self):
+        import os
+        hits = []
+        for root, _, files in os.walk('app'):
+            for f in files:
+                if not f.endswith('.py'):
+                    continue
+                path = os.path.join(root, f).replace(os.sep, '/')
+                with open(path, encoding='utf-8') as fh:
+                    src = fh.read()
+                # Comments explaining the deletion mention the table by name;
+                # only real SQL counts.
+                code = '\n'.join(l for l in src.splitlines()
+                                 if not l.lstrip().startswith('#'))
+                if 'company_features' in code:
+                    hits.append(path)
+        return hits
+
+    def test_company_features_is_read_nowhere_else(self):
+        """A third hand-rolled tenant switch is the failure this prevents."""
+        offenders = set(self._files_reading_company_features()) - self.ALLOWED
+        assert not offenders, (
+            f'{sorted(offenders)} read company_features directly. The tenant '
+            f'switch is resolved once, in app/auth.py — use '
+            f'@require_feature_access / can_access_feature instead.')
+
+    def test_the_deleted_gates_have_not_come_back(self):
+        for mod, name in (('app.routes.skills_intelligence', '_si_enabled'),
+                          ('app.routes.skills_intelligence', '_check_si_company_access'),
+                          ('app.routes.analytics', '_analytics_enabled'),
+                          ('app.routes.analytics', '_check_analytics_access')):
+            m = __import__(mod, fromlist=['x'])
+            assert not hasattr(m, name), (
+                f'{mod}.{name} is back — that is a second tenant switch beside '
+                f'the resolver (KAN-188)')
+
+    def test_the_switch_is_a_term_in_the_one_resolver(self):
+        import inspect, importlib
+        auth = importlib.import_module('app.auth')
+        src = inspect.getsource(auth._load_feature_access)
+        assert 'company_features' in src
+        assert 'COALESCE(cf.is_enabled, pf.default_enabled)' in src, (
+            'the default for a missing row must come from the DATA column, not '
+            'a constant — onboarding policy is administrable')
+
+    def test_the_non_session_resolver_applies_the_same_two_terms(self):
+        """KAN-196 asks about OTHER users; it must not get a laxer answer."""
+        import inspect, importlib
+        auth = importlib.import_module('app.auth')
+        src = inspect.getsource(auth.feature_access_for)
+        assert 'COALESCE(cf.is_enabled, pf.default_enabled)' in src
+        assert 'company_role_feature_access' in src
+        assert 'SYSTEM_ADMIN' in src, 'the bypass must match the session path'
+
+    def test_the_non_session_resolver_is_not_request_cached(self):
+        """It answers about somebody else; caching it under `g` would hand the
+        next caller the wrong person's access."""
+        import inspect, importlib, re
+        auth = importlib.import_module('app.auth')
+        src = inspect.getsource(auth.feature_access_for)
+        code = '\n'.join(l for l in src.splitlines() if not l.lstrip().startswith('#'))
+        # `g.<anything>` — assignment or read. Matching the bare name would hit
+        # the docstring's reference to `_load_feature_access`, which merely
+        # NAMES the cached sibling and is not caching.
+        assert not re.search(r'\bg\.\w', code), (
+            'feature_access_for touches request-global state; it answers about '
+            'another user and must not be cached per request')
+
+    def test_every_toggle_of_the_switch_is_audited(self):
+        import inspect
+        from app.routes import analytics
+        src = inspect.getsource(analytics.api_toggle_company_feature)
+        assert 'audit_service.record' in src, 'a tenant toggle is unattributable'
+        assert 'with transaction()' in src, (
+            'the toggle and its audit row must commit together (ADR-006) — '
+            'otherwise the switch can flip with no record of who flipped it')
+
+    def test_licensed_features_default_off_and_the_rest_default_on(self):
+        """The defect this story nearly shipped.
+
+        A blanket `default_enabled = TRUE` would GRANT `reports` and
+        `skills_intelligence` to any company that never had a `company_features`
+        row — the deleted gates read "no row" as DENIED. Everything else was
+        never gated at all, so TRUE is right for those.
+        """
+        with open('database/migrations/11_tenant_feature_switch.sql') as f:
+            sql = f.read()
+        assert "SET default_enabled = FALSE" in sql
+        assert "code IN ('reports', 'skills_intelligence')" in sql
+        assert 'DEFAULT TRUE' in sql, 'the column default must stay TRUE'
+
+    def test_the_seed_and_the_migration_agree_on_every_default(self):
+        """DEF-004, and KAN-188 walked straight into it.
+
+        A fresh CI database is `schema.sql` + `seed_rbac.sql` and **never replays
+        migrations** (TECHNICAL_DOCUMENTATION §10). `default_enabled` is DATA, so
+        setting it only in migration 11 left `reports` and `skills_intelligence`
+        defaulting to TRUE on every fresh build while every developer machine —
+        where the migration had been run by hand — read FALSE. Same shape as the
+        `audit_log` break on 9 Aug 2026.
+
+        Caught by rebuilding the way CI does. This asserts it stays fixed.
+        """
+        with open('database/migrations/11_tenant_feature_switch.sql') as f:
+            mig = f.read()
+        with open('database/seed_rbac.sql') as f:
+            seed = f.read()
+
+        # Which features the migration declares OFF by default.
+        import re
+        m = re.search(r"SET default_enabled = FALSE\s*WHERE code IN \(([^)]*)\)", mig)
+        assert m, 'migration 11 no longer declares the licensed-feature defaults'
+        licensed = {c.strip().strip("'") for c in m.group(1).split(',')}
+        assert licensed == {'reports', 'skills_intelligence'}, licensed
+
+        # Every portal_features INSERT in the seed must state default_enabled,
+        # and state the same value the migration would produce.
+        inserts = re.findall(
+            r"INSERT INTO public\.portal_features \(([^)]*)\) VALUES\s*\n?\s*\((.*?)\)\s*(?:ON CONFLICT[^;]*)?;",
+            seed, re.S)
+        assert inserts, 'no portal_features rows found in the seed'
+        for cols, vals in inserts:
+            code = re.search(r"'([a-z_]+)'", vals.split(',', 1)[1]).group(1)
+            assert 'default_enabled' in cols, (
+                f"seed row for {code!r} does not state default_enabled — it will "
+                f"silently take the column default on a fresh CI database")
+            want = 'false' if code in licensed else 'true'
+            got = vals.rsplit(',', 1)[1].strip().lower()
+            assert got == want, (
+                f"seed says default_enabled={got} for {code!r}, migration 11 "
+                f"implies {want} — a fresh CI database would disagree with every "
+                f"developer machine")

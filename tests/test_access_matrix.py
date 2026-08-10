@@ -378,7 +378,6 @@ def test_si_system_admin_no_500(app, route):
     """SYSTEM_ADMIN accessing SI routes should not get 500."""
     c = make_client(app, ['SYSTEM_ADMIN'])
     with patch('app.routes.skills_intelligence.query', return_value=[]), \
-         patch('app.routes.skills_intelligence._si_enabled', return_value=True), \
          patch('app.auth._load_feature_access', return_value=FULL_FEATURE_ACCESS):
         r = c.get(route)
     assert r.status_code != 500
@@ -389,7 +388,6 @@ def test_si_portal_admin_with_access_no_500(app, route):
     """PORTAL_ADMIN with SI access should not get 500."""
     c = make_client(app, ['PORTAL_ADMIN'])
     with patch('app.routes.skills_intelligence.query', return_value=[]), \
-         patch('app.routes.skills_intelligence._si_enabled', return_value=True), \
          patch('app.auth._load_feature_access', return_value=FULL_FEATURE_ACCESS):
         r = c.get(route)
     assert r.status_code != 500
@@ -418,7 +416,6 @@ def test_analytics_no_500_for_any_role(app, role, route):
     c = make_client(app, [role])
     mock_data = {'total': 0, 'active': 0, 'data': []}
     with patch('app.routes.analytics.query', return_value=[]), \
-         patch('app.routes.analytics._analytics_enabled', return_value=True), \
          patch('app.services.analytics_service.get_overview', return_value=mock_data), \
          patch('app.services.analytics_service.get_org_analytics', return_value=mock_data), \
          patch('app.services.analytics_service.get_vacation_analytics', return_value=mock_data), \
@@ -743,7 +740,6 @@ def test_admin_analytics_portal_admin_no_500(app):
     """PORTAL_ADMIN can access admin analytics page."""
     c = make_client(app, ['PORTAL_ADMIN'])
     with patch('app.routes.analytics.query', return_value=[]), \
-         patch('app.routes.analytics._analytics_enabled', return_value=True), \
          patch('app.auth._load_feature_access', return_value={
              'reports': {'r': True, 'w': True, 'd': True}
          }):

@@ -11,6 +11,10 @@ app = Flask(
 app.secret_key = _cfg.SECRET_KEY
 app.permanent_session_lifetime = _cfg.SESSION_LIFETIME
 app.config.update(
+    SESSION_COOKIE_SECURE=_cfg.SESSION_COOKIE_SECURE,
+    SESSION_COOKIE_HTTPONLY=_cfg.SESSION_COOKIE_HTTPONLY,
+    SESSION_COOKIE_SAMESITE=_cfg.SESSION_COOKIE_SAMESITE,
+    MAX_CONTENT_LENGTH=_cfg.MAX_CONTENT_LENGTH,
     SMTP_HOST=_cfg.SMTP_HOST,
     SMTP_PORT=_cfg.SMTP_PORT,
     SMTP_USER=_cfg.SMTP_USER,
@@ -31,6 +35,8 @@ register_context_processor(app)
 from app.routes import auth, dashboard, employees, admin, org, company, vacation  # noqa: F401
 from app.routes import notifications, search, calendar, imports, analytics, benchmarks, skills_intelligence  # noqa: F401
 from app.routes import org_change  # noqa: F401
+from app.routes import compensation  # noqa: F401
+from app.routes import performance  # noqa: F401
 
 # Register page-view tracker (after_request hook)
 from app.services import page_tracker as _pt

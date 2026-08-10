@@ -393,3 +393,269 @@ class TestTemplateAssetConsistency:
                     f.read()
             except UnicodeDecodeError:
                 pytest.fail(f"Template {path} has non-UTF-8 characters")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SHELL ACCESSIBILITY PRIMITIVES (KAN-204 · EP33 debt)
+#
+# Three primitives the whole product shares. The point of the story is that a
+# new screen's accessibility is a call to something that already exists — so
+# these tests pin the primitives AND the fact that nobody reimplements them.
+#
+# EP38 was believed to have delivered this and had not (UX verified three of
+# nine), which is why T-204-1 says to verify against the shell rather than
+# assume. These assertions are that verification, kept.
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestShellFocusVisibility:
+    """Primitive 1 — one focus ring, WCAG 2.4.7, on the shell not per screen."""
+
+    def setup_method(self):
+        with open('static/css/style.css') as f:
+            self.css = f.read()
+
+    def test_a_global_focus_visible_rule_exists(self):
+        assert '\n:focus-visible {' in self.css, (
+            'no global focus indicator — before KAN-204 only .row-menu-btn and '
+            '.row-menu-list > * had one, on a product with ~210 onclick handlers')
+
+    def test_the_ring_is_a_token_so_it_cannot_drift(self):
+        assert '--focus-ring:' in self.css
+        assert 'outline: 2px solid var(--focus-ring)' in self.css
+
+    def test_the_ring_has_a_dark_theme_value(self):
+        """#2563eb on #0f172a is close to failing WCAG 1.4.11's 3:1."""
+        dark = self.css[self.css.index('[data-theme="dark"] {'):]
+        dark = dark[:dark.index('}')]
+        assert '--focus-ring:' in dark, 'the focus ring has no dark-theme value'
+
+    def test_the_global_rule_comes_after_every_outline_none(self):
+        """This is what makes it work, not a formatting preference.
+
+        `:focus-visible` is 0,1,0 — the same specificity as `.search-input`,
+        `select.filter-sel` and `.rows-select`, each of which sets
+        `outline: none`. It beats them by source order alone, so moving it up
+        the file silently returns those controls to having no visible focus.
+        """
+        rule = self.css.index('\n:focus-visible {')
+        last_reset = max(self.css.rindex('outline: none', 0, rule),
+                         self.css.rindex('outline:none', 0, rule)
+                         if 'outline:none' in self.css[:rule] else 0)
+        assert rule > last_reset
+        assert 'outline: none' not in self.css[rule:], (
+            'an `outline: none` was added after the global focus rule — it now '
+            'wins, and that control has no visible focus again')
+
+    def test_the_two_deliberate_component_rings_still_win(self):
+        """0,2,0 beats 0,1,0 regardless of order — they are tuned for a menu."""
+        assert '.row-menu-btn:focus-visible' in self.css
+        assert '.row-menu-list > *:focus-visible' in self.css
+
+    def test_focus_is_not_styled_on_plain_focus(self):
+        """`:focus` would leave a ring behind after a mouse click."""
+        block = self.css[self.css.index('\n:focus-visible {'):]
+        assert not block.startswith('\n:focus {')
+
+
+class TestShellLiveRegions:
+    """Primitive 2 — exactly ONE pair of live regions in the whole product."""
+
+    def setup_method(self):
+        with open('templates/base.html') as f:
+            self.base = f.read()
+
+    def test_the_shell_declares_both_regions(self):
+        assert 'id="live-status"' in self.base and 'aria-live="polite"' in self.base
+        assert 'id="live-alert"' in self.base and 'aria-live="assertive"' in self.base
+
+    def test_both_regions_are_sr_only_and_not_hidden(self):
+        """`display:none`/`hidden` removes a region from the a11y tree entirely,
+        which silences it — the failure mode that looks like it works."""
+        for rid in ('live-status', 'live-alert'):
+            tag = re.search(rf'<span[^>]*id="{rid}"[^>]*>', self.base)
+            assert tag, f'{rid} is not a <span> element'
+            tag = tag.group(0)
+            assert 'sr-only' in tag, f'{rid} is not screen-reader-only'
+            assert 'display:none' not in tag and ' hidden' not in tag
+
+    def test_the_regions_precede_every_script(self):
+        """A region injected with its text is not reliably announced."""
+        assert self.base.index('id="live-status"') < self.base.index('<script')
+
+    def test_exactly_one_live_region_pair_exists_in_all_templates(self):
+        """T-204-2's grep-assert. Ten screens with ten private live regions is
+        the duplication D-004 exists to prevent, and competing regions are a
+        real screen-reader bug, not merely untidy."""
+        import os
+        polite = assertive = 0
+        offenders = []
+        for root, _, files in os.walk('templates'):
+            for f in files:
+                if not f.endswith('.html'):
+                    continue
+                path = os.path.join(root, f)
+                with open(path, encoding='utf-8') as fh:
+                    src = fh.read()
+                p, a = src.count('aria-live="polite"'), src.count('aria-live="assertive"')
+                if (p or a) and os.path.normpath(path) != os.path.join('templates', 'base.html'):
+                    offenders.append(path)
+                polite += p
+                assertive += a
+        assert not offenders, (
+            f'live regions declared outside the shell: {offenders} — use '
+            f'announce(msg, level) from base.html instead')
+        assert (polite, assertive) == (1, 1), (
+            f'expected exactly one polite + one assertive region, got {polite}/{assertive}')
+
+    def test_announce_is_defined_once_in_the_shell(self):
+        assert 'function announce(msg, level)' in self.base
+        assert self.base.count('function announce(') == 1
+
+    def test_announce_defaults_to_polite(self):
+        """Assertive interrupts; the default must be the courteous one."""
+        fn = self.base[self.base.index('function announce(msg, level)'):]
+        fn = fn[:fn.index('\n}')]
+        assert "level === 'assertive' ? 'live-alert' : 'live-status'" in fn
+
+    def test_announce_never_throws_when_the_region_is_absent(self):
+        """A missing region must not break the flow that was announcing."""
+        fn = self.base[self.base.index('function announce(msg, level)'):]
+        fn = fn[:fn.index('\n}')]
+        assert 'if (!el) return;' in fn
+
+    def test_the_move_dialog_no_longer_owns_live_regions(self):
+        """It had the product's first pair; they became the shell's."""
+        with open('templates/org_change/_move_modal.html') as f:
+            src = f.read()
+        assert 'aria-live' not in src
+        assert 'mv-live-status' not in src and 'mv-live-alert' not in src
+        assert 'announce(' in src, 'the dialog went silent instead of migrating'
+
+    def test_the_directory_announces_its_result_count(self):
+        """An empty-state/filter transition is silent without this."""
+        with open('templates/employees/directory.html') as f:
+            src = f.read()
+        assert 'announce(' in src
+        assert 'No employees found.' in src
+
+
+class TestShellReducedMotion:
+    """Primitive 3 — WCAG 2.3.3, honoured shell-wide."""
+
+    def setup_method(self):
+        with open('static/css/style.css') as f:
+            self.css = f.read()
+
+    def test_a_reduced_motion_block_exists(self):
+        assert '@media (prefers-reduced-motion: reduce)' in self.css
+
+    def test_it_covers_transitions_and_animations_universally(self):
+        block = self.css[self.css.index('@media (prefers-reduced-motion: reduce)'):]
+        for decl in ('animation-duration', 'animation-iteration-count',
+                     'transition-duration'):
+            assert f'{decl}: .01ms !important' in block or \
+                   f'{decl}: 1 !important' in block, f'{decl} not neutralised'
+        assert '*, *::before, *::after' in block
+
+    def test_infinite_animations_are_capped(self):
+        """A permanently throbbing badge is what this media query is for.
+        `pulse`, `anniv-sway` and `anniv-pulse-scale` all run `infinite`."""
+        assert 'infinite' in self.css, 'fixture assumption changed'
+        block = self.css[self.css.index('@media (prefers-reduced-motion: reduce)'):]
+        assert 'animation-iteration-count: 1 !important' in block
+
+    def test_durations_are_near_zero_not_zero(self):
+        """A 0s duration fires no `transitionend`, so code awaiting one hangs."""
+        block = self.css[self.css.index('@media (prefers-reduced-motion: reduce)'):]
+        assert '0s !important' not in block
+        assert '.01ms !important' in block
+
+    def test_non_motion_cues_are_left_alone(self):
+        """The drag affordance keeps its dashed outline and tint — those are not
+        motion, and removing them would take away the only remaining signal."""
+        block = self.css[self.css.index('@media (prefers-reduced-motion: reduce)'):]
+        code = re.sub(r'/\*.*?\*/', '', block, flags=re.S)   # declarations only
+        assert 'outline' not in code, 'reduced motion must not touch outlines'
+        assert 'background' not in code, 'reduced motion must not touch colour'
+        assert '.ft-card.ft-dragging' in code, 'the drag affordance is not addressed'
+
+
+class TestDialogsDoNotPutABoxClassOnTheOverlay:
+    """A real defect the demo caught, and no unit test could have.
+
+    This codebase has TWO legitimate dialog patterns, and both are fine:
+
+      A. `.modal-overlay.open` (fixed, inset 0, flex-centred) + `.modal` for the box
+      B. an inline-styled overlay + `.modal-box` for the box (used by
+         `_move_modal.html` and five other templates)
+
+    The bug was neither pattern: the EP42 screens put **`class="modal"` on the
+    OVERLAY**. `.modal` and `.modal-box` are both BOX classes carrying an explicit
+    `width` (480px / 500px) and a white background, so applying one to the
+    full-screen backdrop turns the backdrop itself into a 480px white panel —
+    every dialog rendered left-aligned over the sidebar.
+
+    Nothing in the DOM looked wrong. It was only visible on screen, which is
+    exactly what the Demo Readiness Gate is for.
+    """
+
+    DIALOG_TEMPLATES = ('templates/admin/job_architecture.html',
+                        'templates/admin/job_mapping.html',
+                        'templates/employees/step_assessment.html')
+
+    # Both are BOX classes: each sets its own `width`, so neither may ever land on
+    # a full-screen overlay.
+    BOX_CLASSES = ('modal-box', 'modal')
+
+    def test_the_premise_holds_both_box_classes_still_set_a_width(self):
+        """Pin the assumption. If the stylesheet is reorganised so these stop
+        being sized boxes, fail loudly here rather than let the rule below become
+        meaningless."""
+        with open('static/css/style.css') as f:
+            css = f.read()
+        for rule in ('\n.modal {', '\n.modal-box {'):
+            block = css[css.index(rule):]
+            block = block[:block.index('}')]
+            assert 'width:' in block, f'{rule.strip()} no longer sets a width'
+        # And the overlay is the centring layer — read the BASE rule, not the
+        # `[data-theme="dark"]` override that appears earlier in the file.
+        overlay = css[css.index('\n.modal-overlay {'):]
+        overlay = overlay[:overlay.index('}')]
+        assert 'position: fixed' in overlay and 'inset: 0' in overlay
+        assert 'justify-content: center' in overlay
+
+    def test_no_dialog_overlay_carries_a_box_class(self):
+        """The rule that actually matters, stated per element."""
+        import re
+        for path in self.DIALOG_TEMPLATES:
+            with open(path) as f:
+                src = f.read()
+            dialogs = list(re.finditer(r'<div[^>]*role="dialog"[^>]*>', src))
+            assert dialogs, f'{path}: no role="dialog" element found'
+            for m in dialogs:
+                tag = m.group(0)
+                classes = re.search(r'class="([^"]*)"', tag)
+                classes = set((classes.group(1) if classes else '').split())
+                offending = classes & set(self.BOX_CLASSES)
+                assert not offending, (
+                    f'{path}: the role="dialog" overlay carries the BOX class '
+                    f'{offending} — those set a width, so the backdrop becomes a '
+                    f'narrow panel and the dialog renders off-centre. Tag: {tag[:90]}')
+
+    def test_every_dialog_overlay_can_actually_centre_its_box(self):
+        """Either pattern is fine; what is not fine is neither."""
+        import re
+        for path in self.DIALOG_TEMPLATES:
+            with open(path) as f:
+                src = f.read()
+            for m in re.finditer(r'<div[^>]*role="dialog"[^>]*>', src):
+                tag = m.group(0)
+                uses_class = 'modal-overlay' in tag
+                # `.modal-overlay` is transparent and click-through without
+                # `.open` (opacity: 0; pointer-events: none).
+                if uses_class:
+                    assert 'open' in tag, f'{path}: .modal-overlay without .open stays invisible'
+                else:
+                    assert 'justify-content:center' in tag.replace(' ', ''), (
+                        f'{path}: the overlay neither uses .modal-overlay nor '
+                        f'centres inline, so its box will not be centred')

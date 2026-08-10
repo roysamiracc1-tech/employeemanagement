@@ -44,7 +44,11 @@ def step1_migrate(cur):
         code       VARCHAR(100) UNIQUE NOT NULL,
         label      VARCHAR(150) NOT NULL,
         description TEXT,
-        sort_order INT NOT NULL DEFAULT 0
+        sort_order INT NOT NULL DEFAULT 0,
+        -- KAN-188: whether a company with no company_features row gets this
+        -- feature. TRUE, because a new tenant should get the product, not a
+        -- blank portal they have to have switched on feature by feature.
+        default_enabled BOOLEAN NOT NULL DEFAULT TRUE
     )""")
 
     cur.execute("""CREATE TABLE IF NOT EXISTS role_feature_access (
@@ -112,6 +116,12 @@ def step4_seed_portal_features(cur):
         ('system_config',        'System Configuration',     'Widget settings and global platform config',                8),
         ('skills_intelligence',  'Skills Intelligence',      'Benchmark company skills against industry trends',          9),
         ('org_change',           'Position Change Requests', 'Raise and approve business unit / department / manager changes', 10),
+        ('job_architecture',     'Job Architecture',
+         'Read the job ladder — families, levels, steps and what each step expects; '
+         'write step roadmaps for your reports', 11),
+        ('performance',          'Performance Reviews',
+         "Read your own performance review; administer the company's review rounds", 12),
+        ('audit_log',            'Audit Log',                'View the immutable audit trail of changes within the company',   13),
     ]
     for code, label, desc, order in features:
         cur.execute(
@@ -142,7 +152,10 @@ def step4_seed_portal_features(cur):
                                 ('vacations',           True, True,  True),
                                 ('reports',             True, True,  False),
                                 ('skills_intelligence', True, False, False),
-                                ('org_change',          True, True,  False)],
+                                ('org_change',          True, True,  False),
+                                # Read-only: audit_log is append-only, there is
+                                # no legitimate write or delete path.
+                                ('audit_log',           True, False, False)],
         'PORTAL_ADMIN':        [('employee_profiles',   True, True,  True),
                                 ('org_structure',       True, True,  True),
                                 ('user_accounts',       True, True,  True),
@@ -151,7 +164,8 @@ def step4_seed_portal_features(cur):
                                 ('reports',             True, True,  False),
                                 ('company_settings',    True, True,  False),
                                 ('skills_intelligence', True, True,  False),
-                                ('org_change',          True, True,  False)],
+                                ('org_change',          True, True,  False),
+                                ('audit_log',           True, False, False)],
     }
     for role_name, perms in access_map.items():
         for feat_code, r, w, d in perms:

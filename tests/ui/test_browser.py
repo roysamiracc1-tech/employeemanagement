@@ -424,12 +424,14 @@ def run_all(playwright):
         fail("Employee directory page loads", str(e))
 
     try:
-        page.wait_for_function(
-            "document.querySelectorAll('.emp-card, .directory-row, tr').length > 2",
-            timeout=6000)
-        ok("Directory shows employee rows/cards")
+        # Tech Admin has no company selected, so under the two-tier scoping model
+        # the directory shows a "Select a Company" prompt rather than rows. Actual
+        # row rendering is verified under a company-scoped user (Portal Admin) in
+        # section 12.
+        assert "Select a Company" in page.content()
+        ok("Directory prompts Tech Admin to select a company (scoping)")
     except Exception as e:
-        fail("Directory shows employee rows/cards", str(e))
+        fail("Directory prompts Tech Admin to select a company (scoping)", str(e))
 
     # ══════════════════════════════════════════════════════════
     section("12 · Portal Admin login + scoping")
@@ -466,6 +468,17 @@ def run_all(playwright):
         ok("Portal Admin can access vacation calendar")
     except Exception as e:
         fail("Portal Admin can access vacation calendar", str(e))
+
+    try:
+        # Directory row rendering (company-scoped): a Portal Admin sees their
+        # company's employees. Verifies buildRow() renders rows without error.
+        page.goto(BASE + "/directory")
+        page.wait_for_load_state("networkidle")
+        page.wait_for_function(
+            "document.querySelectorAll('tbody tr').length > 2", timeout=6000)
+        ok("Directory shows employee rows (Portal Admin, company-scoped)")
+    except Exception as e:
+        fail("Directory shows employee rows (Portal Admin, company-scoped)", str(e))
 
     # ══════════════════════════════════════════════════════════
     section("13 · My Company page (Portal Admin)")
@@ -538,6 +551,15 @@ def run_all(playwright):
         ok("Plain employee can view own profile")
     except Exception as e:
         fail("Plain employee can view own profile", str(e))
+
+    try:
+        # KAN-185 / P3 — an employee can never initiate their own move, through
+        # any entry point. The button must be absent, not merely disabled.
+        assert page.query_selector("button:has-text('Transfer')") is None
+        assert page.query_selector("#move-modal") is None
+        ok("Plain employee has no Transfer… entry point on their own profile")
+    except Exception as e:
+        fail("Plain employee has no Transfer… entry point on their own profile", str(e))
 
     # ══════════════════════════════════════════════════════════
     section("15 · Mobile responsive (viewport simulation)")
@@ -619,6 +641,497 @@ def run_all(playwright):
             fail(f"  {path} → redirects to login", str(e))
 
     anon_ctx.close()
+
+    # ══════════════════════════════════════════════════════════
+    section("17 · Transfer… entry point (KAN-185)")
+    # ══════════════════════════════════════════════════════════
+    # The HR-initiated entry point to the org-change engine. There is exactly one
+    # dialog, one endpoint and one engine (EP38 UX spec §6.0), so these checks
+    # assert the entry points reach the SAME "Request Position Change" dialog —
+    # a second transfer flow appearing here is the failure this guards against.
+    logout(page)
+    subject_href = None
+    try:
+        login(page, PORTAL_ADMIN)          # also HR_ADMIN — may initiate for anyone
+        page.goto(BASE + "/directory")
+        page.wait_for_load_state("networkidle")
+        page.wait_for_selector("#employee-table-body tr", timeout=8000)
+        ok("Directory loads for Portal/HR Admin")
+    except Exception as e:
+        fail("Directory loads for Portal/HR Admin", str(e))
+
+    try:
+        btns = page.query_selector_all(".row-menu-btn")
+        assert btns, "no row-action menu rendered"
+        btns[0].click()
+        page.wait_for_timeout(300)
+        items = page.eval_on_selector_all(
+            ".row-menu-list:not([hidden]) [role=menuitem]",
+            "els => els.map(e => e.textContent.trim())")
+        assert "Transfer…" in items, f"menu items were {items}"
+        ok("Directory row menu offers Transfer…")
+    except Exception as e:
+        fail("Directory row menu offers Transfer…", str(e))
+
+    try:
+        page.click(".row-menu-list:not([hidden]) button[role=menuitem]")
+        page.wait_for_timeout(1200)
+        assert page.eval_on_selector("#move-modal", "e => e.style.display") == "flex"
+        # Same dialog as the drag-and-drop — the word "Transfer" stays on the
+        # entry point and never becomes a second status vocabulary.
+        assert page.inner_text("#mv-title") == "Request Position Change"
+        ok("Directory Transfer… opens the shared Request Position Change dialog")
+    except Exception as e:
+        fail("Directory Transfer… opens the shared Request Position Change dialog", str(e))
+
+    try:
+        page.keyboard.press("Escape")
+        page.wait_for_timeout(300)
+        subject_href = page.eval_on_selector_all(
+            "#employee-table-body a[href^='/profile/']",
+            "a => a.length ? a[0].getAttribute('href') : null")
+        assert subject_href, "no employee profile link in the directory"
+        page.goto(BASE + subject_href)
+        page.wait_for_load_state("networkidle")
+        assert page.query_selector("button:has-text('Transfer')") is not None
+        ok("Profile shows the Transfer… entry point for an eligible subject")
+    except Exception as e:
+        fail("Profile shows the Transfer… entry point for an eligible subject", str(e))
+
+    try:
+        page.click("button:has-text('Transfer')")
+        page.wait_for_timeout(1400)
+        assert page.eval_on_selector("#move-modal", "e => e.style.display") == "flex"
+        assert page.inner_text("#mv-title") == "Request Position Change"
+        # PD2 — the approval-chain line is never blank, even unconfigured.
+        assert "approval" in page.inner_text("#mv-chain").lower()
+        ok("Profile Transfer… opens the dialog with a non-empty approval chain")
+    except Exception as e:
+        fail("Profile Transfer… opens the dialog with a non-empty approval chain", str(e))
+
+    # ── The effective date (KAN-189 / AC-185-07) — the field KAN-185 left out ──
+    try:
+        el = page.query_selector("#mv-effective")
+        assert el, "the effective-date field is not in the dialog"
+        assert el.get_attribute("type") == "date", "not a real date input"
+        # Defaults to today, so the common case is one less decision.
+        import datetime as _d
+        today = _d.date.today().isoformat()
+        assert el.input_value() == today, f"default was {el.input_value()!r}, expected {today}"
+        ok("KAN-189 · Effective date defaults to today")
+    except Exception as e:
+        fail("KAN-189 · Effective date defaults to today", str(e))
+
+    try:
+        el = page.query_selector("#mv-effective")
+        # `max` is today: a placement move has no scheduler, so offering future
+        # days would be offering something the server refuses. `min` is the
+        # backdate window, so the picker and the validator cannot disagree.
+        import datetime as _d
+        assert el.get_attribute("max") == _d.date.today().isoformat(), \
+            f"max was {el.get_attribute('max')!r} — a future date would be offered and refused"
+        mn = el.get_attribute("min")
+        assert mn and mn < _d.date.today().isoformat(), f"min was {mn!r}"
+        ok("KAN-189 · The picker is bounded by the server's window, not the client's")
+    except Exception as e:
+        fail("KAN-189 · The picker is bounded by the server's window, not the client's", str(e))
+
+    try:
+        # Labelled and described — WCAG 3.3.2 / 1.3.1. The field is required, so
+        # an unlabelled date box would be the worst control in the dialog.
+        lbl = page.eval_on_selector(
+            "label[for=mv-effective]", "e => e.textContent.trim()")
+        assert lbl, "the effective-date field has no label"
+        assert page.query_selector("#mv-effective[aria-describedby]"), \
+            "no aria-describedby tying the help/error text to the field"
+        assert "backdate" in page.inner_text("#mv-effective-help").lower(), \
+            "the help text does not say how far back you may date it"
+        ok("KAN-189 · The date field is labelled and its limits are explained")
+    except Exception as e:
+        fail("KAN-189 · The date field is labelled and its limits are explained", str(e))
+
+    try:
+        # Clearing it must be refused client-side, and said out loud — an empty
+        # required field that fails silently on submit is the E5 pattern.
+        # The reason is filled first because it is validated BEFORE the date, so
+        # without it this would only re-prove the reason check.
+        page.fill("#mv-reason", "Probe: the date field is required")
+        page.fill("#mv-effective", "")
+        page.click("#mv-submit")
+        page.wait_for_timeout(400)
+        err = page.inner_text("#mv-error")
+        assert "date" in err.lower(), f"submit with no date was not refused; error was {err!r}"
+        assert page.eval_on_selector("#mv-error", "e => e.style.display") != "none"
+        ok("KAN-189 · Submitting with no effective date is refused with a reason")
+    except Exception as e:
+        fail("KAN-189 · Submitting with no effective date is refused with a reason", str(e))
+
+    try:
+        # And the server refuses an out-of-window date even when the picker is
+        # bypassed — the bound on the input is a convenience, not the control.
+        # A REAL subject id, so the request reaches the date check instead of
+        # dying earlier on a malformed UUID (which would pass this test for the
+        # wrong reason). The body is not parsed as JSON: an earlier guard may
+        # legitimately answer with an HTML error page, and the assertion here is
+        # only that nothing was created.
+        import datetime as _d
+        subj_id = subject_href.rsplit("/", 1)[-1] if subject_href else None
+        assert subj_id, "no subject id to probe with"
+        future = (_d.date.today() + _d.timedelta(days=30)).isoformat()
+        status = page.evaluate("""async ([id, d]) => {
+          const r = await fetch('/api/org-change/request', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({employee_id: id, business_unit_id: null,
+                                  manager_id: null, reason: 'probe',
+                                  effective_date: d})});
+          return r.status;
+        }""", [subj_id, future])
+        assert status != 200, "a future-dated placement was accepted"
+        ok("KAN-189 · A future-dated placement is refused server-side too")
+    except Exception as e:
+        fail("KAN-189 · A future-dated placement is refused server-side too", str(e))
+
+    try:
+        # Nothing is applied by opening or cancelling — the dialog only ever
+        # creates a PENDING request, and only on submit.
+        page.click("#mv-cancel")
+        page.wait_for_timeout(300)
+        assert page.eval_on_selector("#move-modal", "e => e.style.display") == "none"
+        ok("Cancelling the transfer dialog applies nothing and closes it")
+    except Exception as e:
+        fail("Cancelling the transfer dialog applies nothing and closes it", str(e))
+
+    # ══════════════════════════════════════════════════════════
+    section("18 · Bell content — approvals are actionable (DEF-001/2/3)")
+    # ══════════════════════════════════════════════════════════
+    # Section 9 only proves the bell OPENS. These checks prove what is INSIDE
+    # it, which is where three defects lived while section 9 stayed green:
+    #   DEF-001  a position change awaiting you never appeared in the bell's
+    #            approvals area at all — it fetched vacation only — so the bell
+    #            said "No pending approvals ✓" while an approval sat waiting.
+    #   DEF-002  every event except VACATION_APPROVED rendered a red ❌, so an
+    #            undecided request and a successful approval both read as
+    #            refusals.
+    #   DEF-003  "awaiting your approval" survived in the bell after the request
+    #            had been decided and could no longer be acted on.
+    # The request raised here is REJECTED at the end, never approved: a
+    # rejection applies no org change, so the suite stays re-runnable and never
+    # mutates anybody's placement.
+    logout(page)
+    oc_id = oc_name = None
+    try:
+        login(page, PORTAL_ADMIN)          # HR_ADMIN — level-1 approver AND may initiate
+        page.goto(BASE + "/directory")
+        page.wait_for_load_state("networkidle")
+        page.wait_for_selector("#employee-table-body tr", timeout=8000)
+        # Find any colleague we can genuinely raise a move for: skip anyone who
+        # already has a pending request (one per person, AC-185-08) and anyone
+        # whose only units match their current placement.
+        created = page.evaluate("""async () => {
+          const hrefs = [...document.querySelectorAll("#employee-table-body a[href^='/profile/']")]
+            .map(a => a.getAttribute('href').split('/profile/')[1]).slice(0, 8);
+          for (const id of hrefs) {
+            const pre = await (await fetch('/api/org-change/prefill?subject=' + id)).json();
+            if (pre.pending_request_id) continue;
+            const bu = (pre.business_units || []).find(b => b.id !== (pre.subject_current || {}).bu);
+            if (!bu) continue;
+            const res = await fetch('/api/org-change/request', {
+              method: 'POST', headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({ employee_id: id, business_unit_id: bu.id,
+                                     reason: 'UAT — bell actionability check' }) });
+            if (res.ok) { const d = await res.json();
+                          return { id: d.id, name: (pre.subject || {}).name }; }
+          }
+          return null;
+        }""")
+        assert created, "could not raise a position change to test the bell with"
+        oc_id, oc_name = created["id"], created["name"]
+        ok("Raised a position change to exercise the bell with")
+    except Exception as e:
+        fail("Raised a position change to exercise the bell with", str(e))
+
+    try:
+        assert oc_id, "no request was raised"
+        page.goto(BASE + "/dashboard")
+        page.wait_for_load_state("networkidle")
+        badge = page.eval_on_selector(
+            "#bell-badge", "e => e.style.display !== 'none' ? e.textContent.trim() : '0'")
+        assert badge != '0', "badge stayed silent while an approval was waiting"
+        ok("DEF-001 · Bell badge counts a position change awaiting me")
+    except Exception as e:
+        fail("DEF-001 · Bell badge counts a position change awaiting me", str(e))
+
+    try:
+        page.locator(".bell-btn").click()
+        page.wait_for_timeout(1500)
+        assert page.eval_on_selector("#bell-oc-hdr", "e => e.style.display") != "none", \
+            "Position Changes section stayed hidden"
+        assert oc_name in page.inner_text("#bell-oc-list"), \
+            f"{oc_name} not listed in the bell's Position Changes section"
+        ok("DEF-001 · Position change appears in the bell's approvals area")
+    except Exception as e:
+        fail("DEF-001 · Position change appears in the bell's approvals area", str(e))
+
+    try:
+        # Actionable, not a read-only line of text.
+        assert page.query_selector(f"#bell-oc-{oc_id} .bell-approve") is not None
+        href = page.eval_on_selector(f"#bell-oc-{oc_id} .bell-reject", "e => e.getAttribute('href')")
+        assert href and f"review={oc_id}" in href and "action=reject" in href, \
+            f"reject control does not deep-link to the review dialog (href={href})"
+        ok("DEF-001 · Bell offers Approve, and Reject deep-links for a reason")
+    except Exception as e:
+        fail("DEF-001 · Bell offers Approve, and Reject deep-links for a reason", str(e))
+
+    try:
+        # The call to action has NO outcome yet, so it must not wear one.
+        # Scoped to OUR subject: a shared dev database legitimately holds other
+        # people's pending requests, and asserting on "any" notification would
+        # pass or fail on someone else's data.
+        icon = page.evaluate("""(name) => {
+          const it = [...document.querySelectorAll('#bell-notif-list .bell-notif-item')]
+            .find(e => e.innerText.includes('awaiting your approval') && e.innerText.includes(name));
+          return it ? it.querySelector('.bell-notif-icon').textContent.trim() : null; }""", oc_name)
+        assert icon is not None, "no 'awaiting your approval' notification was written"
+        assert icon != '❌', "an undecided request is still rendered as a rejection"
+        assert icon == '⏳', f"expected the in-flight icon, got {icon!r}"
+        ok("DEF-002 · Undecided request shows ⏳, not a rejection cross")
+    except Exception as e:
+        fail("DEF-002 · Undecided request shows ⏳, not a rejection cross", str(e))
+
+    try:
+        # Reject from the bell — the deep link must open the review dialog.
+        page.goto(BASE + f"/org-change?review={oc_id}&action=reject")
+        page.wait_for_load_state("networkidle")
+        page.wait_for_timeout(1500)
+        assert page.eval_on_selector("#review-modal", "e => e.style.display") == "flex", \
+            "the bell's Reject link did not open the review dialog"
+        ok("DEF-001 · Reject from the bell opens the review dialog")
+    except Exception as e:
+        fail("DEF-001 · Reject from the bell opens the review dialog", str(e))
+
+    try:
+        page.fill("#rv-note", "UAT — rejected, applies nothing.")
+        page.click("#review-modal button:has-text('Reject')")
+        page.wait_for_timeout(1800)
+        rows = page.evaluate("""() => [...document.querySelectorAll('#pending-tbody tr')]
+            .map(r => r.innerText)""")
+        assert not any((oc_name or '') in r for r in rows), "request survived its own rejection"
+        ok("Rejecting from the bell's deep link decides the request")
+    except Exception as e:
+        fail("Rejecting from the bell's deep link decides the request", str(e))
+
+    try:
+        # DEF-003 — the call to action is retired; the OUTCOME notification is not.
+        page.goto(BASE + "/dashboard")
+        page.wait_for_load_state("networkidle")
+        page.locator(".bell-btn").click()
+        page.wait_for_timeout(1500)
+        stale = page.evaluate("""(name) => [...document.querySelectorAll('#bell-notif-list .bell-notif-item')]
+            .some(e => e.innerText.includes('awaiting your approval') && e.innerText.includes(name))""",
+            oc_name)
+        assert not stale, "a decided request still asks to be approved in the bell"
+        icon = page.evaluate("""(name) => {
+          const it = [...document.querySelectorAll('#bell-notif-list .bell-notif-item')]
+            .find(e => e.innerText.includes('was rejected') && e.innerText.includes(name));
+          return it ? it.querySelector('.bell-notif-icon').textContent.trim() : null; }""", oc_name)
+        assert icon is not None, "the rejection outcome was never announced"
+        assert icon == '❌', f"a rejection should read as one, got {icon!r}"
+        ok("DEF-003 · Decided request leaves the bell; outcome shows ❌")
+    except Exception as e:
+        fail("DEF-003 · Decided request leaves the bell; outcome shows ❌", str(e))
+
+    try:
+        assert page.query_selector(f"#bell-oc-{oc_id}") is None, \
+            "the Position Changes section is still offering a decided request"
+        ok("DEF-001 · Decided request leaves the bell's approvals area")
+    except Exception as e:
+        fail("DEF-001 · Decided request leaves the bell's approvals area", str(e))
+
+    # ── 19 · Shell accessibility primitives (KAN-204) ──────────────
+    # `tests/test_ui_ux.py` asserts the CSS and markup are PRESENT. These check
+    # they actually take effect in a real engine — the focus rule works by source
+    # order against several `outline: none` declarations, and a specificity
+    # argument that is right on paper and wrong in the browser is worth nothing.
+    section("19 · Shell accessibility (KAN-204)")
+
+    page.goto(BASE + "/directory")
+    page.wait_for_load_state("networkidle")
+
+    def ring_on(selector, label):
+        """Focus the element the way a keyboard user does, then read the ring."""
+        try:
+            el = page.query_selector(selector)
+            assert el, f"{label}: {selector} not on the page"
+            # `:focus-visible` only matches keyboard-initiated focus, so a
+            # .click() would prove nothing here — the element must be tabbed to.
+            page.evaluate("(s) => document.querySelector(s).focus()", selector)
+            style = page.evaluate("""(s) => {
+              const c = getComputedStyle(document.querySelector(s));
+              return {w: c.outlineWidth, st: c.outlineStyle, col: c.outlineColor};
+            }""", selector)
+            assert page.evaluate(
+                "(s) => document.querySelector(s).matches(':focus-visible')", selector), \
+                f"{label}: element does not match :focus-visible when focused"
+            assert style["st"] != "none", f"{label}: outline-style is none"
+            assert float(style["w"].replace("px", "")) >= 2, \
+                f"{label}: ring is {style['w']}, expected >= 2px"
+            ok(f"Focus ring is visible on {label}")
+        except Exception as e:
+            fail(f"Focus ring is visible on {label}", str(e))
+
+    # The search box is the case that matters: `.search-input` sets
+    # `outline: none` at the SAME specificity, so this is the source-order proof.
+    ring_on(".search-input", "the directory search box (beats `outline: none`)")
+    ring_on(".sidebar a", "a sidebar nav link")
+    ring_on(".bell-btn", "the notification bell")
+
+    try:
+        # Exactly one pair of live regions, and both reachable + non-hidden.
+        counts = page.evaluate("""() => ({
+          polite: document.querySelectorAll('[aria-live=polite]').length,
+          assertive: document.querySelectorAll('[aria-live=assertive]').length,
+          statusHidden: (() => { const e = document.getElementById('live-status');
+            if (!e) return 'missing';
+            const c = getComputedStyle(e);
+            return c.display === 'none' || c.visibility === 'hidden' ? 'hidden' : 'ok'; })()
+        })""")
+        assert counts["polite"] == 1, f"expected 1 polite region, found {counts['polite']}"
+        assert counts["assertive"] == 1, f"expected 1 assertive region, found {counts['assertive']}"
+        assert counts["statusHidden"] == "ok", \
+            f"the polite region is {counts['statusHidden']} — display:none silences it"
+        ok("Exactly one live-region pair, present and not display:none")
+    except Exception as e:
+        fail("Exactly one live-region pair, present and not display:none", str(e))
+
+    try:
+        # announce() reaches the region, and the default is polite.
+        page.evaluate("() => announce('Twelve employees found.')")
+        assert page.evaluate("() => document.getElementById('live-status').textContent") \
+            == 'Twelve employees found.', "a polite announcement did not land"
+        page.evaluate("() => announce('Something went wrong.', 'assertive')")
+        assert page.evaluate("() => document.getElementById('live-alert').textContent") \
+            == 'Something went wrong.', "an assertive announcement did not land"
+        ok("announce() reaches both regions and defaults to polite")
+    except Exception as e:
+        fail("announce() reaches both regions and defaults to polite", str(e))
+
+    try:
+        # The directory's own empty state announces — filter to nonsense.
+        page.fill(".search-input", "zzzz-no-such-person-zzzz")
+        page.wait_for_timeout(600)
+        spoken = page.evaluate("() => document.getElementById('live-status').textContent")
+        assert 'No employees found' in spoken, \
+            f"the empty state was silent; region held {spoken!r}"
+        ok("Directory empty state is announced, not just drawn")
+    except Exception as e:
+        fail("Directory empty state is announced, not just drawn", str(e))
+
+    try:
+        # Reduced motion, in an engine that is actually honouring the query.
+        rm = browser.new_context(reduced_motion="reduce")
+        rp = rm.new_page()
+        rp.goto(BASE + "/login")
+        rp.wait_for_load_state("networkidle")
+        dur = rp.evaluate("""() => {
+          const d = document.createElement('div');
+          d.style.transition = 'opacity 400ms';
+          document.body.appendChild(d);
+          const v = getComputedStyle(d).transitionDuration;
+          d.remove();
+          return v;
+        }""")
+        # Near-zero, but deliberately NOT 0s — a 0s transition fires no
+        # `transitionend`, and code awaiting one would hang for ever.
+        assert dur not in ("0.4s", "400ms"), f"transition not reduced: {dur}"
+        assert dur != "0s", f"duration collapsed to exactly 0s: {dur}"
+        ok("prefers-reduced-motion shortens transitions without reaching 0s")
+        rm.close()
+    except Exception as e:
+        fail("prefers-reduced-motion shortens transitions without reaching 0s", str(e))
+
+    # ── 20 · Job architecture — the ladder (KAN-190) ────────────────
+    # The step arithmetic is the thing worth checking in a browser: `step_count`
+    # counts increments ABOVE entry, so 5 must READ as six steps everywhere a
+    # human looks. An off-by-one here becomes a wrong salary in W2.
+    section("20 · Job architecture ladder (KAN-190)")
+
+    logout(page)
+    login(page, PORTAL_ADMIN)           # also HR_ADMIN → holds org_structure:w
+    page.goto(BASE + "/admin/job-architecture")
+    page.wait_for_load_state("networkidle")
+
+    try:
+        assert page.query_selector("a[href='/admin/job-architecture']"), \
+            "no nav link — the feature code is not granting read access"
+        assert "const JA_CAN_CONFIGURE = true" in page.content(), \
+            "HR/Portal admin cannot configure; org_structure:w is not resolving"
+        ok("Ladder page loads and offers configuration to org_structure:w")
+    except Exception as e:
+        fail("Ladder page loads and offers configuration to org_structure:w", str(e))
+
+    try:
+        body = page.content()
+        # The seeded worked example: 5 above entry renders as .0–.5 and "(6)".
+        assert "2.0 – 2.5" in body, "the step range is not rendered from step_count"
+        assert "(6)" in body, "5 increments above entry did not read as 6 steps"
+        # And a level with THREE above entry reads as four — proving it is per
+        # level and not a constant.
+        assert "1.0 – 1.3" in body and "(4)" in body, \
+            "step counts are not per level"
+        ok("step_count reads as increments ABOVE entry (5 → 6 steps, 3 → 4)")
+    except Exception as e:
+        fail("step_count reads as increments ABOVE entry (5 → 6 steps, 3 → 4)", str(e))
+
+    try:
+        body = page.content()
+        # The half-authored level must be visible AS half-authored.
+        assert "0/6" in body, "an undescribed level does not show as undescribed"
+        assert "6/6" in body, "a fully described level does not show as complete"
+        assert "Software Engineer" in body
+        assert "cannot assess somebody against a step that has not been described" in body, \
+            "the incomplete banner does not explain the consequence"
+        ok("Incomplete steps are named, with their denominator and consequence")
+    except Exception as e:
+        fail("Incomplete steps are named, with their denominator and consequence", str(e))
+
+    try:
+        # The live preview is the guard against the off-by-one at entry time.
+        page.click("button:has-text('+ Add level')")
+        page.wait_for_timeout(400)
+        page.fill("#ja-lvl-ordinal", "9")
+        page.fill("#ja-lvl-steps", "4")
+        page.wait_for_timeout(250)
+        preview = page.inner_text("#ja-lvl-steps-preview")
+        assert "5 steps" in preview and "9.0 to 9.4" in preview, \
+            f"the preview does not show what the number means: {preview!r}"
+        # And the field ships EMPTY — a pre-filled 5 would record a decision
+        # nobody made.
+        page.fill("#ja-lvl-steps", "")
+        page.click("#ja-lvl-save")
+        page.wait_for_timeout(400)
+        assert "no default" in page.inner_text("#ja-lvl-error").lower(), \
+            "a level saved with no step count"
+        page.keyboard.press("Escape")
+        ok("Step count is previewed, required, and has no default")
+    except Exception as e:
+        fail("Step count is previewed, required, and has no default", str(e))
+
+    try:
+        # A plain employee may READ the ladder — that is the transparency the
+        # owner asked for — but must see no editing affordance.
+        logout(page)
+        login(page, EMPLOYEE)
+        page.goto(BASE + "/admin/job-architecture")
+        page.wait_for_load_state("networkidle")
+        body = page.content()
+        assert "Junior Software Fullstack Engineer" in body, \
+            "an employee cannot read the ladder; job_architecture:r is not seeded to EMPLOYEE"
+        assert "const JA_CAN_CONFIGURE = false" in body, \
+            "an employee was offered ladder configuration"
+        assert "+ Add family" not in body
+        ok("An employee reads the ladder and is offered no editing")
+    except Exception as e:
+        fail("An employee reads the ladder and is offered no editing", str(e))
 
     browser.close()
 

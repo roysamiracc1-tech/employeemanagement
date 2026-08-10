@@ -6,7 +6,7 @@ and response structure.
 import json
 import pytest
 from unittest.mock import patch, MagicMock
-from tests.conftest import _set_session
+from tests.conftest import _set_session, tenant_feature_off, tenant_feature_on, tenant_on_role_denied
 
 FAKE_COMPANY_ID = '00000000-0000-0000-0000-000000000001'
 FAKE_COMPANY_ID_2 = '00000000-0000-0000-0000-000000000002'
@@ -70,7 +70,6 @@ def test_si_api_no_500_all_roles(app, role, route):
     """All SI API endpoints return non-500 for every role."""
     c = make_client(app, [role])
     with patch('app.routes.skills_intelligence.query', return_value=[]), \
-         patch('app.routes.skills_intelligence._si_enabled', return_value=True), \
          patch('app.db.query', return_value=[]), \
          patch('app.auth._load_feature_access', return_value=SI_FULL_MAP):
         r = c.get(route)
@@ -87,7 +86,7 @@ def test_si_api_no_500_all_roles(app, role, route):
 def test_si_disabled_non_sa_gets_403(app, role, route):
     """When SI disabled, non-SA roles with access still get 403."""
     c = make_client(app, [role])
-    with patch('app.routes.skills_intelligence._si_enabled', return_value=False), \
+    with tenant_feature_off('skills_intelligence'), \
          patch('app.routes.skills_intelligence.current_company_id', return_value=FAKE_COMPANY_ID), \
          patch('app.auth._load_feature_access', return_value=SI_FULL_MAP):
         r = c.get(route)
@@ -99,7 +98,7 @@ def test_si_disabled_sa_still_accessible(app, route):
     """SYSTEM_ADMIN can access SI even when disabled."""
     c = make_client(app, ['SYSTEM_ADMIN'])
     with patch('app.routes.skills_intelligence.query', return_value=[]), \
-         patch('app.routes.skills_intelligence._si_enabled', return_value=False), \
+         tenant_feature_off('skills_intelligence'), \
          patch('app.auth._load_feature_access', return_value=SI_FULL_MAP):
         r = c.get(route)
     assert r.status_code != 500
@@ -110,7 +109,6 @@ def test_si_enabled_portal_admin_accessible(app, route):
     """PORTAL_ADMIN can access SI when enabled and has access."""
     c = make_client(app, ['PORTAL_ADMIN'])
     with patch('app.routes.skills_intelligence.query', return_value=[]), \
-         patch('app.routes.skills_intelligence._si_enabled', return_value=True), \
          patch('app.auth._load_feature_access', return_value=SI_FULL_MAP):
         r = c.get(route)
     assert r.status_code != 500
@@ -121,7 +119,6 @@ def test_si_enabled_hr_admin_accessible(app, route):
     """HR_ADMIN can access SI when enabled and has access."""
     c = make_client(app, ['HR_ADMIN'])
     with patch('app.routes.skills_intelligence.query', return_value=[]), \
-         patch('app.routes.skills_intelligence._si_enabled', return_value=True), \
          patch('app.auth._load_feature_access', return_value=SI_FULL_MAP):
         r = c.get(route)
     assert r.status_code != 500
@@ -134,7 +131,6 @@ def test_si_page_with_access_no_500(app, role):
     """SI page accessible to roles with access."""
     c = make_client(app, [role])
     with patch('app.routes.skills_intelligence.query', return_value=[]), \
-         patch('app.routes.skills_intelligence._si_enabled', return_value=True), \
          patch('app.auth._load_feature_access', return_value=SI_FULL_MAP):
         r = c.get(SI_PAGE_ROUTE)
     assert r.status_code != 500
@@ -144,7 +140,8 @@ def test_si_page_with_access_no_500(app, role):
 def test_si_page_without_access_redirect(app, role):
     """SI page redirects roles without access."""
     c = make_client(app, [role])
-    with patch('app.auth._load_feature_access', return_value=SI_EMPTY_MAP):
+    with tenant_on_role_denied(), \
+         patch('app.auth._load_feature_access', return_value=SI_EMPTY_MAP):
         r = c.get(SI_PAGE_ROUTE)
     assert r.status_code in (302, 308)
 
@@ -159,7 +156,6 @@ def test_si_manager_scoped_no_500(app, role, route):
     """SI endpoints handle manager scoping without 500."""
     c = make_client(app, [role])
     with patch('app.routes.skills_intelligence.query', return_value=[]), \
-         patch('app.routes.skills_intelligence._si_enabled', return_value=True), \
          patch('app.db.query', return_value=[]), \
          patch('app.auth._load_feature_access', return_value=SI_FULL_MAP):
         r = c.get(route)
@@ -172,7 +168,6 @@ def test_si_kpi_returns_json(app):
     """SI KPI endpoint returns JSON."""
     c = make_client(app, ['PORTAL_ADMIN'])
     with patch('app.routes.skills_intelligence.query', return_value=[]), \
-         patch('app.routes.skills_intelligence._si_enabled', return_value=True), \
          patch('app.auth._load_feature_access', return_value=SI_FULL_MAP):
         r = c.get('/api/admin/skills-intelligence/kpi')
     assert r.status_code != 500
@@ -185,7 +180,6 @@ def test_si_coverage_returns_json(app):
     """SI coverage endpoint returns JSON."""
     c = make_client(app, ['PORTAL_ADMIN'])
     with patch('app.routes.skills_intelligence.query', return_value=[]), \
-         patch('app.routes.skills_intelligence._si_enabled', return_value=True), \
          patch('app.auth._load_feature_access', return_value=SI_FULL_MAP):
         r = c.get('/api/admin/skills-intelligence/coverage')
     assert r.status_code != 500
@@ -195,7 +189,6 @@ def test_si_gaps_returns_json(app):
     """SI gaps endpoint returns JSON."""
     c = make_client(app, ['PORTAL_ADMIN'])
     with patch('app.routes.skills_intelligence.query', return_value=[]), \
-         patch('app.routes.skills_intelligence._si_enabled', return_value=True), \
          patch('app.auth._load_feature_access', return_value=SI_FULL_MAP):
         r = c.get('/api/admin/skills-intelligence/gaps')
     assert r.status_code != 500
@@ -205,7 +198,6 @@ def test_si_heatmap_returns_json(app):
     """SI heatmap endpoint returns JSON."""
     c = make_client(app, ['PORTAL_ADMIN'])
     with patch('app.routes.skills_intelligence.query', return_value=[]), \
-         patch('app.routes.skills_intelligence._si_enabled', return_value=True), \
          patch('app.auth._load_feature_access', return_value=SI_FULL_MAP):
         r = c.get('/api/admin/skills-intelligence/heatmap')
     assert r.status_code != 500
@@ -215,7 +207,6 @@ def test_si_top_skills_returns_json(app):
     """SI top-skills endpoint returns JSON."""
     c = make_client(app, ['PORTAL_ADMIN'])
     with patch('app.routes.skills_intelligence.query', return_value=[]), \
-         patch('app.routes.skills_intelligence._si_enabled', return_value=True), \
          patch('app.auth._load_feature_access', return_value=SI_FULL_MAP):
         r = c.get('/api/admin/skills-intelligence/top-skills')
     assert r.status_code != 500
@@ -225,7 +216,6 @@ def test_si_validation_returns_json(app):
     """SI validation endpoint returns JSON."""
     c = make_client(app, ['PORTAL_ADMIN'])
     with patch('app.routes.skills_intelligence.query', return_value=[]), \
-         patch('app.routes.skills_intelligence._si_enabled', return_value=True), \
          patch('app.auth._load_feature_access', return_value=SI_FULL_MAP):
         r = c.get('/api/admin/skills-intelligence/validation')
     assert r.status_code != 500
@@ -235,7 +225,6 @@ def test_si_trends_returns_json(app):
     """SI trends endpoint returns JSON."""
     c = make_client(app, ['PORTAL_ADMIN'])
     with patch('app.routes.skills_intelligence.query', return_value=[]), \
-         patch('app.routes.skills_intelligence._si_enabled', return_value=True), \
          patch('app.auth._load_feature_access', return_value=SI_FULL_MAP):
         r = c.get('/api/admin/skills-intelligence/trends')
     assert r.status_code != 500
@@ -245,7 +234,6 @@ def test_si_growth_returns_json(app):
     """SI growth endpoint returns JSON."""
     c = make_client(app, ['PORTAL_ADMIN'])
     with patch('app.routes.skills_intelligence.query', return_value=[]), \
-         patch('app.routes.skills_intelligence._si_enabled', return_value=True), \
          patch('app.auth._load_feature_access', return_value=SI_FULL_MAP):
         r = c.get('/api/admin/skills-intelligence/growth')
     assert r.status_code != 500
@@ -255,7 +243,6 @@ def test_si_job_coverage_returns_json(app):
     """SI job-coverage endpoint returns JSON."""
     c = make_client(app, ['PORTAL_ADMIN'])
     with patch('app.routes.skills_intelligence.query', return_value=[]), \
-         patch('app.routes.skills_intelligence._si_enabled', return_value=True), \
          patch('app.auth._load_feature_access', return_value=SI_FULL_MAP):
         r = c.get('/api/admin/skills-intelligence/job-coverage')
     assert r.status_code != 500
@@ -275,7 +262,6 @@ def test_si_various_company_ids(app, company_id, route):
     """SI endpoints handle various company IDs."""
     c = make_client(app, ['PORTAL_ADMIN'], company_id=company_id)
     with patch('app.routes.skills_intelligence.query', return_value=[]), \
-         patch('app.routes.skills_intelligence._si_enabled', return_value=True), \
          patch('app.auth._load_feature_access', return_value=SI_FULL_MAP):
         r = c.get(route)
     assert r.status_code != 500
@@ -288,7 +274,6 @@ def test_si_empty_db_results(app, route):
     """SI endpoints handle empty DB results."""
     c = make_client(app, ['PORTAL_ADMIN'])
     with patch('app.routes.skills_intelligence.query', return_value=[]), \
-         patch('app.routes.skills_intelligence._si_enabled', return_value=True), \
          patch('app.auth._load_feature_access', return_value=SI_FULL_MAP):
         r = c.get(route)
     assert r.status_code != 500
@@ -309,15 +294,47 @@ def test_si_toggle_hr_sa_only(app):
     assert r.status_code != 500
 
 
-def test_si_toggle_hr_blocked_portal_admin(app):
-    """SI toggle-hr endpoint blocked for PORTAL_ADMIN."""
+def test_si_toggle_hr_allowed_for_portal_admin_with_write_access(app):
+    """INVERTED BY KAN-188 — the old assertion was passing by accident.
+
+    This used to assert PORTAL_ADMIN was BLOCKED, which contradicts the route's
+    own docstring: *"PORTAL_ADMIN can enable/disable Skills Intelligence for HR
+    Admins in their company."* It passed only because the deleted `_si_enabled`
+    read "no company_features row" as denied, and this fixture's company has no
+    rows — so the test was measuring a missing fixture, not a permission rule.
+
+    With the tenant switch resolved centrally and the company having the feature,
+    a PORTAL_ADMIN holding `skills_intelligence:w` may call it, which is what the
+    route was written to allow. Inverted rather than deleted so the trail from
+    the accidental behaviour to the intended one survives.
+
+    (The endpoint itself writes `enabled_for_hr`, which has NO consumer — TD-17.
+    Its removal path is named in the route's docstring.)
+    """
     c = make_client(app, ['PORTAL_ADMIN'])
-    r = c.post(
-        '/api/admin/skills-intelligence/toggle-hr',
-        data=json.dumps({'company_id': FAKE_COMPANY_ID, 'enabled': True}),
-        content_type='application/json'
-    )
-    assert r.status_code in (302, 308, 403)
+    with tenant_feature_on('skills_intelligence'), \
+         patch('app.routes.skills_intelligence.query',
+               return_value={'id': '00000000-0000-0000-0000-0000000000f1'}), \
+         patch('app.routes.skills_intelligence.execute'):
+        r = c.post(
+            '/api/admin/skills-intelligence/toggle-hr',
+            data=json.dumps({'company_id': FAKE_COMPANY_ID, 'enabled': True}),
+            content_type='application/json'
+        )
+    assert r.status_code == 200, r.data
+
+
+def test_si_toggle_hr_blocked_when_the_company_lacks_the_feature(app):
+    """The tenant switch still gates it — and says so in JSON, not HTML."""
+    c = make_client(app, ['PORTAL_ADMIN'])
+    with tenant_feature_off('skills_intelligence'):
+        r = c.post(
+            '/api/admin/skills-intelligence/toggle-hr',
+            data=json.dumps({'company_id': FAKE_COMPANY_ID, 'enabled': True}),
+            content_type='application/json'
+        )
+    assert r.status_code == 403
+    assert json.loads(r.data)['reason'] == 'tenant_feature_disabled'
 
 
 # ── Feature access required ───────────────────────────────────────────────────
@@ -326,7 +343,8 @@ def test_si_toggle_hr_blocked_portal_admin(app):
 def test_si_kpi_no_feature_access_redirect(app, role):
     """SI KPI redirects when user lacks feature access."""
     c = make_client(app, [role])
-    with patch('app.auth._load_feature_access', return_value=SI_EMPTY_MAP):
+    with tenant_on_role_denied(), \
+         patch('app.auth._load_feature_access', return_value=SI_EMPTY_MAP):
         r = c.get('/api/admin/skills-intelligence/kpi')
     assert r.status_code in (302, 308)
 
@@ -337,7 +355,6 @@ def test_si_multiple_endpoints_sequence(app):
     """Multiple SI endpoints can be called in sequence without error."""
     c = make_client(app, ['PORTAL_ADMIN'])
     with patch('app.routes.skills_intelligence.query', return_value=[]), \
-         patch('app.routes.skills_intelligence._si_enabled', return_value=True), \
          patch('app.auth._load_feature_access', return_value=SI_FULL_MAP):
         for route in SI_API_ROUTES:
             r = c.get(route)
@@ -352,7 +369,7 @@ def test_si_null_company_id(app, role, route):
     """SI endpoints handle null company_id gracefully."""
     c = make_client(app, [role], company_id=None)
     with patch('app.routes.skills_intelligence.query', return_value=[]), \
-         patch('app.routes.skills_intelligence._si_enabled', return_value=False), \
+         tenant_feature_off('skills_intelligence'), \
          patch('app.routes.skills_intelligence.current_company_id', return_value=None), \
          patch('app.auth._load_feature_access', return_value=SI_FULL_MAP):
         r = c.get(route)
@@ -366,7 +383,6 @@ def test_si_sa_company_context(app, company_id):
     """SA with specific company context gets correct SI data."""
     c = make_client(app, ['SYSTEM_ADMIN'], admin_company_id=company_id)
     with patch('app.routes.skills_intelligence.query', return_value=[]), \
-         patch('app.routes.skills_intelligence._si_enabled', return_value=True), \
          patch('app.auth._load_feature_access', return_value=SI_FULL_MAP):
         r = c.get('/api/admin/skills-intelligence/kpi')
     assert r.status_code != 500
@@ -380,7 +396,8 @@ def test_si_partial_feature_map_no_si_access(app, role):
     c = make_client(app, [role])
     # Map has reports but not skills_intelligence
     partial_map = {'reports': {'r': True, 'w': True, 'd': True}}
-    with patch('app.auth._load_feature_access', return_value=partial_map):
+    with tenant_on_role_denied(), \
+         patch('app.auth._load_feature_access', return_value=partial_map):
         r = c.get('/api/admin/skills-intelligence/kpi')
     assert r.status_code in (302, 308)
 
@@ -393,7 +410,6 @@ def test_si_readonly_access_allowed(app, route):
     c = make_client(app, ['HR_ADMIN'])
     readonly_map = {'skills_intelligence': {'r': True, 'w': False, 'd': False}}
     with patch('app.routes.skills_intelligence.query', return_value=[]), \
-         patch('app.routes.skills_intelligence._si_enabled', return_value=True), \
          patch('app.auth._load_feature_access', return_value=readonly_map):
         r = c.get(route)
     assert r.status_code != 500

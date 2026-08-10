@@ -6,7 +6,7 @@ All DB calls mocked.
 import datetime
 import pytest
 from unittest.mock import patch, MagicMock
-from tests.conftest import _set_session
+from tests.conftest import _set_session, tenant_feature_off, tenant_feature_on
 
 FAKE_CO  = '00000000-0000-0000-0000-000000000001'
 FAKE_EMP = '00000000-0000-0000-0000-000000000030'
@@ -796,29 +796,38 @@ SI_COMPANY_ACCESS_ENABLED_CASES = [
     ['SOLID_LINE_MANAGER', 'EMPLOYEE'],
 ]
 
-@pytest.mark.parametrize("roles", SI_COMPANY_ACCESS_ENABLED_CASES)
-def test_check_si_company_access_passes_when_enabled(roles, app):
-    with app.app_context():
-        with app.test_request_context('/'):
-            from flask import session as s
-            s['roles'] = roles
-            s['company_id'] = FAKE_CO
-            s['user_id'] = FAKE_USER
-            from app.routes.skills_intelligence import _check_si_company_access
-            with patch('app.routes.skills_intelligence._si_enabled', return_value=True):
-                ok, err = _check_si_company_access(FAKE_CO)
-                assert ok is True
+# `_check_si_company_access` was DELETED by KAN-188 — a hand-rolled tenant switch
+# inside a route module. The property it guarded (company enablement gates the
+# feature for every non-SA role alike) now belongs to the central resolver, so
+# these drive the ROUTE, which is what a user actually meets.
 
 @pytest.mark.parametrize("roles", SI_COMPANY_ACCESS_ENABLED_CASES)
-def test_check_si_company_access_blocks_when_disabled(roles, app):
-    with app.app_context():
-        with app.test_request_context('/'):
-            from flask import session as s
-            s['roles'] = roles
-            s['company_id'] = FAKE_CO
-            s['user_id'] = FAKE_USER
-            from app.routes.skills_intelligence import _check_si_company_access
-            with patch('app.routes.skills_intelligence._si_enabled', return_value=False):
-                ok, err = _check_si_company_access(FAKE_CO)
-                assert ok is False
+def test_si_reachable_for_every_granted_role_when_the_company_has_it(roles, app):
+    c = _make_si_client(app, roles)
+    with tenant_feature_on('skills_intelligence'), \
+         patch('app.routes.skills_intelligence.query', return_value=[]):
+        r = c.get('/admin/skills-intelligence')
+    assert r.status_code == 200
+
+
+@pytest.mark.parametrize("roles", SI_COMPANY_ACCESS_ENABLED_CASES)
+def test_si_off_state_shown_to_every_role_when_the_company_lacks_it(roles, app):
+    """One switch, one answer — the tenant switch is not role-shaped."""
+    c = _make_si_client(app, roles)
+    with tenant_feature_off('skills_intelligence'), \
+         patch('app.routes.skills_intelligence.query', return_value=[]):
+        r = c.get('/admin/skills-intelligence')
+    assert r.status_code == 200
+    assert b'switched on' in r.data
+
+
+def _make_si_client(app, roles):
+    c = app.test_client()
+    with c.session_transaction() as s:
+        s['roles'] = list(roles)
+        s['company_id'] = FAKE_CO
+        s['user_id'] = FAKE_USER
+        s['employee_id'] = 'emp-x'
+        s['user_name'] = 'T'
+    return c
 

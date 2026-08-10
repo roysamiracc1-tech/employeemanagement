@@ -21,6 +21,10 @@
   --table-row-hover: #f8fafc;
   --co-header-bg: transparent;
   --co-footer-bg: transparent;
+  /* Shell accessibility primitive 1 of 3 (KAN-204 · EP33 debt). One token, so
+     every focus ring in the product is the same ring — see the global
+     `:focus-visible` rule at the foot of this file for why it lives there. */
+  --focus-ring: #2563eb;
 }
 
 /* ── Dark theme ──────────────────────────────────────────── */
@@ -37,6 +41,10 @@
   --table-row-hover: #162032;
   --co-header-bg: rgba(255,255,255,.04);
   --co-footer-bg: rgba(255,255,255,.04);
+  /* Lighter than the light-theme ring: #2563eb on a #0f172a surface is close to
+     failing WCAG 1.4.11's 3:1 for a non-text indicator, and a focus ring you
+     have to hunt for is the same defect as no focus ring. */
+  --focus-ring: #60a5fa;
 }
 [data-theme="dark"] body { color-scheme: dark; }
 [data-theme="dark"] .topbar { background: var(--topbar-bg); }
@@ -535,6 +543,39 @@ select.filter-sel:focus { border-color: var(--primary); }
 }
 .team-card-footer a:hover { text-decoration: underline; }
 
+/* ── Directory row actions (⋯ menu) ──────────────────────── */
+.row-actions { text-align: right; white-space: nowrap; }
+.row-menu { position: relative; display: inline-block; }
+.row-menu-btn {
+  background: none; border: 1px solid transparent; border-radius: 6px;
+  cursor: pointer; color: #64748b; font-size: 1rem; line-height: 1;
+  padding: 4px 8px;
+}
+.row-menu-btn:hover { background: var(--bg); border-color: var(--border); }
+.row-menu-btn:focus-visible { outline: 2px solid #2563eb; outline-offset: 1px; }
+.row-menu-list {
+  position: absolute; right: 0; top: 100%; z-index: 40; min-width: 160px;
+  background: var(--card, #fff); border: 1px solid var(--border);
+  border-radius: 8px; box-shadow: 0 8px 24px rgba(15, 23, 42, .14);
+  padding: 4px; display: flex; flex-direction: column;
+}
+.row-menu-list[hidden] { display: none; }
+.row-menu-list > * {
+  background: none; border: 0; text-align: left; cursor: pointer;
+  font-size: .8rem; color: var(--text); padding: 7px 10px;
+  border-radius: 6px; text-decoration: none;
+}
+.row-menu-list > *:hover { background: var(--bg); }
+.row-menu-list > *:focus-visible { outline: 2px solid #2563eb; outline-offset: -2px; }
+
+/* Visible to screen readers only — for labelling controls that are obvious
+   sighted (e.g. an actions column header) but unnamed without it. */
+.sr-only {
+  position: absolute; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
 /* ── Profile page ────────────────────────────────────────── */
 .profile-header {
   background: linear-gradient(135deg, #0f2044, #2563eb);
@@ -543,6 +584,17 @@ select.filter-sel:focus { border-color: var(--primary); }
   color: #fff;
 }
 .profile-name { font-size: 1.5rem; font-weight: 700; }
+/* Header action cluster — Transfer… (KAN-185), later Offboard… (KAN-184).
+   Right-aligned beside the name; wraps under it once the header narrows. */
+.profile-actions {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+.profile-actions .profile-name { flex: 1 1 auto; min-width: 0; }
+.profile-actions .btn { flex: 0 0 auto; }
+@media (max-width: 767px) {
+  .profile-actions .profile-name { flex-basis: 100%; }
+  .profile-actions .btn { flex: 1 1 auto; justify-content: center; }
+}
 .profile-title { opacity: .8; margin-top: 4px; font-size: .9rem; }
 .profile-meta { margin-top: 10px; display: flex; gap: 10px; flex-wrap: wrap; }
 .profile-meta-item {
@@ -1666,24 +1718,31 @@ select.filter-sel:focus { border-color: var(--primary); }
 .bell-item-type  { font-size: .65rem; font-weight: 700; padding: 2px 7px; border-radius: 5px; }
 .bell-item-dates { font-size: .75rem; color: #64748b; margin-bottom: 8px; }
 .bell-item-actions { display: flex; gap: 6px; }
+/* inline-block so the same styling works when Reject is an <a> that hands off
+   to the review dialog for a reason (position changes) rather than a <button>
+   that decides in place (vacation). */
 .bell-approve, .bell-reject {
   padding: 4px 12px; border-radius: 6px; font-size: .72rem; font-weight: 600;
   cursor: pointer; border: 1.5px solid; transition: background .12s; font-family: inherit;
+  display: inline-block; line-height: 1.4;
 }
 .bell-approve { background: #f0fdf4; border-color: #86efac; color: #166534; }
 .bell-approve:hover { background: #dcfce7; }
 .bell-reject  { background: #fef2f2; border-color: #fca5a5; color: #991b1b; }
 .bell-reject:hover { background: #fee2e2; }
 .bell-divider { border: none; border-top: 1px solid #e2e8f0; margin: 4px 0; }
-.bell-notif-item { background: #f0fdf4 !important; }
-.bell-notif-item:hover { background: #dcfce7 !important; }
+/* Neutral, not green (DEF-002). Every notification shared one success-green
+   card, so a rejection and a request still awaiting a decision were both
+   presented as good news. Outcome is carried by the icon alone. */
+.bell-notif-item { background: #f8fafc !important; }
+.bell-notif-item:hover { background: #f1f5f9 !important; }
 .bell-notif-icon { font-size: .9rem; flex-shrink: 0; }
 .bell-notif-link { display: block; margin-top: 4px; }
 [data-theme="dark"] .bell-btn:hover    { background: #1e293b; }
 [data-theme="dark"] .bell-dropdown     { background: #1e293b; border-color: #334155; }
 [data-theme="dark"] .bell-item:hover   { background: #263548; }
-[data-theme="dark"] .bell-notif-item   { background: #052e16 !important; }
-[data-theme="dark"] .bell-notif-item:hover { background: #14532d !important; }
+[data-theme="dark"] .bell-notif-item   { background: #0f1c2e !important; }
+[data-theme="dark"] .bell-notif-item:hover { background: #1c2c42 !important; }
 [data-theme="dark"] .bell-divider      { border-color: #334155; }
 [data-theme="dark"] .bell-item-name  { color: #f1f5f9; }
 [data-theme="dark"] .bell-drop-hdr   { border-color: #334155; }
@@ -1892,3 +1951,72 @@ select.filter-sel:focus { border-color: var(--primary); }
 [data-theme="dark"] .an-card-hdr  { background: #1e293b; color: #f1f5f9; }
 [data-theme="dark"] .an-table th  { background: #0f172a; }
 [data-theme="dark"] .an-table tr:hover td { background: #263548; }
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   SHELL ACCESSIBILITY PRIMITIVES (KAN-204 · EP33 debt)
+
+   Three primitives the whole product shares, so that a new screen's
+   accessibility is a call to something that already exists rather than ten
+   private reimplementations. Documented in TECHNICAL_DOCUMENTATION.md §  —
+   the third (`announce()`) is JS and lives in templates/base.html.
+
+   THESE RULES ARE DELIBERATELY LAST IN THE FILE. Both must beat declarations
+   written above them, and they do it by source order at equal specificity
+   rather than by `!important` or inflated selectors:
+
+     • `:focus-visible` is one class-worth of specificity (0,1,0) — exactly the
+       same as `.search-input`, `select.filter-sel` and `.rows-select`, each of
+       which sets `outline: none`. Moving this rule higher up the file silently
+       returns those three controls to having no visible focus. It is not a
+       formatting preference; it is what makes the rule work.
+     • The two deliberate per-component rings (`.row-menu-btn:focus-visible`,
+       `.row-menu-list > *:focus-visible`) are 0,2,0 and so still win. They are
+       tuned to sit inside a tight menu; leave them alone.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── 1. Focus visibility — WCAG 2.4.7 on the SHELL, not per screen ──────────
+   `:focus-visible` rather than `:focus`, so a mouse click on a button does not
+   leave a ring behind while keyboard traversal always shows one. Applied to
+   everything focusable, including anything a screen gives `tabindex` to.       */
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  /* Rounded to follow the control it traces; harmless on square elements. */
+  border-radius: 3px;
+}
+/* Inputs already carry a focus glow, and an outline 2px outside a full-width
+   field can clip against its container. Tuck it in and keep both cues. */
+.search-input:focus-visible,
+.form-control:focus-visible,
+select.filter-sel:focus-visible,
+.rows-select:focus-visible {
+  outline-offset: 0;
+}
+/* Sidebar and topbar sit on dark navy in BOTH themes, where the light-theme
+   token is too low-contrast to find. Fixed colour on purpose, not a token. */
+.sidebar :focus-visible,
+.sidebar-logo :focus-visible {
+  outline-color: #93c5fd;
+}
+
+/* ── 2. Reduced motion — WCAG 2.3.3, honoured shell-wide ────────────────────
+   Covers all ~57 transitions and every keyframe animation in one place, so no
+   screen has to remember. This matters most for the three INFINITE animations
+   (`pulse`, `anniv-sway`, `anniv-pulse-scale`) — a permanently throbbing badge
+   is the exact trigger this media query exists for — and for the org tree's
+   drag affordance. Motion is removed; colour and outline cues are untouched,
+   so nothing that was communicated by movement alone is lost.
+
+   Near-zero rather than `none`: a 0s duration skips `transitionend` /
+   `animationend` events, and code that waits on one would hang for ever.       */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+  /* The drag-and-drop affordance keeps its dashed outline and tint — those are
+     not motion — but loses the opacity fade while a card is in flight. */
+  .ft-card.ft-dragging { opacity: .45; }
+}

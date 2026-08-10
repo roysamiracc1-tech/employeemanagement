@@ -100,13 +100,52 @@ def _user_email(employee_id):
 # ── In-app user notifications ────────────────────────────────────────────────
 
 def create_user_notification(user_id: str, event_type: str, message: str,
-                              link: str = None) -> None:
-    """Insert one unread in-app notification row for *user_id*."""
+                              link: str = None, related_type: str = None,
+                              related_id: str = None) -> None:
+    """Insert one unread in-app notification row for *user_id*.
+
+    Pass *related_type* / *related_id* whenever the notification is ABOUT
+    something that can later be decided (an approval request, a leave request).
+    That is what lets `resolve_related()` retire it once it is no longer
+    actionable — without the tag it lives in the bell until the user reads it,
+    which for a call to action is the wrong behaviour (DEF-003).
+    """
     execute(
-        "INSERT INTO user_notifications (user_id, event_type, message, link) "
-        "VALUES (%s::uuid, %s, %s, %s)",
-        (user_id, event_type, message, link),
+        "INSERT INTO user_notifications "
+        "(user_id, event_type, message, link, related_type, related_id) "
+        "VALUES (%s::uuid, %s, %s, %s, %s, %s::uuid)",
+        (user_id, event_type, message, link, related_type, related_id),
     )
+
+
+def resolve_related(related_type: str, related_id: str,
+                    event_types: list = None) -> None:
+    """Retire the still-unread notifications about one entity.
+
+    Called when the entity reaches a state where the notification is no longer
+    a live call to action — e.g. a position change is rejected, so every
+    "awaiting your approval" for it is now history and must leave the bell for
+    EVERY approver, not just the one who happened to decide it.
+
+    *event_types* narrows it to the calls to action; pass None to retire all
+    notifications about the entity. Outcome notifications ("… was rejected")
+    are deliberately NOT retired here — the user has not seen them yet.
+    """
+    if not related_type or not related_id:
+        return
+    if event_types:
+        execute(
+            "UPDATE user_notifications SET is_read=TRUE "
+            "WHERE related_type=%s AND related_id=%s::uuid "
+            "  AND event_type = ANY(%s) AND NOT is_read",
+            (related_type, related_id, list(event_types)),
+        )
+    else:
+        execute(
+            "UPDATE user_notifications SET is_read=TRUE "
+            "WHERE related_type=%s AND related_id=%s::uuid AND NOT is_read",
+            (related_type, related_id),
+        )
 
 
 def get_unread_count(user_id: str) -> int:

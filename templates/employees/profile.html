@@ -11,7 +11,22 @@
       <div class="avatar xl" id="profile-avatar">{{ emp.full_name[0] }}</div>
     </div>
     <div class="profile-header-info">
-      <h1 class="profile-name">{{ emp.full_name }}</h1>
+      {# Action cluster — right-aligned beside the name on wide viewports, stacked
+         below it on narrow ones (UX spec §5.1a). KAN-184's Offboard… joins this
+         same cluster; it is not built yet. #}
+      <div class="profile-actions">
+        <h1 class="profile-name">{{ emp.full_name }}</h1>
+        {% if can_transfer %}
+          {# Gated server-side in employees._can_transfer; the API re-checks. #}
+          {# The handler attribute is SINGLE-quoted on purpose: `tojson` escapes
+             `'` to ' but leaves `"` intact, so a name inside a
+             double-quoted attribute would terminate it and break the button. #}
+          <button type="button" class="btn btn-ghost btn-sm" aria-haspopup="dialog"
+                  onclick='openTransferModal({{ emp.id | tojson }}, {{ emp.full_name | tojson }}, {{ (emp.employee_number or "") | tojson }})'>
+            Transfer…
+          </button>
+        {% endif %}
+      </div>
       <div class="profile-title">{{ emp.job_title or '—' }}</div>
       <div class="profile-meta">
         {% if emp.location %}<span class="badge badge-gray">📍 {{ emp.location }}</span>{% endif %}
@@ -316,6 +331,11 @@
   </div>
 </div>
 {% endif %}
+
+{# The one shared Request Position Change dialog — same component, endpoint and
+   engine as the org-tree drag-and-drop (UX spec §6.0). Included only when the
+   Transfer… entry point is actually shown. #}
+{% if can_transfer %}{% include 'org_change/_move_modal.html' %}{% endif %}
 {% endblock %}
 
 {% block scripts %}

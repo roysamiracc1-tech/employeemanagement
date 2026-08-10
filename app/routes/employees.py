@@ -2,7 +2,7 @@ from flask import session, redirect, url_for, request, render_template, flash, j
 
 from app import app
 from app.db import query, execute, insert_returning, to_dict
-from app.auth import login_required, require_roles
+from app.auth import login_required, require_roles, can_access_feature
 from app.helpers import fetch_employees, direct_report_ids, is_direct_report
 from app.services.company_scope import current_company_id
 
@@ -32,12 +32,25 @@ def directory():
         companies = [to_dict(r) for r in query(
             "SELECT id::text, name, logo_url FROM companies WHERE is_active ORDER BY name")]
 
+    # Transfer… row action (KAN-185 / AC-185-01). Rows are rendered client-side,
+    # so the two inputs the per-row rule needs are passed once rather than
+    # queried per employee: whether the viewer may initiate for *anyone* in the
+    # company, and who the viewer is (for the "their own report" case, which the
+    # row's existing `solid_manager_id` already answers).
+    from app.routes.org_change import can_initiate_org_change_for_anyone
+    may_transfer = can_access_feature('org_change', 'w')
+    can_transfer_any = may_transfer and can_initiate_org_change_for_anyone()
+    can_transfer_reports = may_transfer and not can_transfer_any
+
     return render_template('employees/directory.html',
                            departments=departments,
                            locations=locations,
                            active_company_id=co_id or '',
                            companies=companies,
-                           is_sa=is_sa)
+                           is_sa=is_sa,
+                           can_transfer_any=can_transfer_any,
+                           can_transfer_reports=can_transfer_reports,
+                           viewer_employee_id=session.get('employee_id') or '')
 
 
 @app.route('/my-team')
@@ -86,9 +99,37 @@ def profile(emp_id=None):
 
     return render_template('employees/profile.html',
                            emp=emp, team=team, is_own=is_own,
+                           can_transfer=_can_transfer(emp_id, emp, is_own),
                            all_skills=all_skills,
                            prof_levels=prof_levels,
                            all_certs=all_certs)
+
+
+def _can_transfer(emp_id, emp, is_own):
+    """Should this profile show the Transfer… entry point? (UX spec §6.1)
+
+    All four conditions, in the spec's order: `org_change` write access, the
+    org-change initiator rule, an ACTIVE subject, and not your own profile (P3 —
+    an employee can never initiate their own move through any entry point).
+
+    The ACTIVE check is asserted rather than assumed: `fetch_employees` already
+    filters to ACTIVE today, but KAN-184 is about to make non-ACTIVE rows real
+    and this button must not survive that change by accident.
+
+    This is a **display** gate only. `POST /api/org-change/request` re-checks the
+    feature gate, `_can_initiate_for` and the ACTIVE status server-side on every
+    call, so hiding the button is never what enforces any of this.
+    """
+    # Imported here, not at module scope: `app/__init__` imports this module
+    # before `org_change`, and the rule is deliberately borrowed rather than
+    # re-implemented (CLAUDE.md org-change invariant 2).
+    from app.routes.org_change import can_initiate_org_change_for
+    return bool(
+        not is_own
+        and emp.get('employment_status') == 'ACTIVE'
+        and can_access_feature('org_change', 'w')
+        and can_initiate_org_change_for(emp_id)
+    )
 
 
 # ── Employee APIs ─────────────────────────────────────────────────────────────

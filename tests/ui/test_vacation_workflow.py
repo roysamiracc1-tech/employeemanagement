@@ -19,7 +19,7 @@ Journey tested:
 Run:  python3 tests/ui/test_vacation_workflow.py
 """
 
-import sys, datetime, traceback
+import os, sys, datetime, traceback
 from playwright.sync_api import sync_playwright
 
 BASE        = "http://localhost:8000"
@@ -35,6 +35,14 @@ def _next_weekday(base: datetime.date, min_days: int) -> datetime.date:
     while d.weekday() >= 5:   # 5=Sat, 6=Sun
         d += datetime.timedelta(days=1)
     return d
+
+# Notes this suite writes onto the requests it creates. They are the marker
+# `reset_test_employee_leave()` deletes on, so they must stay in sync with the
+# three submit calls below — hence constants rather than inline literals.
+NOTE_FIRST  = 'UI test request – please approve'
+NOTE_SECOND = 'Second request for manager approval'
+NOTE_THIRD  = 'This one will be rejected'
+SUITE_NOTES = [NOTE_FIRST, NOTE_SECOND, NOTE_THIRD]
 
 today       = datetime.date.today()
 _start_date = _next_weekday(today, 14)           # first weekday ≥ 2 weeks out
@@ -93,6 +101,42 @@ def get_request_id(page):
         return None
 
 # ─────────────────────────────────────────────────────────────
+def reset_test_employee_leave():
+    """Remove the requests previous runs of THIS suite left behind.
+
+    Every run submits, approves and rejects real requests for `EMPLOYEE` and
+    never cleaned them up, so each run permanently consumed part of a 25-day
+    annual allowance. After ~12 runs step 12 started failing with
+    `Exceeds annual limit` — the suite could only ever pass a fixed number of
+    times. That is a defect in the suite, not in the product, and the fix is to
+    make the run idempotent rather than to relax the limit check.
+
+    Scoped deliberately narrowly: only this suite's own employee, and only rows
+    carrying one of the three note strings this file submits. Matching on the
+    marker rather than on a date range matters — earlier runs booked dates
+    relative to *their* run date, so a window around today would miss them while
+    they still count against the same annual allowance. Seeded demo leave is
+    never touched.
+    """
+    # Run as a script, sys.path[0] is tests/ui — the repo root is not importable.
+    root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    if root not in sys.path:
+        sys.path.insert(0, root)
+    try:
+        from app import app as flask_app
+        from app.db import execute
+    except Exception as e:                       # pragma: no cover - dev convenience
+        print(f"  ⚠️  Could not reset prior test leave ({e}); continuing.")
+        return
+    with flask_app.app_context():
+        execute("""
+            DELETE FROM vacation_requests
+            WHERE employee_id = (SELECT id FROM employees WHERE email = %s)
+              AND notes = ANY(%s)
+        """, (EMPLOYEE, SUITE_NOTES))
+    print(f"  🧹  Cleared prior runs' leave for {EMPLOYEE}")
+
+
 def run_workflow(playwright):
     browser = playwright.chromium.launch(headless=True)
     ctx     = browser.new_context(viewport={"width": 1280, "height": 800})
@@ -167,7 +211,7 @@ def run_workflow(playwright):
                         vacation_type_id: '{vt_id}',
                         start_date: '{START}',
                         end_date:   '{END}',
-                        notes:      'UI test request – please approve'
+                        notes:      '{NOTE_FIRST}'
                     }})
                 }});
                 return await r.json();
@@ -242,7 +286,7 @@ def run_workflow(playwright):
                         vacation_type_id: '{vt_id}',
                         start_date: '{START}',
                         end_date:   '{END}',
-                        notes:      'Second request for manager approval'
+                        notes:      '{NOTE_SECOND}'
                     }})
                 }});
                 return await r.json();
@@ -612,7 +656,7 @@ def run_workflow(playwright):
                         vacation_type_id: '{vt_id}',
                         start_date: '{reject_start}',
                         end_date:   '{reject_end}',
-                        notes:      'This one will be rejected'
+                        notes:      '{NOTE_THIRD}'
                     }})
                 }});
                 return await r.json();
@@ -728,6 +772,8 @@ if __name__ == "__main__":
     print(f"  Manager  : {MANAGER}")
     print(f"  Target   : {BASE}")
     print(f"{'═'*64}")
+
+    reset_test_employee_leave()
 
     with sync_playwright() as pw:
         try:

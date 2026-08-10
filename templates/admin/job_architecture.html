@@ -1,0 +1,438 @@
+{% extends 'base.html' %}
+{% block title %}Job Architecture — HR Portal{% endblock %}
+{% block page_title %}Job Architecture{% endblock %}
+
+{#
+  KAN-190 — the ladder configurator.
+
+  TWO GATES ON ONE SCREEN, and they are different on purpose (CFL-42-35):
+    • the PAGE is gated on `job_architecture:r` — seeded to every role, because
+      an employee must be able to read their own step and the next one;
+    • the EDITING affordances are gated on `org_structure:w` (`can_configure`),
+      which is HR/Portal admin and deliberately NOT a manager.
+  `job_architecture:w` is roadmap authoring (KAN-207), not ladder editing.
+
+  Hiding a control is never the control — every write endpoint re-checks
+  server-side. But an affordance that appears and then refuses is the
+  DEF-001/2/3 failure mode, so they agree.
+
+  Uses the shell primitives from KAN-204: `announce()` for async changes,
+  `escH()` on every DOM builder, and the global focus ring. No private live
+  region, no local focus styles.
+#}
+
+{% block content %}
+<div class="page">
+
+  {% if not has_company %}
+  {# A SYSTEM_ADMIN with no company context. The ladder is per company, so
+     there is nothing to show — say which thing is missing, not "no data". #}
+  <div class="card" style="max-width:560px;margin:40px auto;padding:32px;text-align:center">
+    <h2 style="font-size:1rem;font-weight:700;margin:0 0 8px">Pick a company first</h2>
+    <p style="font-size:.86rem;color:var(--muted);margin:0;line-height:1.6">
+      A job ladder belongs to one company. Choose a company from the context
+      switcher to see or build its ladder.
+    </p>
+  </div>
+  {% else %}
+
+  {# ── Completeness, as a named figure with its denominator (D7) ───────────── #}
+  <div class="card" style="padding:18px 20px;margin-bottom:16px">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap">
+      <div>
+        <h2 style="font-size:.95rem;font-weight:700;margin:0 0 6px">Your job ladder</h2>
+        <p style="font-size:.82rem;color:var(--muted);margin:0;line-height:1.55">
+          Families, the levels inside them, and what each step expects of somebody.
+          {% if can_configure %}
+          <strong>Saving publishes immediately</strong> — there is no draft.
+          {% endif %}
+        </p>
+      </div>
+      {% if completeness and completeness.steps_total %}
+      <div style="text-align:right;flex-shrink:0">
+        <div style="font-size:1.3rem;font-weight:700;color:var(--text)">
+          {{ completeness.steps_authored }} / {{ completeness.steps_total }}
+        </div>
+        <div style="font-size:.74rem;color:var(--muted)">steps described</div>
+      </div>
+      {% endif %}
+    </div>
+
+    {% if completeness and completeness.levels_incomplete %}
+    {# Named, not hidden. A ladder whose steps are unwritten delivers none of the
+       transparency this is for — and KAN-191's step assessment has the authored
+       expectations as a hard dependency, not a nicety (R-18). #}
+    <div role="note" style="margin-top:14px;background:#fffbeb;border:1px solid #fcd34d;
+                            border-radius:8px;padding:10px 12px">
+      <p style="font-size:.79rem;color:#92400e;margin:0;line-height:1.5">
+        <strong>{{ completeness.levels_incomplete | length }}</strong>
+        level{{ '' if completeness.levels_incomplete | length == 1 else 's' }} still
+        {{ 'has' if completeness.levels_incomplete | length == 1 else 'have' }} steps with
+        no description:
+        {{ completeness.levels_incomplete | join(', ') }}.
+        Managers cannot assess somebody against a step that has not been described.
+      </p>
+    </div>
+    {% endif %}
+  </div>
+
+  {% if can_configure %}
+  <div style="display:flex;gap:8px;margin-bottom:16px">
+    <button class="btn btn-primary btn-sm" onclick="jaOpenFamily()">+ Add family</button>
+  </div>
+  {% endif %}
+
+  {# ── The ladder ──────────────────────────────────────────────────────────── #}
+  <div id="ja-ladder"></div>
+
+  {# Empty state, rendered server-side so it is never a flash of nothing. #}
+  {% if not ladder %}
+  <div class="card" style="max-width:620px;margin:8px auto 40px;padding:36px;text-align:center">
+    <h2 style="font-size:1rem;font-weight:700;margin:0 0 10px">No ladder yet</h2>
+    <p style="font-size:.86rem;color:var(--muted);margin:0 0 6px;line-height:1.6">
+      Nothing has been defined for this company. You start with a
+      <strong>family</strong> — a group of related jobs, like Engineering or
+      Commercial — then add the <strong>levels</strong> inside it.
+    </p>
+    <p style="font-size:.82rem;color:var(--muted);margin:0 0 20px;line-height:1.6">
+      <strong>Decide the order before you build it.</strong> A level's position
+      can't be renumbered once people are on it — a step is written as
+      level.step, so renumbering would change what past records mean.
+    </p>
+    {% if can_configure %}
+    <button class="btn btn-primary btn-sm" onclick="jaOpenFamily()">Add your first family</button>
+    {% else %}
+    <p style="font-size:.8rem;color:var(--muted);margin:0">
+      Your HR or portal administrator can set this up.
+    </p>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% endif %}
+</div>
+
+{# ── Family dialog ───────────────────────────────────────────────────────── #}
+<div id="ja-family-modal" class="modal-overlay open" style="display:none"
+     role="dialog" aria-modal="true" aria-labelledby="ja-family-title">
+  <div class="modal" style="padding:26px;width:460px;max-width:92vw">
+    <h3 id="ja-family-title" style="font-size:.95rem;font-weight:700;margin:0 0 16px">Add a job family</h3>
+    <div class="form-group" style="margin-bottom:12px">
+      <label for="ja-fam-name">Name *</label>
+      <input id="ja-fam-name" class="form-control" placeholder="Engineering">
+    </div>
+    <div class="form-group" style="margin-bottom:12px">
+      <label for="ja-fam-code">Short code *</label>
+      <input id="ja-fam-code" class="form-control" placeholder="ENG" maxlength="50"
+             aria-describedby="ja-fam-code-help">
+      <div id="ja-fam-code-help" style="font-size:.74rem;color:var(--muted);margin-top:4px">
+        Used in exports and CSV. It can't be changed later.
+      </div>
+    </div>
+    <div class="form-group" style="margin-bottom:4px">
+      <label for="ja-fam-desc">Description</label>
+      <textarea id="ja-fam-desc" class="form-control" rows="2" style="resize:vertical"></textarea>
+    </div>
+    <div id="ja-fam-error" role="alert" style="display:none;color:#b91c1c;font-size:.78rem;
+         background:#fef2f2;padding:8px 12px;border-radius:6px;margin-top:12px"></div>
+    <div style="display:flex;gap:8px;margin-top:18px;justify-content:flex-end">
+      <button class="btn btn-ghost btn-sm" onclick="jaClose('ja-family-modal')">Cancel</button>
+      <button class="btn btn-primary btn-sm" id="ja-fam-save" onclick="jaSaveFamily()">Save</button>
+    </div>
+  </div>
+</div>
+
+{# ── Level dialog ────────────────────────────────────────────────────────── #}
+<div id="ja-level-modal" class="modal-overlay open" style="display:none"
+     role="dialog" aria-modal="true" aria-labelledby="ja-level-title">
+  <div class="modal" style="padding:26px;width:520px;max-width:92vw">
+    <h3 id="ja-level-title" style="font-size:.95rem;font-weight:700;margin:0 0 4px">Add a level</h3>
+    <p id="ja-level-sub" style="font-size:.78rem;color:var(--muted);margin:0 0 16px"></p>
+    <div style="display:flex;gap:10px;margin-bottom:12px">
+      <div class="form-group" style="margin:0;width:90px">
+        <label for="ja-lvl-ordinal">Position *</label>
+        <input id="ja-lvl-ordinal" class="form-control" type="number" min="1" max="{{ max_ordinal }}">
+      </div>
+      <div class="form-group" style="margin:0;flex:1">
+        <label for="ja-lvl-title">Title *</label>
+        <input id="ja-lvl-title" class="form-control" placeholder="Junior Software Fullstack Engineer">
+      </div>
+    </div>
+    <div class="form-group" style="margin-bottom:12px">
+      <label for="ja-lvl-steps">Steps above entry *</label>
+      <input id="ja-lvl-steps" class="form-control" type="number"
+             min="{{ min_step_count }}" max="{{ max_step_count }}"
+             aria-describedby="ja-lvl-steps-help">
+      {# NO DEFAULT VALUE, deliberately. Trainee→Junior and Junior→Mid are
+         genuinely different distances, so the form must ask. A pre-filled 5
+         would record a decision nobody made. #}
+      <div id="ja-lvl-steps-help" style="font-size:.74rem;color:var(--muted);margin-top:4px">
+        Counts increments <strong>above</strong> entry, so
+        <strong>5</strong> gives you six steps — <code>.0</code> to <code>.5</code>.
+        There's no default on purpose: levels sit genuinely different distances apart.
+        <span id="ja-lvl-steps-preview" style="display:block;margin-top:4px;color:var(--text)"></span>
+      </div>
+    </div>
+    <div class="form-group" style="margin-bottom:4px">
+      <label for="ja-lvl-short">Short code</label>
+      <input id="ja-lvl-short" class="form-control" placeholder="L2" maxlength="20">
+    </div>
+    <div id="ja-lvl-error" role="alert" style="display:none;color:#b91c1c;font-size:.78rem;
+         background:#fef2f2;padding:8px 12px;border-radius:6px;margin-top:12px"></div>
+    <div style="display:flex;gap:8px;margin-top:18px;justify-content:flex-end">
+      <button class="btn btn-ghost btn-sm" onclick="jaClose('ja-level-modal')">Cancel</button>
+      <button class="btn btn-primary btn-sm" id="ja-lvl-save" onclick="jaSaveLevel()">Save</button>
+    </div>
+  </div>
+</div>
+
+{# ── Step expectations dialog ────────────────────────────────────────────── #}
+<div id="ja-step-modal" class="modal-overlay open" style="display:none"
+     role="dialog" aria-modal="true" aria-labelledby="ja-step-title">
+  <div class="modal" style="padding:26px;width:600px;max-width:94vw">
+    <h3 id="ja-step-title" style="font-size:.95rem;font-weight:700;margin:0 0 4px">Step expectations</h3>
+    <p id="ja-step-sub" style="font-size:.78rem;color:var(--muted);margin:0 0 16px"></p>
+    <div class="form-group" style="margin-bottom:12px">
+      <label for="ja-step-summary">One-line summary *</label>
+      <input id="ja-step-summary" class="form-control" maxlength="200"
+             placeholder="Delivers well-scoped features with review">
+    </div>
+    <div class="form-group" style="margin-bottom:12px">
+      <label for="ja-step-desc">Responsibilities and expectations *</label>
+      <textarea id="ja-step-desc" class="form-control" rows="8" style="resize:vertical"
+                aria-describedby="ja-step-desc-help"
+                placeholder="What somebody at this step is expected to do…"></textarea>
+      <div id="ja-step-desc-help" style="font-size:.74rem;color:var(--muted);margin-top:4px">
+        Every employee can read this — it's the point of it. Paste from a
+        document if the content was written elsewhere.
+      </div>
+    </div>
+    <div class="form-group" style="margin-bottom:4px">
+      <label for="ja-step-drafted">Drafted by</label>
+      <input id="ja-step-drafted" class="form-control" placeholder="e.g. Priya Raman, Head of Engineering"
+             aria-describedby="ja-step-drafted-help">
+      <div id="ja-step-drafted-help" style="font-size:.74rem;color:var(--muted);margin-top:4px">
+        Who wrote the content, if that isn't you — most companies have engineering
+        managers write it and HR transcribe it.
+      </div>
+    </div>
+    <div id="ja-step-error" role="alert" style="display:none;color:#b91c1c;font-size:.78rem;
+         background:#fef2f2;padding:8px 12px;border-radius:6px;margin-top:12px"></div>
+    <div style="display:flex;gap:8px;margin-top:18px;justify-content:flex-end">
+      <button class="btn btn-ghost btn-sm" onclick="jaClose('ja-step-modal')">Cancel</button>
+      <button class="btn btn-primary btn-sm" id="ja-step-save" onclick="jaSaveStep()">Save &amp; publish</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const JA_CAN_CONFIGURE = {{ can_configure | tojson }};
+let JA_LADDER = {{ ladder | tojson }};
+let jaFamilyId = null, jaLevelId = null, jaStepNo = null, jaOpener = null;
+
+function jaEl(id) { return document.getElementById(id); }
+
+// ── Dialog plumbing (KAN-204: focus is returned, Esc closes) ─────────────────
+function jaOpen(id) {
+  jaOpener = document.activeElement;
+  jaEl(id).style.display = 'flex';
+  document.addEventListener('keydown', jaKeydown);
+  const first = jaEl(id).querySelector('input, textarea');
+  if (first) first.focus();
+}
+function jaClose(id) {
+  jaEl(id).style.display = 'none';
+  document.removeEventListener('keydown', jaKeydown);
+  if (jaOpener && jaOpener.focus) jaOpener.focus();
+  jaOpener = null;
+}
+function jaKeydown(e) {
+  if (e.key !== 'Escape') return;
+  ['ja-family-modal', 'ja-level-modal', 'ja-step-modal'].forEach(id => {
+    if (jaEl(id).style.display === 'flex') jaClose(id);
+  });
+}
+function jaErr(box, msg) {
+  const e = jaEl(box);
+  e.textContent = msg; e.style.display = '';
+  announce(msg, 'assertive');            // shell primitive, not a private region
+}
+function jaClearErr(box) { const e = jaEl(box); e.style.display = 'none'; e.textContent = ''; }
+
+// ── Render ──────────────────────────────────────────────────────────────────
+function jaRender() {
+  const host = jaEl('ja-ladder');
+  if (!JA_LADDER.length) { host.innerHTML = ''; return; }
+  host.innerHTML = JA_LADDER.map(f => `
+    <div class="card" style="padding:0;margin-bottom:16px;overflow:hidden">
+      <div style="padding:14px 18px;background:var(--table-head);display:flex;
+                  align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <div>
+          <span style="font-weight:700;font-size:.9rem">${escH(f.name)}</span>
+          <span class="badge badge-outline" style="margin-left:8px">${escH(f.code)}</span>
+          <span style="font-size:.76rem;color:var(--muted);margin-left:8px">
+            ${f.levels.length} level${f.levels.length === 1 ? '' : 's'}
+          </span>
+        </div>
+        ${JA_CAN_CONFIGURE ? `<button class="btn btn-ghost btn-sm"
+            onclick="jaOpenLevel('${escH(f.id)}','${escH(f.name)}')">+ Add level</button>` : ''}
+      </div>
+      ${f.levels.length ? `<table class="table" style="margin:0">
+        <thead><tr>
+          <th style="width:70px">Level</th><th>Title</th>
+          <th style="width:130px">Steps</th><th style="width:110px">Described</th>
+          <th style="width:90px">People</th>
+          ${JA_CAN_CONFIGURE ? '<th><span class="sr-only">Actions</span></th>' : ''}
+        </tr></thead>
+        <tbody>${f.levels.map(l => jaLevelRow(l)).join('')}</tbody>
+      </table>` : `<div style="padding:20px 18px;font-size:.82rem;color:var(--muted)">
+        No levels in this family yet.
+      </div>`}
+    </div>`).join('');
+}
+
+function jaLevelRow(l) {
+  // "Described" is authored/total, never a bare percentage: a bare 80% hides
+  // which steps are missing, and the missing ones are the actionable part.
+  const done = l.authored_steps >= l.step_total;
+  return `<tr>
+    <td><strong>${l.ordinal}</strong>${l.short_code ? ` <span style="color:var(--muted)">${escH(l.short_code)}</span>` : ''}</td>
+    <td>${escH(l.title)}</td>
+    <td><span style="font-family:ui-monospace,monospace;font-size:.8rem">${l.ordinal}.0 – ${escH(l.top_step_label)}</span>
+        <span style="color:var(--muted);font-size:.74rem"> (${l.step_total})</span></td>
+    <td>${done
+          ? `<span style="color:#047857;font-weight:600">${l.authored_steps}/${l.step_total} ✓</span>`
+          : `<span style="color:#b45309;font-weight:600">${l.authored_steps}/${l.step_total}</span>`}</td>
+    <td>${l.headcount || '—'}</td>
+    ${JA_CAN_CONFIGURE ? `<td class="row-actions">
+      <button class="btn btn-ghost btn-sm" onclick="jaOpenSteps('${escH(l.id)}')">Describe steps</button>
+    </td>` : ''}
+  </tr>`;
+}
+
+// ── Family ──────────────────────────────────────────────────────────────────
+function jaOpenFamily() {
+  jaClearErr('ja-fam-error');
+  ['ja-fam-name', 'ja-fam-code', 'ja-fam-desc'].forEach(i => jaEl(i).value = '');
+  jaOpen('ja-family-modal');
+}
+async function jaSaveFamily() {
+  jaClearErr('ja-fam-error');
+  const body = { name: jaEl('ja-fam-name').value.trim(),
+                 code: jaEl('ja-fam-code').value.trim(),
+                 description: jaEl('ja-fam-desc').value.trim() };
+  if (!body.name || !body.code) {
+    jaErr('ja-fam-error', 'A family needs both a name and a short code.'); return;
+  }
+  await jaPost('/api/job-architecture/families', body, 'ja-fam-error', 'ja-family-modal',
+               `Family ${body.name} added.`);
+}
+
+// ── Level ───────────────────────────────────────────────────────────────────
+function jaOpenLevel(familyId, familyName) {
+  jaFamilyId = familyId;
+  jaClearErr('ja-lvl-error');
+  ['ja-lvl-ordinal', 'ja-lvl-title', 'ja-lvl-steps', 'ja-lvl-short']
+    .forEach(i => jaEl(i).value = '');
+  jaEl('ja-lvl-steps-preview').textContent = '';
+  jaEl('ja-level-sub').textContent = `In ${familyName}. The position can't be changed once people are on it.`;
+  jaOpen('ja-level-modal');
+}
+// Live preview of what the number MEANS, because the off-by-one is the whole
+// risk: typing 5 must visibly produce six steps before it is saved.
+jaEl('ja-lvl-steps').addEventListener('input', function () {
+  const n = parseInt(this.value, 10);
+  const ord = parseInt(jaEl('ja-lvl-ordinal').value, 10) || 1;
+  jaEl('ja-lvl-steps-preview').textContent =
+    (Number.isInteger(n) && n >= 1)
+      ? `That gives ${n + 1} steps: ${ord}.0 to ${ord}.${n}.`
+      : '';
+});
+async function jaSaveLevel() {
+  jaClearErr('ja-lvl-error');
+  const steps = jaEl('ja-lvl-steps').value;
+  if (steps === '') {
+    jaErr('ja-lvl-error', 'Say how many steps this level has above entry — there is no default.');
+    jaEl('ja-lvl-steps').focus(); return;
+  }
+  const body = { job_family_id: jaFamilyId,
+                 ordinal: jaEl('ja-lvl-ordinal').value,
+                 title: jaEl('ja-lvl-title').value.trim(),
+                 step_count: steps,
+                 short_code: jaEl('ja-lvl-short').value.trim() };
+  if (!body.ordinal || !body.title) {
+    jaErr('ja-lvl-error', 'A level needs a position and a title.'); return;
+  }
+  await jaPost('/api/job-architecture/levels', body, 'ja-lvl-error', 'ja-level-modal',
+               `Level ${body.ordinal} ${body.title} added.`);
+}
+
+// ── Steps ───────────────────────────────────────────────────────────────────
+async function jaOpenSteps(levelId) {
+  jaLevelId = levelId;
+  const res = await fetch(`/api/job-architecture/levels/${encodeURIComponent(levelId)}/steps`);
+  const data = await res.json();
+  if (!res.ok) { announce(data.error || 'Could not load the steps.', 'assertive'); return; }
+  // One step at a time, starting at the first UNDESCRIBED one — that is the work.
+  const next = data.steps.find(s => !s.authored) || data.steps[0];
+  jaShowStep(data.level, next);
+}
+function jaShowStep(level, step) {
+  jaStepNo = step.step_no;
+  jaClearErr('ja-step-error');
+  jaEl('ja-step-title').textContent = `Step ${step.label} — ${level.title}`;
+  jaEl('ja-step-sub').textContent = step.is_entry
+    ? 'Entry step. What is expected of somebody who has just reached this level.'
+    : `Increment ${step.step_no} of ${level.step_count} above entry.`;
+  jaEl('ja-step-summary').value = step.authored ? step.summary : '';
+  jaEl('ja-step-desc').value = step.description || '';
+  jaEl('ja-step-drafted').value = step.drafted_by || '';
+  jaOpen('ja-step-modal');
+}
+async function jaSaveStep() {
+  jaClearErr('ja-step-error');
+  const body = { summary: jaEl('ja-step-summary').value.trim(),
+                 description: jaEl('ja-step-desc').value.trim(),
+                 drafted_by: jaEl('ja-step-drafted').value.trim() };
+  if (!body.summary || !body.description) {
+    jaErr('ja-step-error', 'A step needs both a one-line summary and the expectations behind it.');
+    return;
+  }
+  await jaPut(`/api/job-architecture/levels/${encodeURIComponent(jaLevelId)}/steps/${jaStepNo}`,
+              body, 'ja-step-error', 'ja-step-modal', 'Step expectations published.');
+}
+
+// ── Transport ───────────────────────────────────────────────────────────────
+async function jaSend(method, url, body, errBox, modalId, okMsg) {
+  let res, data;
+  try {
+    res = await fetch(url, { method,
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    data = await res.json();
+  } catch (_) {
+    jaErr(errBox, "That didn't save. Nothing has been changed — try again."); return;
+  }
+  if (!res.ok) { jaErr(errBox, data.error || "That didn't save."); return; }
+  jaClose(modalId);
+  announce(okMsg);                       // polite: a save is not an interruption
+  await jaReload();
+}
+const jaPost = (u, b, e, m, ok) => jaSend('POST', u, b, e, m, ok);
+const jaPut  = (u, b, e, m, ok) => jaSend('PUT',  u, b, e, m, ok);
+
+async function jaReload() {
+  const res = await fetch('/api/job-architecture/ladder');
+  if (!res.ok) return;
+  const data = await res.json();
+  JA_LADDER = data.families || [];
+  jaRender();
+  // A full reload keeps the completeness banner honest rather than letting it
+  // drift from the table beside it.
+  if (JA_LADDER.length) location.reload();
+}
+
+jaRender();
+</script>
+{% endblock %}

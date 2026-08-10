@@ -112,16 +112,16 @@ function buildPendingRow(r) {
   return `<tr id="pr-${r.id}">
     <td>
       <div style="display:flex;align-items:center;gap:8px">
-        <div class="avatar" style="background:${avatarColor(r.employee_name)};font-size:.65rem;width:28px;height:28px">${initials(r.employee_name)}</div>
+        <div class="avatar" style="background:${avatarColor(r.employee_name)};font-size:.65rem;width:28px;height:28px">${escH(initials(r.employee_name))}</div>
         <div>
-          <a href="/profile/${r.employee_id}" style="font-size:.82rem;font-weight:600;color:#0f172a;text-decoration:none">${r.employee_name}</a>
-          <div style="font-size:.68rem;color:#64748b">${r.job_title||''}${r.location?' · '+r.location:''}</div>
+          <a href="/profile/${encodeURIComponent(r.employee_id)}" style="font-size:.82rem;font-weight:600;color:#0f172a;text-decoration:none">${escH(r.employee_name)}</a>
+          <div style="font-size:.68rem;color:#64748b">${escH(r.job_title||'')}${r.location?' · '+escH(r.location):''}</div>
         </div>
       </div>
     </td>
     <td>
       <span style="display:inline-flex;align-items:center;gap:4px;font-size:.78rem">
-        <span style="width:8px;height:8px;border-radius:50%;background:${r.color}"></span>${r.type_name}
+        <span style="width:8px;height:8px;border-radius:50%;background:${r.color}"></span>${escH(r.type_name)}
       </span>
       <div style="font-size:.68rem;margin-top:3px;${bp && bp.over ? 'color:#b91c1c;font-weight:600' : 'color:#64748b'}">
         ${bp ? `${bp.remainingNow}/${bp.max} left${bp.over ? ' ⚠ over limit' : ''}` : 'no limit'}
@@ -130,7 +130,7 @@ function buildPendingRow(r) {
     <td style="font-size:.8rem;white-space:nowrap">${fmtShort(r.start_date)}</td>
     <td style="font-size:.8rem;white-space:nowrap">${fmtShort(r.end_date)}</td>
     <td style="font-weight:600;text-align:center">${r.working_days}</td>
-    <td style="font-size:.75rem;color:#64748b;max-width:160px">${r.notes||'—'}</td>
+    <td style="font-size:.75rem;color:#64748b;max-width:160px">${escH(r.notes||'—')}</td>
     <td style="font-size:.72rem;color:#94a3b8;white-space:nowrap">${fmt(r.created_at)}</td>
     <td>
       <div style="display:flex;gap:5px">
@@ -170,14 +170,14 @@ function openReview(id, action) {
   const b = balanceParts(r);
   if (!b) {
     bal.style.background='#f8fafc'; bal.style.borderColor='#e2e8f0'; bal.style.color='#475569';
-    bal.innerHTML = `<strong>${r.type_name}</strong> · No annual limit`;
+    bal.innerHTML = `<strong>${escH(r.type_name)}</strong> · No annual limit`;
   } else if (b.over) {
     bal.style.background='#fef2f2'; bal.style.borderColor='#fecaca'; bal.style.color='#b91c1c';
-    bal.innerHTML = `<strong>${r.employee_name}</strong> has <strong>${b.remainingNow}</strong> of ${b.max} ${r.type_name} days left.`
+    bal.innerHTML = `<strong>${escH(r.employee_name)}</strong> has <strong>${b.remainingNow}</strong> of ${b.max} ${escH(r.type_name)} days left.`
       + `<br>⚠ Approving this ${r.working_days}-day request exceeds the annual limit (${b.remainingAfter} would remain).`;
   } else {
     bal.style.background='#f0fdf4'; bal.style.borderColor='#bbf7d0'; bal.style.color='#166534';
-    bal.innerHTML = `<strong>${r.employee_name}</strong> has <strong>${b.remainingNow}</strong> of ${b.max} ${r.type_name} days left.`
+    bal.innerHTML = `<strong>${escH(r.employee_name)}</strong> has <strong>${b.remainingNow}</strong> of ${b.max} ${escH(r.type_name)} days left.`
       + `<br>Approving this ${r.working_days}-day request leaves <strong>${b.remainingAfter}</strong> day${b.remainingAfter!==1?'s':''}.`;
   }
   bal.style.display = '';
@@ -209,15 +209,15 @@ function buildUpcomingCard(r) {
   const start = new Date(r.start_date);
   const isActive = start <= today && new Date(r.end_date) >= today;
   return `<div style="display:flex;align-items:center;gap:12px;padding:12px 16px;background:#fff;border:1.5px solid #e2e8f0;border-radius:10px;border-left:4px solid ${r.color}">
-    <div class="avatar" style="background:${avatarColor(r.employee_name)};font-size:.65rem;width:32px;height:32px;flex-shrink:0">${initials(r.employee_name)}</div>
+    <div class="avatar" style="background:${avatarColor(r.employee_name)};font-size:.65rem;width:32px;height:32px;flex-shrink:0">${escH(initials(r.employee_name))}</div>
     <div style="flex:1;min-width:0">
-      <div style="font-size:.83rem;font-weight:700"><a href="/profile/${r.employee_id}" style="text-decoration:none;color:#0f172a">${r.employee_name}</a></div>
-      <div style="font-size:.72rem;color:#64748b">${r.job_title||''}</div>
+      <div style="font-size:.83rem;font-weight:700"><a href="/profile/${encodeURIComponent(r.employee_id)}" style="text-decoration:none;color:#0f172a">${escH(r.employee_name)}</a></div>
+      <div style="font-size:.72rem;color:#64748b">${escH(r.job_title||'')}</div>
     </div>
     <div style="text-align:center;min-width:90px">
       <div style="font-size:.72rem;color:#64748b;margin-bottom:2px">${fmtShort(r.start_date)} → ${fmtShort(r.end_date)}</div>
       <span style="display:inline-flex;align-items:center;gap:4px;font-size:.72rem;padding:2px 8px;border-radius:4px;background:${r.color}18;color:${r.color}">
-        <span style="width:7px;height:7px;border-radius:50%;background:${r.color}"></span>${r.type_name}
+        <span style="width:7px;height:7px;border-radius:50%;background:${r.color}"></span>${escH(r.type_name)}
       </span>
     </div>
     <div style="text-align:right;min-width:60px">

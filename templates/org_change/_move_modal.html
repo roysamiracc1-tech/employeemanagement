@@ -1,0 +1,448 @@
+{# ──────────────────────────────────────────────────────────────────────────────
+   Shared "Request Position Change" dialog (KAN-185, EP38 UX spec §6).
+
+   ONE dialog, ONE endpoint, TWO openers:
+     • openMoveModal(subjectId, subjectName, targetId, targetName) — org-tree drag-and-drop
+     • openTransferModal(subjectId, subjectName)                   — the Transfer… entry point
+
+   Deliberately NOT a second system: same title, same `/api/org-change/request`,
+   same inbox, same sequential engine (UX spec §6.0). The word "Transfer" appears
+   only on the entry point.
+
+   Include this inside {% block content %} on any page that needs the dialog, and
+   only when the viewer has org_change write access.
+
+   NOTE — the "Effective from" field of UX spec §6.2 is NOT implemented here.
+   `org_change_requests` has no column to carry an effective date and
+   `org_change_service.create_request()` has no parameter for one, so shipping the
+   input would silently discard what the user typed. Blocked pending the
+   Architect's schema call (see AC-185-07 / CFL-4).
+─────────────────────────────────────────────────────────────────────────────── #}
+<div id="move-modal" role="dialog" aria-modal="true" aria-labelledby="mv-title"
+     style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.45);align-items:center;justify-content:center"
+     onclick="if(event.target===this)closeMoveModal()">
+  <div class="modal-box" style="width:480px;max-width:calc(100vw - 24px)" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title" id="mv-title" tabindex="-1">Request Position Change</div>
+        <div class="modal-sub" id="mv-sub"></div>
+      </div>
+      <button class="modal-close" onclick="closeMoveModal()" aria-label="Close">×</button>
+    </div>
+
+    <!-- ── Blocking conflict (E10 pending request · E11 subject offboarded) ─── -->
+    <div class="modal-body" id="mv-conflict" style="display:none">
+      <div id="mv-conflict-msg" role="alert"
+           style="font-size:.82rem;color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:10px 12px"></div>
+    </div>
+
+    <!-- ── Success (S1 — replaces the old alert(), UX spec §6.3) ───────────── -->
+    <div class="modal-body" id="mv-success" style="display:none">
+      <div style="font-size:.85rem;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px 14px">
+        <div style="font-weight:700;color:#15803d;margin-bottom:4px">✓ Position change submitted for approval.</div>
+        <div id="mv-success-detail" style="color:#334155;font-size:.8rem"></div>
+        <div style="color:#64748b;font-size:.78rem;margin-top:4px">You can follow it in Position Changes.</div>
+      </div>
+    </div>
+
+    <!-- ── The form ─────────────────────────────────────────────────────────── -->
+    <div class="modal-body" id="mv-form" style="display:flex;flex-direction:column;gap:12px">
+
+      <div style="font-size:.78rem;color:#64748b;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px">
+        This change is <strong>not applied immediately</strong> — it is submitted for approval.
+        <div id="mv-chain" role="status" style="margin-top:4px"></div>
+      </div>
+
+      <!-- "Currently:" (transfer opener only — UX spec §6.2) -->
+      <dl id="mv-current" style="display:none;margin:0;font-size:.78rem;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px">
+        <dt style="font-weight:700;color:#334155;display:inline">Currently:</dt>
+        <dd id="mv-current-val" style="display:inline;margin:0;color:#64748b"></dd>
+      </dl>
+
+      <div id="mv-reports" style="display:none;font-size:.76rem;color:#64748b"></div>
+
+      <div class="form-group" style="margin:0">
+        <label for="mv-manager">New reporting manager</label>
+        <select id="mv-manager" class="form-control"></select>
+        <div id="mv-manager-help" style="display:none;font-size:.72rem;color:#94a3b8;margin-top:3px"></div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="form-group" style="margin:0">
+          <label for="mv-bu">Business unit</label>
+          <select id="mv-bu" class="form-control" onchange="mvFilterFU()"></select>
+          <div id="mv-bu-help" style="display:none;font-size:.72rem;color:#94a3b8;margin-top:3px"></div>
+        </div>
+        <div class="form-group" style="margin:0">
+          <label for="mv-fu">Functional unit</label>
+          <select id="mv-fu" class="form-control"></select>
+        </div>
+      </div>
+
+      <div class="form-group" style="margin:0">
+        <label for="mv-loc">Location</label>
+        <select id="mv-loc" class="form-control"></select>
+      </div>
+
+      <!-- AC-185-07 (KAN-189) — the effective date. Deliberately absent until
+           now: there was no column to carry it, and rendering a field whose
+           value is silently discarded is worse than not offering it. -->
+      <div class="form-group" style="margin:0">
+        <label for="mv-effective">Takes effect on *</label>
+        <input type="date" id="mv-effective" class="form-control"
+               aria-describedby="mv-effective-help mv-error">
+        <div id="mv-effective-help" style="font-size:.75rem;color:#64748b;margin-top:4px">
+          The day the new position starts. Today by default;
+          <span id="mv-effective-back"></span>
+        </div>
+      </div>
+
+      <div class="form-group" style="margin:0">
+        <label for="mv-reason">Reason *</label>
+        <textarea id="mv-reason" class="form-control" rows="2" aria-describedby="mv-error"
+                  placeholder="Why is this move needed?" style="resize:vertical"></textarea>
+      </div>
+
+      <div id="mv-error" role="alert"
+           style="display:none;color:#b91c1c;font-size:.78rem;background:#fef2f2;padding:8px 12px;border-radius:6px"></div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-ghost btn-sm" id="mv-cancel" onclick="closeMoveModal()">Cancel</button>
+      <a class="btn btn-ghost btn-sm" id="mv-view-link" href="/org-change" style="display:none">View in Position Changes</a>
+      <button class="btn btn-primary btn-sm" id="mv-submit" onclick="submitMove()">Submit for Approval</button>
+    </div>
+  </div>
+</div>
+
+<!-- This dialog used to carry its own pair of live regions here. They were the
+     first ones in the product and became the shell's (KAN-204): they now live in
+     templates/base.html and are reached through `announce()`. Do not add them
+     back — this file is included on three pages, so a private pair would be
+     three competing copies on any page that includes it twice. -->
+
+<script>
+// ── Request Position Change dialog — shared by drag-and-drop and Transfer… ────
+let mvSubjectId = null, mvSubjectName = '', mvFUAll = [], mvMode = 'drag',
+    mvOpener = null, mvChainData = [];
+
+function mvEl(id) { return document.getElementById(id); }
+function mvOpt(v, l, sel, dis) {
+  return `<option value="${escH(v)}"${sel ? ' selected' : ''}${dis ? ' disabled' : ''}>${escH(l)}</option>`;
+}
+// Status and errors both go through the shell's `announce()` (base.html) rather
+// than this dialog's own live regions. `mvSay`/`mvErr` are kept as the dialog's
+// vocabulary — they also show the error visually, which announcing does not.
+function mvSay(msg)   { announce(msg || '', 'polite'); }
+function mvClearErr()  { const e = mvEl('mv-error'); e.style.display = 'none'; e.textContent = ''; announce('', 'assertive'); }
+function mvErr(msg)    {
+  const e = mvEl('mv-error');
+  e.textContent = msg; e.style.display = '';
+  // Assertive: every caller is a validation failure or a failed submit, which
+  // is the case that must interrupt rather than queue behind other speech.
+  announce(msg, 'assertive');
+}
+
+// ── Panels ────────────────────────────────────────────────────────────────────
+function mvPanel(which) {                       // 'form' | 'success' | 'conflict'
+  mvEl('mv-form').style.display     = which === 'form'     ? 'flex' : 'none';
+  mvEl('mv-success').style.display  = which === 'success'  ? ''     : 'none';
+  mvEl('mv-conflict').style.display = which === 'conflict' ? ''     : 'none';
+  mvEl('mv-submit').style.display   = which === 'form'     ? ''     : 'none';
+  mvEl('mv-view-link').style.display = which === 'success' ? ''     : 'none';
+  mvEl('mv-cancel').textContent      = which === 'form'    ? 'Cancel' : (which === 'success' ? 'Done' : 'Close');
+}
+
+// ── L1 loading ────────────────────────────────────────────────────────────────
+function mvLoading(on) {
+  ['mv-manager', 'mv-bu', 'mv-fu', 'mv-loc'].forEach(id => {
+    const s = mvEl(id);
+    if (on) { s.innerHTML = mvOpt('', 'Loading…', true, true); s.disabled = true; }
+  });
+  mvEl('mv-submit').disabled = on;
+}
+
+// ── Approval-chain sentence (PD2: never blank) ────────────────────────────────
+function mvChainText(chain) {
+  const names = (chain || []).map(c => c.label).filter(Boolean);
+  if (!names.length) return 'It needs 1 approval: HR Admin.';
+  if (names.length === 1) return `It needs 1 approval: ${names[0]}.`;
+  const list = names.slice(0, -1).join(', ') + ', then ' + names[names.length - 1];
+  return `It needs ${names.length} approvals: ${list}. Nothing changes until the last one approves.`;
+}
+
+function mvCurrentText(n) {
+  return [n.manager || 'No manager', n.business_unit, n.functional_unit, n.location]
+         .filter(Boolean).join(' · ');
+}
+
+// ── Focus management (UX spec §6.5) ───────────────────────────────────────────
+function mvKeydown(e) {
+  if (e.key === 'Escape') { e.preventDefault(); closeMoveModal(); return; }
+  if (e.key !== 'Tab') return;
+  const box = mvEl('move-modal').querySelector('.modal-box');
+  const f = [...box.querySelectorAll('button,select,textarea,input,a[href]')]
+              .filter(el => !el.disabled && el.offsetParent !== null);
+  if (!f.length) return;
+  const first = f[0], last = f[f.length - 1];
+  if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+}
+
+// ── Openers ───────────────────────────────────────────────────────────────────
+function openMoveModal(subjectId, subjectName, targetId, targetName) {
+  return mvOpen('drag', subjectId, subjectName, `Move ${subjectName} → under ${targetName}`, targetId);
+}
+
+function openTransferModal(subjectId, subjectName, employeeNumber) {
+  const sub = 'Transfer · ' + subjectName + (employeeNumber ? ' · ' + employeeNumber : '');
+  return mvOpen('transfer', subjectId, subjectName, sub, null);
+}
+
+async function mvOpen(mode, subjectId, subjectName, subtitle, targetId) {
+  mvMode = mode; mvSubjectId = subjectId; mvSubjectName = subjectName || 'this employee';
+  mvOpener = document.activeElement;
+
+  mvClearErr();
+  mvPanel('form');
+  mvEl('mv-reason').value = '';
+  mvEl('mv-sub').textContent = subtitle;
+  mvEl('mv-chain').textContent = '';
+  mvEl('mv-current').style.display = 'none';
+  mvEl('mv-reports').style.display = 'none';
+  mvEl('mv-manager-help').style.display = 'none';
+  mvEl('mv-bu-help').style.display = 'none';
+  mvLoading(true);
+
+  mvEl('move-modal').style.display = 'flex';
+  document.addEventListener('keydown', mvKeydown);
+  mvEl('mv-title').focus();
+  mvSay(`Loading ${mvSubjectName}'s current position…`);
+
+  let data;
+  try {
+    let url = '/api/org-change/prefill?subject=' + encodeURIComponent(subjectId);
+    if (targetId) url += '&target=' + encodeURIComponent(targetId);
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    data = await res.json();
+  } catch (_) {
+    // E3 — prefill failed
+    mvLoading(false);
+    mvFill({});
+    mvErr(`We couldn't load ${mvSubjectName}'s current position. Close this and try again.`);
+    mvEl('mv-submit').disabled = true;
+    return;
+  }
+
+  const subject = data.subject || {};
+  if (subject.name) mvSubjectName = subject.name;
+
+  // E11 — subject is no longer an active employee
+  if (subject.employment_status && subject.employment_status !== 'ACTIVE') {
+    mvEl('mv-conflict-msg').innerHTML =
+      `${escH(mvSubjectName)} has left the company. You can't transfer a former employee.`;
+    mvPanel('conflict');
+    mvSay('This employee has left the company.');
+    return;
+  }
+
+  // E10 — a pending request already exists (AC-185-08)
+  if (data.pending_request_id) {
+    mvEl('mv-conflict-msg').innerHTML =
+      `${escH(mvSubjectName)} already has a position change waiting for approval. That one has to be ` +
+      `decided or cancelled first. <a href="/org-change" style="color:#b91c1c;font-weight:600">View it</a>`;
+    mvPanel('conflict');
+    mvSay('This employee already has a position change waiting for approval.');
+    return;
+  }
+
+  mvChainData = data.approval_chain || [];
+  mvEl('mv-chain').textContent = mvChainText(mvChainData);
+
+  if (mvMode === 'transfer') {
+    mvEl('mv-current-val').textContent = ' ' + mvCurrentText(data.subject_current_names || {});
+    mvEl('mv-current').style.display = '';
+    const n = data.direct_reports || 0;
+    if (n > 0) {                                   // AC-185-10
+      mvEl('mv-reports').textContent =
+        `${n} direct report${n === 1 ? '' : 's'} will continue to report to ${mvSubjectName}.`;
+      mvEl('mv-reports').style.display = '';
+    }
+  }
+
+  mvLoading(false);
+  mvFill(data, targetId);
+  mvEffectiveInit(data.effective_date);
+  mvSay(`Loaded ${mvSubjectName}'s current position.`);
+}
+
+// ── Effective date (KAN-189 / AC-185-07) ──────────────────────────────────────
+// Bounds come from the server, never from the client: the picker and the
+// validator must agree, and there is exactly one authority on the window.
+function mvEffectiveInit(cfg) {
+  const el = mvEl('mv-effective');
+  if (!cfg) {                      // older payload — leave it empty; server uses today
+    el.value = ''; el.removeAttribute('min'); el.removeAttribute('max');
+    mvEl('mv-effective-back').textContent = '';
+    return;
+  }
+  el.value = cfg.default || '';
+  if (cfg.min) el.min = cfg.min;
+  // `max` is today for a placement move — there is no scheduler to apply a
+  // future-dated one, so offering future days would be offering a lie.
+  if (cfg.max) el.max = cfg.max;
+  mvEl('mv-effective-back').textContent = cfg.backdate_limit_days
+    ? `you can backdate up to ${cfg.backdate_limit_days} days.`
+    : '';
+}
+
+// ── Fill the selects (incl. E1 / E2 empty states) ─────────────────────────────
+function mvFill(data, targetId) {
+  const t   = data.target || {};
+  const cur = data.subject_current || {};
+  mvFUAll = data.functional_units || [];
+
+  // In transfer mode every select starts at "no change"; drag mode proposes the
+  // drop target's placement.
+  const wantMgr = mvMode === 'drag' ? targetId : null;
+  const wantBU  = mvMode === 'drag' ? t.bu     : null;
+  const wantLoc = mvMode === 'drag' ? t.loc    : null;
+  const wantFU  = mvMode === 'drag' ? t.fu     : null;
+
+  const mgrs = (data.managers || []).filter(m => m.id !== mvSubjectId);
+  const mgrSel = mvEl('mv-manager');
+  if (!mgrs.length) {                                            // E2
+    mgrSel.innerHTML = mvOpt('', '— No other active employees —', true, true);
+    mgrSel.disabled = true;
+    mvEl('mv-manager-help').textContent = 'There is nobody else active in your company to report to.';
+    mvEl('mv-manager-help').style.display = '';
+  } else {
+    mgrSel.disabled = false;
+    mgrSel.innerHTML = mvOpt('', '— No change —', false) +
+      mgrs.map(m => mvOpt(m.id, m.name + (m.job_title ? ' · ' + m.job_title : ''), m.id === wantMgr)).join('');
+  }
+
+  const bus = data.business_units || [];
+  const buSel = mvEl('mv-bu');
+  if (!bus.length) {                                             // E1
+    buSel.innerHTML = mvOpt('', '— None configured —', true, true);
+    buSel.disabled = true;
+    mvEl('mv-bu-help').textContent = 'No business units have been set up for your company yet.';
+    mvEl('mv-bu-help').style.display = '';
+  } else {
+    buSel.disabled = false;
+    buSel.innerHTML = mvOpt('', '— No change —', false) +
+      bus.map(b => mvOpt(b.id, b.name, b.id === wantBU)).join('');
+  }
+
+  const locs = data.locations || [];
+  const locSel = mvEl('mv-loc');
+  if (!locs.length) {                                            // E1
+    locSel.innerHTML = mvOpt('', '— None configured —', true, true);
+    locSel.disabled = true;
+  } else {
+    locSel.disabled = false;
+    locSel.innerHTML = mvOpt('', '— No change —', false) +
+      locs.map(l => mvOpt(l.id, l.name, l.id === wantLoc)).join('');
+  }
+
+  mvFilterFU(wantFU);
+  // A manager-only move still works with no units configured, so the submit
+  // button stays enabled unless the prefill itself failed.
+  mvEl('mv-submit').disabled = !(mgrs.length || bus.length || locs.length);
+  void cur;
+}
+
+function mvFilterFU(selectFu) {
+  const bu  = mvEl('mv-bu').value;
+  const cur = selectFu !== undefined ? selectFu : mvEl('mv-fu').value;
+  const list = mvFUAll.filter(f => !bu || f.business_unit_id === bu);
+  const sel = mvEl('mv-fu');
+  if (!list.length) {
+    sel.innerHTML = mvOpt('', '— None configured —', true, true);
+    sel.disabled = true;
+    return;
+  }
+  sel.disabled = false;
+  sel.innerHTML = mvOpt('', '— No change —', false) +
+    list.map(f => mvOpt(f.id, f.name, f.id === cur)).join('');
+}
+
+function closeMoveModal() {
+  mvEl('move-modal').style.display = 'none';
+  document.removeEventListener('keydown', mvKeydown);
+  if (mvOpener && typeof mvOpener.focus === 'function') mvOpener.focus();
+  mvOpener = null;
+}
+
+// ── Submit ────────────────────────────────────────────────────────────────────
+async function submitMove() {
+  mvClearErr();
+  const reason = mvEl('mv-reason').value.trim();
+  if (!reason) {                                                  // E5
+    mvErr('Please give a reason for the move.');
+    mvEl('mv-reason').focus();
+    return;
+  }
+  // KAN-189 — required, because "when" is not a detail on a move. The server
+  // re-validates the window; this only catches the empty box, so the user is not
+  // sent to the server to be told something the form already knew.
+  const effective = mvEl('mv-effective').value;
+  if (!effective) {
+    mvErr('Please choose the date this move takes effect.');
+    mvEl('mv-effective').focus();
+    return;
+  }
+  const body = {
+    employee_id:        mvSubjectId,
+    manager_id:         mvEl('mv-manager').value || null,
+    business_unit_id:   mvEl('mv-bu').value || null,
+    functional_unit_id: mvEl('mv-fu').value || null,
+    location_id:        mvEl('mv-loc').value || null,
+    effective_date:     effective,
+    reason,
+  };
+  if (!body.manager_id && !body.business_unit_id && !body.functional_unit_id && !body.location_id) {
+    mvErr('Pick at least one change (manager, unit or location).');  // E4
+    return;
+  }
+
+  const btn = mvEl('mv-submit');
+  btn.disabled = true; btn.textContent = 'Submitting…';             // L2
+  let res, data;
+  try {
+    res = await fetch('/api/org-change/request', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+    });
+    data = await res.json();
+  } catch (_) {
+    btn.disabled = false; btn.textContent = 'Submit for Approval';
+    mvErr("We couldn't submit this change. Nothing has been sent for approval. Try again.");  // E12
+    return;
+  }
+  btn.disabled = false; btn.textContent = 'Submit for Approval';
+
+  if (!res.ok) {
+    if (res.status === 409) {                                       // E10
+      mvEl('mv-conflict-msg').innerHTML =
+        escH(data.error || 'This employee already has a position change waiting for approval.') +
+        ' <a href="/org-change" style="color:#b91c1c;font-weight:600">View it</a>';
+      mvPanel('conflict');
+      return;
+    }
+    // E8 / E9 / E12 — server strings are surfaced verbatim
+    mvErr(data.error || "We couldn't submit this change. Nothing has been sent for approval. Try again.");
+    return;
+  }
+
+  // S1 — in-dialog success panel (replaces the old alert())
+  const total = mvChainData.length || 1;
+  const first = (mvChainData[0] && mvChainData[0].label) || 'HR Admin';
+  const detail = `${mvSubjectName}'s move is with ${first} (approval 1 of ${total}).`;
+  mvEl('mv-success-detail').textContent = detail;
+  mvPanel('success');
+  mvSay('Position change submitted for approval. ' + detail);
+  if (typeof onMoveSubmitted === 'function') onMoveSubmitted(data.id);
+}
+</script>

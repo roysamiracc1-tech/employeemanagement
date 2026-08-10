@@ -119,10 +119,13 @@
             <th>Skill Ratings</th>
             <th>Solid-Line Manager</th>
             <th>Dotted-Line Manager</th>
+            {% if can_transfer_any or can_transfer_reports %}
+            <th><span class="sr-only">Actions</span></th>
+            {% endif %}
           </tr>
         </thead>
         <tbody id="employee-table-body">
-          <tr class="empty-row"><td colspan="11">Loading employees…</td></tr>
+          <tr class="empty-row"><td colspan="{{ 12 if (can_transfer_any or can_transfer_reports) else 11 }}">Loading employees…</td></tr>
         </tbody>
       </table>
     </div>
@@ -163,11 +166,22 @@
     <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
   </button>
 </div>
+
+{# The one shared Request Position Change dialog — same component, endpoint and
+   engine as the profile and the org tree (UX spec §6.0). #}
+{% if can_transfer_any or can_transfer_reports %}{% include 'org_change/_move_modal.html' %}{% endif %}
 {% endblock %}
 
 {% block scripts %}
 <script>
 const ACTIVE_COMPANY_ID = {{ active_company_id | tojson }};
+
+// Row-action inputs (KAN-185). `DIR_ACTIONS` also drives the extra column, so
+// the header, the body rows and the empty-state colspan cannot disagree.
+const CAN_TRANSFER_ANY = {{ can_transfer_any | tojson }};
+const DIR_ACTIONS      = {{ (can_transfer_any or can_transfer_reports) | tojson }};
+const VIEWER_EMP_ID    = {{ viewer_employee_id | tojson }};
+const DIR_COLS         = DIR_ACTIONS ? 12 : 11;
 
 function toggleDirCoPicker() {
   document.getElementById('dir-co-picker-menu').classList.toggle('co-picker-menu--open');
@@ -230,42 +244,100 @@ function buildRow(emp) {
   const ratingsHtml = skills.length
     ? `<div class="skill-ratings">${skills.slice(0,3).map(r=>`
         <div class="skill-rating">
-          <span class="skill-name" title="${r.skill}">${r.skill}</span>
+          <span class="skill-name" title="${escH(r.skill)}">${escH(r.skill)}</span>
           <div class="skill-bar-track"><div class="skill-bar-fill ${r.val_order>0?'validated':''}" style="width:${(r.val_order||r.self_order)*25}%"></div></div>
           <span class="skill-score">${r.val_order||r.self_order}</span>
         </div>`).join('')}</div>` : '—';
 
   const tagsHtml = skills.length
-    ? `<div class="skill-tags">${skills.slice(0,3).map(s=>`<span class="skill-tag">${s.skill}</span>`).join('')}${skills.length>3?`<span class="skill-tag">+${skills.length-3}</span>`:''}</div>` : '—';
+    ? `<div class="skill-tags">${skills.slice(0,3).map(s=>`<span class="skill-tag">${escH(s.skill)}</span>`).join('')}${skills.length>3?`<span class="skill-tag">+${skills.length-3}</span>`:''}</div>` : '—';
 
   const managerCell = (name, title, id) => name
-    ? `<a href="/profile/${id}" style="text-decoration:none"><div class="manager-cell">
-        <span class="manager-name">${name}</span>
-        ${title?`<span class="manager-desig">${title}</span>`:''}
+    ? `<a href="/profile/${encodeURIComponent(id)}" style="text-decoration:none"><div class="manager-cell">
+        <span class="manager-name">${escH(name)}</span>
+        ${title?`<span class="manager-desig">${escH(title)}</span>`:''}
        </div></a>` : '—';
 
   return `<tr>
-    <td style="color:#94a3b8;font-size:.75rem;font-weight:500">${emp.employee_number||emp.id.slice(0,8)}</td>
-    <td><a href="/profile/${emp.id}" style="text-decoration:none">
+    <td style="color:#94a3b8;font-size:.75rem;font-weight:500">${escH(emp.employee_number||emp.id.slice(0,8))}</td>
+    <td><a href="/profile/${encodeURIComponent(emp.id)}" style="text-decoration:none">
       <div class="name-cell">
-        <div class="avatar" style="background:${avatarColor(emp.full_name)}">${initials(emp.full_name)}</div>
-        <div><div class="name-text">${emp.full_name}${anniversaryBadge(emp.join_date)}</div><div class="title-text">${emp.job_title}</div></div>
+        <div class="avatar" style="background:${avatarColor(emp.full_name)}">${escH(initials(emp.full_name))}</div>
+        <div><div class="name-text">${escH(emp.full_name)}${anniversaryBadge(emp.join_date)}</div><div class="title-text">${escH(emp.job_title||'')}</div></div>
       </div></a></td>
-    <td><span class="dept-badge" style="${deptStyle(emp.business_unit)}">${emp.business_unit||'—'}</span></td>
-    <td>${emp.functional_unit?`<span class="unit-badge">${emp.functional_unit}</span>`:'—'}</td>
+    <td><span class="dept-badge" style="${deptStyle(emp.business_unit)}">${escH(emp.business_unit||'—')}</span></td>
+    <td>${emp.functional_unit?`<span class="unit-badge">${escH(emp.functional_unit)}</span>`:'—'}</td>
     <td><div class="location-cell">
       <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
         <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
         <circle cx="12" cy="9" r="2.5"/>
-      </svg>${emp.location||'—'}</div></td>
-    <td>${emp.job_title?`<span class="designation-chip">${emp.job_title}</span>`:'—'}</td>
+      </svg>${escH(emp.location||'—')}</div></td>
+    <td>${emp.job_title?`<span class="designation-chip">${escH(emp.job_title)}</span>`:'—'}</td>
     <td>${tagsHtml}</td>
     <td><span class="exp-badge">${emp.join_date ? Math.floor((new Date()-new Date(emp.join_date))/(365.25*24*3600*1000)) : 0} yrs</span></td>
     <td>${ratingsHtml}</td>
     <td>${managerCell(emp.solid_manager_name, emp.solid_manager_title, emp.solid_manager_id)}</td>
-    <td>${emp.dotted_manager_name?`<div class="manager-cell"><span class="manager-name">${emp.dotted_manager_name}</span>${emp.dotted_manager_title?`<span class="manager-desig">${emp.dotted_manager_title}</span>`:''}</div>`:'—'}</td>
+    <td>${emp.dotted_manager_name?`<div class="manager-cell"><span class="manager-name">${escH(emp.dotted_manager_name)}</span>${emp.dotted_manager_title?`<span class="manager-desig">${escH(emp.dotted_manager_title)}</span>`:''}</div>`:'—'}</td>
+    ${DIR_ACTIONS ? `<td class="row-actions">${rowActions(emp)}</td>` : ''}
   </tr>`;
 }
+
+// ── Row actions (KAN-185 — Transfer…, UX spec §6.1.2) ────────────────────────
+// The menu will also carry KAN-184's Offboard…; per the spec an empty menu means
+// no ⋯ button at all, so each row is tested rather than rendering a dead control.
+function canTransfer(emp) {
+  if (!DIR_ACTIONS) return false;
+  if (emp.id === VIEWER_EMP_ID) return false;                 // P3 — never yourself
+  if (emp.employment_status && emp.employment_status !== 'ACTIVE') return false;
+  if (CAN_TRANSFER_ANY) return true;                          // HR / Portal / System admin
+  return emp.solid_manager_id === VIEWER_EMP_ID;              // their own report
+}
+
+function rowActions(emp) {
+  if (!canTransfer(emp)) return '';
+  const id = escH(emp.id);
+  return `<div class="row-menu">
+    <button type="button" class="row-menu-btn" aria-haspopup="menu" aria-expanded="false"
+            aria-label="Actions for ${escH(emp.full_name)}"
+            onclick="toggleRowMenu(event, '${id}')">⋯</button>
+    <div class="row-menu-list" id="row-menu-${id}" role="menu" hidden>
+      <a role="menuitem" href="/profile/${encodeURIComponent(emp.id)}">View profile</a>
+      <button type="button" role="menuitem"
+              onclick='closeRowMenus(); openTransferModal(${JSON.stringify(emp.id)}, ${JSON.stringify(emp.full_name)}, ${JSON.stringify(emp.employee_number || "")})'>Transfer…</button>
+    </div>
+  </div>`;
+}
+
+function closeRowMenus() {
+  document.querySelectorAll('.row-menu-list:not([hidden])').forEach(m => {
+    m.hidden = true;
+    const b = m.parentElement.querySelector('.row-menu-btn');
+    if (b) b.setAttribute('aria-expanded', 'false');
+  });
+}
+
+function toggleRowMenu(ev, id) {
+  ev.stopPropagation();
+  const list = document.getElementById('row-menu-' + id);
+  if (!list) return;
+  const wasOpen = !list.hidden;
+  closeRowMenus();
+  if (wasOpen) return;
+  list.hidden = false;
+  list.parentElement.querySelector('.row-menu-btn').setAttribute('aria-expanded', 'true');
+  const first = list.querySelector('[role=menuitem]');
+  if (first) first.focus();
+}
+
+document.addEventListener('click', closeRowMenus);
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  const open = document.querySelector('.row-menu-list:not([hidden])');
+  if (!open) return;
+  const btn = open.parentElement.querySelector('.row-menu-btn');
+  closeRowMenus();
+  if (btn) btn.focus();                                       // focus restore
+});
 
 function pagesToShow(c,t){
   if(t<=7) return Array.from({length:t},(_,i)=>i+1);
@@ -274,10 +346,23 @@ function pagesToShow(c,t){
   return [1,'…',c-1,c,c+1,'…',t];
 }
 
+// Filtering is a silent change: rows appear and vanish with nothing spoken, so
+// a screen-reader user searching the directory gets no confirmation that their
+// query did anything. Announced politely — it must queue behind whatever the
+// user is already hearing, never interrupt their own typing. Guarded on a
+// CHANGED count so paging through a stable result set stays quiet (KAN-204).
+let lastAnnouncedCount = null;
+
 function renderPage(){
   const tbody=document.getElementById('employee-table-body');
+  if(lastAnnouncedCount !== filtered.length){
+    lastAnnouncedCount = filtered.length;
+    announce(filtered.length
+      ? `${filtered.length} employee${filtered.length===1?'':'s'} found.`
+      : 'No employees found.');
+  }
   if(!filtered.length){
-    tbody.innerHTML='<tr class="empty-row"><td colspan="11">No employees found.</td></tr>';
+    tbody.innerHTML=`<tr class="empty-row"><td colspan="${DIR_COLS}">No employees found.</td></tr>`;
     ['top','bottom'].forEach(s=>document.getElementById(`pagination-bar-${s}`).style.display='none');
     return;
   }
