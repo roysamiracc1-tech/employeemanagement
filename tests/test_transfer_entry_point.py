@@ -771,3 +771,201 @@ class TestPrefillContract:
         res = client.post('/api/org-change/request',
                           data=json.dumps(TRANSFER), content_type='application/json')
         assert res.status_code == 302
+
+
+# ── 8. DEF-42-4 / DEF-42-5 — the self-approval chain (KAN-203, T-203-4) ───────
+#
+# These two reproduce the P0 as it was found, in the order it was exploited, so a
+# regression cannot be mistaken for anything else. Both were live on the seeded
+# Acme chain — where `ingrid.makinen` holds PORTAL_ADMIN and HR_ADMIN — because:
+#
+#   DEF-42-4  `_can_initiate_for` returned True for any HR/Portal/System admin
+#             without ever comparing the initiator to the subject.
+#   DEF-42-5  `decide()` checked the decider against the step and the company and
+#             nothing else — never against `req['employee_id']`.
+#
+# Together: one HR_ADMIN could raise their own position change and approve it end
+# to end. `CLAUDE.md`'s headline invariant said this was impossible; the detailed
+# rule beneath it granted admins a blanket exemption. The headline was right.
+#
+# Each test asserts the guard AND that no write happened, because a refusal that
+# still wrote would be a different, quieter defect.
+
+SELF_ADMIN = {'user_id': 'u-hr', 'employee_id': 'emp-hr', 'company_id': CO,
+              'roles': ['HR_ADMIN', 'PORTAL_ADMIN', 'EMPLOYEE']}
+
+
+def _self_req(step=1, total=2):
+    """A PENDING request whose SUBJECT is `SELF_ADMIN` — the exploited shape."""
+    return {'id': 'req-self', 'company_id': CO, 'employee_id': 'emp-hr',
+            'requested_by_user_id': 'u-hr', 'current_step': step,
+            'status': 'PENDING', 'proposed_manager_id': 'm-new',
+            'total_steps': total}
+
+
+class TestDef42_4_SelfInitiationReproduction:
+    """DEF-42-4 — step one of the exploit: raising the request about yourself."""
+
+    def test_the_exploit_is_refused_at_the_api(self, hr_client):
+        with patch('app.routes.org_change.audit_service'):
+            res, mk = _post(hr_client, dict(TRANSFER, employee_id='emp-hr'))
+        assert res.status_code == 403, 'DEF-42-4 has regressed — self-initiation'
+        assert 'yourself' in json.loads(res.data)['error']
+        mk.assert_not_called(), 'a request was created about the initiator'
+
+    def test_the_admin_exemption_no_longer_covers_the_subject(self):
+        """The rule itself, not the route: the self case precedes the exemption.
+
+        Order matters. If the exemption were tested first, every admin would pass
+        before the subject was ever compared — which is precisely DEF-42-4.
+        """
+        from app.routes.org_change import _can_initiate_for
+        assert _can_initiate_for('emp-hr', SELF_ADMIN) is False
+        with patch('app.routes.org_change.employee_solid_manager',
+                   return_value='nobody'):
+            assert _can_initiate_for('emp-sub', SELF_ADMIN) is True, (
+                'the exemption exists so HR can move other people — it must survive')
+
+    def test_no_privilege_level_is_exempt(self):
+        """SYSTEM_ADMIN bypasses feature gates; it does not bypass this."""
+        from app.routes.org_change import _can_initiate_for
+        for roles in (['EMPLOYEE'], ['SOLID_LINE_MANAGER'], ['HR_ADMIN'],
+                      ['PORTAL_ADMIN'], ['SYSTEM_ADMIN']):
+            u = {'user_id': 'u-x', 'employee_id': 'emp-x',
+                 'company_id': CO, 'roles': roles}
+            with patch('app.routes.org_change.employee_solid_manager',
+                       return_value='emp-x'):
+                # Even holding the subject's own manager id — the self bar wins.
+                assert _can_initiate_for('emp-x', u) is False, roles
+
+
+class TestDef42_5_SelfApprovalReproduction:
+    """DEF-42-5 — step two: approving the request you are the subject of.
+
+    Guarded independently of DEF-42-4 on purpose. A request about you can still
+    reach the inbox legitimately — your manager raises it — so the decide-side
+    bar has to hold on its own, not merely because creation was blocked.
+    """
+
+    def _decide(self, user, decision, step=1):
+        from app.services import org_change_service as svc
+        with patch.object(svc, 'query', side_effect=[_self_req(step)]), \
+             patch.object(svc, 'transaction', FakeTransaction()), \
+             patch.object(svc, 'audit_service'), \
+             patch.object(svc, 'execute') as exe, \
+             patch.object(svc, '_apply_change') as applied, \
+             patch.object(svc, 'notif'):
+            ok, msg = svc.decide('req-self', user, decision, None)
+        return ok, msg, exe, applied
+
+    def test_the_subject_cannot_approve_their_own_move(self):
+        ok, msg, exe, applied = self._decide(SELF_ADMIN, 'approve')
+        assert ok is False, 'DEF-42-5 has regressed — self-approval'
+        assert 'yourself' in msg
+        exe.assert_not_called()
+        applied.assert_not_called()
+
+    def test_the_subject_cannot_reject_their_own_move_either(self):
+        """Rejection is also a decision — and a convenient way to kill a move
+        somebody raised about you, which is the same conflict of interest."""
+        ok, msg, exe, _ = self._decide(SELF_ADMIN, 'reject')
+        assert ok is False and 'yourself' in msg
+        exe.assert_not_called()
+
+    def test_the_bar_holds_at_the_final_level(self):
+        """The level that actually applies the change is the one that matters."""
+        ok, msg, exe, applied = self._decide(SELF_ADMIN, 'approve', step=2)
+        assert ok is False and 'yourself' in msg
+        applied.assert_not_called()
+
+    def test_the_refusal_precedes_the_step_lookup(self):
+        """A subject must not learn who is approving them from the error.
+
+        `query` is stubbed with the request row ONLY: a second call — the step
+        lookup — raises StopIteration. So this fails if the guard ever moves
+        below it, which would also leak 'you are not an approver for this step'.
+        """
+        from app.services import org_change_service as svc
+        with patch.object(svc, 'query', side_effect=[_self_req()]) as q, \
+             patch.object(svc, 'transaction', FakeTransaction()), \
+             patch.object(svc, 'audit_service'), \
+             patch.object(svc, 'execute'):
+            ok, msg = svc.decide('req-self', SELF_ADMIN, 'approve', None)
+        assert ok is False
+        assert q.call_count == 1, 'the guard ran after the step lookup'
+
+    def test_the_whole_chain_end_to_end_is_now_impossible(self):
+        """The exploit as reported: raise it, then walk every level of it.
+
+        Level 1 is HR_ADMIN and level 2 is PORTAL_ADMIN on the seeded Acme chain,
+        and `SELF_ADMIN` holds both — so before KAN-203 this person alone carried
+        their own move from PENDING to APPLIED.
+        """
+        from app.services import org_change_service as svc
+        for step in (1, 2):
+            with patch.object(svc, 'query', side_effect=[_self_req(step)]), \
+                 patch.object(svc, 'transaction', FakeTransaction()), \
+                 patch.object(svc, 'audit_service'), \
+                 patch.object(svc, 'execute') as exe, \
+                 patch.object(svc, '_apply_change') as applied:
+                ok, _ = svc.decide('req-self', SELF_ADMIN, 'approve', None)
+            assert ok is False, f'level {step} was self-approved'
+            exe.assert_not_called()
+            applied.assert_not_called()
+
+
+class TestSelfAffordancesAreAbsent:
+    """T-203-3 — the surfaces must agree with the guards.
+
+    Hiding a control is never the control; §8's guards are. But a live
+    Approve button that is refused when pressed is the DEF-001/2/3 failure
+    mode all over again, so the affordances are asserted too.
+    """
+
+    def test_the_inbox_does_not_list_a_request_about_you(self):
+        from app.services import org_change_service as svc
+        mine  = dict(_self_req(), approver_type='ROLE', approver_role='HR_ADMIN',
+                     approver_employee_id=None)
+        other = {'id': 'req-other', 'company_id': CO, 'employee_id': 'emp-sub',
+                 'current_step': 1, 'status': 'PENDING',
+                 'approver_type': 'ROLE', 'approver_role': 'HR_ADMIN',
+                 'approver_employee_id': None}
+        with patch.object(svc, 'query', return_value=[mine, other]):
+            out = svc.list_pending(SELF_ADMIN)
+        assert [r['id'] for r in out] == ['req-other'], (
+            'the inbox offered Approve/Reject on the viewer’s own move')
+
+    def test_the_subject_is_not_notified_as_an_approver(self):
+        """Nor does it reach the bell or the badge count — excluded in SQL."""
+        from app.services import org_change_service as svc
+        with patch.object(svc, 'query', return_value=[{'id': 'u-hr2'}]) as q:
+            svc._step_approver_user_ids(CO, STEP_1, 'emp-hr')
+        sql, params = q.call_args.args[0], q.call_args.args[1]
+        assert 'IS DISTINCT FROM' in _norm(sql)
+        assert params == (CO, 'HR_ADMIN', 'emp-hr')
+
+    def test_a_named_approver_who_is_the_subject_resolves_to_nobody(self):
+        """The EMPLOYEE-type step: a company may name the subject by accident."""
+        from app.services import org_change_service as svc
+        step = {'approver_type': 'EMPLOYEE', 'approver_role': None,
+                'approver_employee_id': 'emp-hr'}
+        with patch.object(svc, 'query') as q:
+            assert svc._step_approver_user_ids(CO, step, 'emp-hr') == []
+        q.assert_not_called()
+
+    def test_omitting_the_subject_still_resolves_every_approver(self):
+        """`IS DISTINCT FROM NULL` must not quietly empty the approver list."""
+        from app.services import org_change_service as svc
+        with patch.object(svc, 'query', return_value=[{'id': 'u-a'}, {'id': 'u-b'}]):
+            assert svc._step_approver_user_ids(CO, STEP_1) == ['u-a', 'u-b']
+
+    def test_your_own_org_tree_card_is_not_draggable(self):
+        """Being dragged makes you the subject; being dropped on does not."""
+        src = open('templates/org/tree.html').read()
+        drag = src[src.index('Drag-and-drop to propose'):src.index('wrap.appendChild(card)')]
+        assert "if (!isSelf) {" in drag, 'your own card can be dragged (KAN-203)'
+        # The draggable half is inside the isSelf guard…
+        gated = drag[drag.index('if (!isSelf) {'):drag.index("card.addEventListener('dragover'")]
+        assert "setAttribute('draggable'" in gated and "'dragstart'" in gated
+        # …and the drop half is deliberately outside it.
+        assert "payload.id === OWN_ID" in drag, 'a hand-crafted drag is not refused'
