@@ -578,3 +578,84 @@ class TestShellReducedMotion:
         assert 'outline' not in code, 'reduced motion must not touch outlines'
         assert 'background' not in code, 'reduced motion must not touch colour'
         assert '.ft-card.ft-dragging' in code, 'the drag affordance is not addressed'
+
+
+class TestDialogsDoNotPutABoxClassOnTheOverlay:
+    """A real defect the demo caught, and no unit test could have.
+
+    This codebase has TWO legitimate dialog patterns, and both are fine:
+
+      A. `.modal-overlay.open` (fixed, inset 0, flex-centred) + `.modal` for the box
+      B. an inline-styled overlay + `.modal-box` for the box (used by
+         `_move_modal.html` and five other templates)
+
+    The bug was neither pattern: the EP42 screens put **`class="modal"` on the
+    OVERLAY**. `.modal` and `.modal-box` are both BOX classes carrying an explicit
+    `width` (480px / 500px) and a white background, so applying one to the
+    full-screen backdrop turns the backdrop itself into a 480px white panel —
+    every dialog rendered left-aligned over the sidebar.
+
+    Nothing in the DOM looked wrong. It was only visible on screen, which is
+    exactly what the Demo Readiness Gate is for.
+    """
+
+    DIALOG_TEMPLATES = ('templates/admin/job_architecture.html',
+                        'templates/admin/job_mapping.html',
+                        'templates/employees/step_assessment.html')
+
+    # Both are BOX classes: each sets its own `width`, so neither may ever land on
+    # a full-screen overlay.
+    BOX_CLASSES = ('modal-box', 'modal')
+
+    def test_the_premise_holds_both_box_classes_still_set_a_width(self):
+        """Pin the assumption. If the stylesheet is reorganised so these stop
+        being sized boxes, fail loudly here rather than let the rule below become
+        meaningless."""
+        with open('static/css/style.css') as f:
+            css = f.read()
+        for rule in ('\n.modal {', '\n.modal-box {'):
+            block = css[css.index(rule):]
+            block = block[:block.index('}')]
+            assert 'width:' in block, f'{rule.strip()} no longer sets a width'
+        # And the overlay is the centring layer — read the BASE rule, not the
+        # `[data-theme="dark"]` override that appears earlier in the file.
+        overlay = css[css.index('\n.modal-overlay {'):]
+        overlay = overlay[:overlay.index('}')]
+        assert 'position: fixed' in overlay and 'inset: 0' in overlay
+        assert 'justify-content: center' in overlay
+
+    def test_no_dialog_overlay_carries_a_box_class(self):
+        """The rule that actually matters, stated per element."""
+        import re
+        for path in self.DIALOG_TEMPLATES:
+            with open(path) as f:
+                src = f.read()
+            dialogs = list(re.finditer(r'<div[^>]*role="dialog"[^>]*>', src))
+            assert dialogs, f'{path}: no role="dialog" element found'
+            for m in dialogs:
+                tag = m.group(0)
+                classes = re.search(r'class="([^"]*)"', tag)
+                classes = set((classes.group(1) if classes else '').split())
+                offending = classes & set(self.BOX_CLASSES)
+                assert not offending, (
+                    f'{path}: the role="dialog" overlay carries the BOX class '
+                    f'{offending} — those set a width, so the backdrop becomes a '
+                    f'narrow panel and the dialog renders off-centre. Tag: {tag[:90]}')
+
+    def test_every_dialog_overlay_can_actually_centre_its_box(self):
+        """Either pattern is fine; what is not fine is neither."""
+        import re
+        for path in self.DIALOG_TEMPLATES:
+            with open(path) as f:
+                src = f.read()
+            for m in re.finditer(r'<div[^>]*role="dialog"[^>]*>', src):
+                tag = m.group(0)
+                uses_class = 'modal-overlay' in tag
+                # `.modal-overlay` is transparent and click-through without
+                # `.open` (opacity: 0; pointer-events: none).
+                if uses_class:
+                    assert 'open' in tag, f'{path}: .modal-overlay without .open stays invisible'
+                else:
+                    assert 'justify-content:center' in tag.replace(' ', ''), (
+                        f'{path}: the overlay neither uses .modal-overlay nor '
+                        f'centres inline, so its box will not be centred')

@@ -1134,7 +1134,7 @@ file carries the numbered, individually testable criteria.
 | **D1** | Story truth | ✅ | Each story's AC restated in its own DONE row above; every claim below maps to a demo step |
 | **D2** | Every actor | ✅ | Ladder walked as **PORTAL_ADMIN** (`ingrid.makinen`, configures), a **manager** (`ana.costa`, assesses her own 2 reports) and a **plain employee** (`tonis.rebane`, reads and is offered nothing). Self-approval walked as the subject |
 | **D3** | Both outcomes | ✅ | Refusals driven, not described: self-initiation 403; step 6 on a 5-step level refused **by the database**; cross-tenant family insert refused **by the FK**; `step_count` omitted refused; empty step submit refused; renumbering an occupied level refused; feature-off renders the explanatory screen |
-| **D4** | Feedback surfaces | 🟡 | See below — the bell rows are **N/A by design**, and that is stated rather than ticked |
+| **D4** | Feedback surfaces | 🟡 | See below. The bell rows are **N/A by design**, stated rather than ticked — and this check **caught DEF-190-1**, five mis-positioned dialogs that every automated suite passed |
 | **D5** | Access & tenancy | ✅ | 17 `@require_feature_access`, **0** `@require_roles` in `compensation.py`; no `OR company_id IS NULL` in SQL (the only match is the docstring forbidding it); SYSTEM_ADMIN bypass in the one resolver |
 | **D6** | State & rehearsal | ✅ | Rehearsed end to end twice in a headless browser before this. **Acme state: 2 families, 4 levels, 10 described steps, 3 of 46 placed, 1 assessed** — deliberately partial, see D6a |
 | **D7** | Automated evidence | 🟡 | **4,825 pytest · browser 110/110 · vacation 39/39.** Caveat disclosed below |
@@ -1159,6 +1159,28 @@ What DOES apply, and passes:
   assessment dialog, the audit reason. `4/9` and `0/6` never become a bare percentage.
 - **The subject** ✅ — an employee can read their own level, their own step and the next one's
   expectations. That is `job_architecture:r`, seeded to every role deliberately.
+
+### 🔴 A DEFECT THE GATE ITSELF FOUND — DEF-190-1, fixed before the demo shipped
+
+**All five new dialogs rendered left-aligned over the sidebar instead of centred.** Found by *looking
+at a screenshot*, which is the entire argument for this gate: **4,825 unit tests, 110 browser checks
+and 39 workflow checks were all green**, and every one of them would have stayed green.
+
+*Cause.* This codebase has two legitimate dialog patterns and the EP42 screens used neither: they put
+`class="modal"` on the **overlay**. `.modal` (480px) and `.modal-box` (500px) are both **box** classes
+carrying an explicit `width` and a white background, so applying one to the full-screen backdrop turns
+the backdrop itself into a narrow white panel. Nothing in the DOM looked wrong.
+
+*Fix.* The overlay now uses `.modal-overlay open` — the stylesheet's own centring layer — and the box
+uses `.modal`. Verified in a real browser: all five dialogs centre to within 30px of the viewport
+midpoint. `TestDialogsDoNotPutABoxClassOnTheOverlay` states the rule per element and pins the
+stylesheet premise, so a reorganisation of the CSS fails loudly instead of quietly making the rule
+meaningless.
+
+*The lesson, which is worth more than the fix:* **a green suite tells you the DOM is right, not that
+the screen is.** This is the third time that distinction has cost something — DEF-002 was one emoji,
+DEF-001 was a bell that opened correctly and contained the wrong thing. Gate rule 4 exists for exactly
+this and it earned its place again.
 
 ### ⚠️ Disclosed at the start of the demo — gate rule 4
 

@@ -117,11 +117,9 @@
 </div>
 
 {# ── Preview dialog — this touches everybody, so it is shown first ──────────── #}
-<div id="jm-preview-modal" class="modal" style="display:none;position:fixed;inset:0;z-index:999;
-     background:rgba(0,0,0,.45);align-items:center;justify-content:center"
+<div id="jm-preview-modal" class="modal-overlay open" style="display:none"
      role="dialog" aria-modal="true" aria-labelledby="jm-preview-title">
-  <div class="modal-box" style="background:var(--card);border-radius:14px;padding:26px;
-       width:640px;max-width:94vw;max-height:86vh;display:flex;flex-direction:column">
+  <div class="modal" style="padding:26px;width:640px;max-width:94vw;max-height:86vh;display:flex;flex-direction:column">
     <h3 id="jm-preview-title" style="font-size:.95rem;font-weight:700;margin:0 0 4px">
       Before anything changes
     </h3>

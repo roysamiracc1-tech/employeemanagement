@@ -67,11 +67,9 @@
 </div>
 
 {# ── Assessment dialog — the expectations are the substance of it ──────────── #}
-<div id="sa-modal" class="modal" style="display:none;position:fixed;inset:0;z-index:999;
-     background:rgba(0,0,0,.45);align-items:center;justify-content:center"
+<div id="sa-modal" class="modal-overlay open" style="display:none"
      role="dialog" aria-modal="true" aria-labelledby="sa-title">
-  <div class="modal-box" style="background:var(--card);border-radius:14px;padding:26px;
-       width:680px;max-width:94vw;max-height:88vh;display:flex;flex-direction:column">
+  <div class="modal" style="padding:26px;width:680px;max-width:94vw;max-height:88vh;display:flex;flex-direction:column">
     <h3 id="sa-title" style="font-size:.95rem;font-weight:700;margin:0 0 4px"></h3>
     <p id="sa-sub" style="font-size:.8rem;color:var(--muted);margin:0 0 14px"></p>
 
