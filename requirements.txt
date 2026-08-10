@@ -5,3 +5,9 @@ werkzeug>=3.0
 # Testing
 pytest>=9.0
 pytest-flask>=1.3
+
+# Programme tracker — `scripts/generate_tracker.py` writes the .xlsx that
+# `docs/project-management/PROGRAMME_TRACKER.xlsx` is regenerated from.
+# In the main list, not a dev extra: `tests/test_programme_tracker.py` imports it,
+# so CI needs it or the suite fails on a missing module rather than a real problem.
+openpyxl>=3.1

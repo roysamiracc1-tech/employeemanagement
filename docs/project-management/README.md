@@ -10,6 +10,27 @@ Do not create issues or wiki pages there, and do not link to `roysamiracc1-17771
 
 ---
 
+## Programme tracker (spreadsheet)
+
+**[`PROGRAMME_TRACKER.xlsx`](PROGRAMME_TRACKER.xlsx)** — the overview: one row per epic, one per story,
+plus what has shipped, the owner decisions, the defect register and the open questions.
+
+> ⚠ **GENERATED — do not edit it.** Regenerate with:
+>
+> ```bash
+> python3 scripts/generate_tracker.py
+> ```
+>
+> `BACKLOG.md` stays the source of truth (project rule: documentation lives in git). A hand-kept
+> spreadsheet beside it becomes a second source that disagrees within a fortnight, and then nobody
+> knows which is right — a worse problem than the one it solves. **Edit the markdown, re-run the
+> script, commit both.** `tests/test_programme_tracker.py` fails if the committed spreadsheet is
+> out of date, so it cannot quietly go stale.
+
+What the spreadsheet is *for*: 1,500 lines of markdown is the right tool for the **reasoning** behind
+a story and the wrong one for *"what is the status of everything?"*. Every row carries its story id,
+so the reasoning is one search away in `BACKLOG.md`.
+
 ## Where everything lives
 
 | I want to change… | Edit this |
