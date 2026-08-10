@@ -412,3 +412,137 @@ class TestWorkflowConfig:
                       {'name': 'W', 'steps': [{'approver_type': 'ROLE', 'approver_role': 'HR_ADMIN'}]})
         assert r.status_code == 200
         mk.assert_called_once()
+
+
+# ── KAN-203 — nobody acts on a request about themselves ───────────────────────
+# P0/Critical, pre-existing. Before this guard `_can_initiate_for` returned True
+# for any HR/Portal/System admin regardless of the subject, and `decide()` never
+# compared the decider to `req['employee_id']` — so an HR_ADMIN who is also an
+# employee could raise their own position change and then approve it.
+#
+# The rule is UNIVERSAL: every request type, every role, SYSTEM_ADMIN included.
+# It is an integrity control, so it is refused outright and is deliberately NOT
+# subject to the advise-and-override rule that governs judgements about amounts.
+
+SELF_SUBJECT_USER = {'user_id': 'u-sub', 'employee_id': 'emp-sub',
+                     'company_id': 'co-1', 'roles': ['HR_ADMIN', 'EMPLOYEE']}
+SELF_SYSADMIN_USER = {'user_id': 'u-sa', 'employee_id': 'emp-sub',
+                      'company_id': 'co-1', 'roles': ['SYSTEM_ADMIN']}
+
+
+class TestKan203SelfInitiationRefused:
+    """`_can_initiate_for` must refuse the subject BEFORE the admin exemption."""
+
+    def test_hr_admin_cannot_raise_a_request_about_themselves(self, hr_client):
+        # hr_client is emp-hr; the subject is also emp-hr.
+        with patch('app.auth.can_access_feature', return_value=True), \
+             patch('app.routes.org_change.query',
+                   return_value={'company_id': 'co-1', 'employment_status': 'ACTIVE',
+                                 'name': 'H R'}), \
+             patch('app.routes.org_change.transaction', FakeTransaction()), \
+             patch('app.routes.org_change.audit_service'):
+            r = _post(hr_client, '/api/org-change/request',
+                      {'employee_id': 'emp-hr', 'manager_id': 'm-2', 'reason': 'x'})
+        assert r.status_code == 403
+        assert 'yourself' in r.get_json()['error']
+
+    def test_the_refusal_is_audited_as_a_security_event(self, hr_client):
+        with patch('app.auth.can_access_feature', return_value=True), \
+             patch('app.routes.org_change.query',
+                   return_value={'company_id': 'co-1', 'employment_status': 'ACTIVE',
+                                 'name': 'H R'}), \
+             patch('app.routes.org_change.transaction', FakeTransaction()), \
+             patch('app.routes.org_change.audit_service') as aud:
+            _post(hr_client, '/api/org-change/request',
+                  {'employee_id': 'emp-hr', 'manager_id': 'm-2', 'reason': 'x'})
+        aud.record.assert_called_once()
+        args, kwargs = aud.record.call_args
+        assert args[0] == 'ORG_CHANGE_SELF_ACTION_REFUSED'
+        assert kwargs['outcome'] == 'FAILED'
+        assert kwargs['retention_class'] == 'SECURITY'
+
+    def test_hr_admin_can_still_raise_for_somebody_else(self, hr_client):
+        """The admin exemption survives — it just no longer covers oneself."""
+        with patch('app.auth.can_access_feature', return_value=True), \
+             patch('app.routes.org_change.query', side_effect=route_query()), \
+             patch('app.routes.org_change.svc.current_placement', return_value=CURRENT_PLACEMENT), \
+             patch('app.routes.org_change.svc.create_request', return_value='req-9') as mk:
+            r = _post(hr_client, '/api/org-change/request',
+                      {'employee_id': 'emp-sub', 'manager_id': 'm-2', 'reason': 'x'})
+        assert r.status_code == 200, r.get_json()
+        mk.assert_called_once()
+
+    def test_display_helper_hides_the_affordance_for_oneself(self, hr_client):
+        """Hiding a button is never the control, but it must agree with it."""
+        from app.routes import org_change as oc
+        with hr_client.application.test_request_context():
+            _set_session(hr_client, roles=['HR_ADMIN'], employee_id='emp-hr', user_id='u-hr')
+            with hr_client.session_transaction():
+                pass
+        with patch.object(oc, '_user', return_value={
+                'user_id': 'u-hr', 'employee_id': 'emp-hr',
+                'company_id': 'co-1', 'roles': ['HR_ADMIN']}):
+            assert oc.can_initiate_org_change_for('emp-hr') is False
+            with patch.object(oc, 'employee_solid_manager', return_value='emp-hr'):
+                assert oc.can_initiate_org_change_for('emp-other') is True
+
+
+class TestKan203SelfDecisionRefused:
+    """`decide()` must refuse the subject at ANY level, in ANY role."""
+
+    def test_subject_cannot_decide_their_own_request(self):
+        from app.services import org_change_service as svc
+        with patch.object(svc, 'query', side_effect=[_req_row()]), \
+             patch.object(svc, 'transaction', FakeTransaction()), \
+             patch.object(svc, 'audit_service'), \
+             patch.object(svc, 'execute') as exe:
+            ok, msg = svc.decide('req-1', SELF_SUBJECT_USER, 'approve', None)
+        assert ok is False
+        assert 'yourself' in msg
+        exe.assert_not_called()   # nothing was written
+
+    def test_subject_cannot_decide_at_a_later_level_either(self):
+        from app.services import org_change_service as svc
+        with patch.object(svc, 'query', side_effect=[_req_row(step=2)]), \
+             patch.object(svc, 'transaction', FakeTransaction()), \
+             patch.object(svc, 'audit_service'), \
+             patch.object(svc, 'execute') as exe:
+            ok, msg = svc.decide('req-1', SELF_SUBJECT_USER, 'approve', None)
+        assert ok is False and 'yourself' in msg
+        exe.assert_not_called()
+
+    def test_system_admin_is_not_exempt(self):
+        """SYSTEM_ADMIN bypasses feature gates, never integrity controls."""
+        from app.services import org_change_service as svc
+        with patch.object(svc, 'query', side_effect=[_req_row()]), \
+             patch.object(svc, 'transaction', FakeTransaction()), \
+             patch.object(svc, 'audit_service'), \
+             patch.object(svc, 'execute') as exe:
+            ok, msg = svc.decide('req-1', SELF_SYSADMIN_USER, 'reject', 'mine')
+        assert ok is False and 'yourself' in msg
+        exe.assert_not_called()
+
+    def test_the_refusal_is_audited_as_a_security_event(self):
+        from app.services import org_change_service as svc
+        with patch.object(svc, 'query', side_effect=[_req_row()]), \
+             patch.object(svc, 'transaction', FakeTransaction()), \
+             patch.object(svc, 'audit_service') as aud, \
+             patch.object(svc, 'execute'):
+            svc.decide('req-1', SELF_SUBJECT_USER, 'approve', None)
+        aud.record.assert_called_once()
+        args, kwargs = aud.record.call_args
+        assert args[0] == 'ORG_CHANGE_SELF_ACTION_REFUSED'
+        assert kwargs['retention_class'] == 'SECURITY'
+
+    def test_a_normal_approver_is_unaffected(self):
+        """The guard must not break the ordinary path (HR_USER is not the subject)."""
+        from app.services import org_change_service as svc
+        txn = FakeTransaction()
+        exe = recording_execute(txn)
+        qs = [_req_row(), _role_step(), {'n': 'Sub Ject'}, [{'id': 'u-sub'}]]
+        with patch.object(svc, 'query', side_effect=qs), \
+             patch.object(svc, 'transaction', txn), \
+             patch.object(svc, 'execute', exe), \
+             patch.object(svc, 'notif'):
+            ok, status = svc.decide('req-1', HR_USER, 'reject', 'no')
+        assert ok and status == 'REJECTED'

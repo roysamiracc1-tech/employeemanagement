@@ -14,7 +14,8 @@ scoping unchanged.
 from flask import session, request, render_template, jsonify, redirect, url_for, flash
 
 from app import app
-from app.db import query, to_dict
+from app.db import query, to_dict, transaction
+from app.services import audit_service
 # `require_roles` is deliberately NOT imported: hardcoded role lists are
 # forbidden on these routes (CLAUDE.md org-change invariant 1). The only
 # role-shaped check here is the initiator business rule in `_can_initiate_for`,
@@ -52,16 +53,65 @@ def _user():
 _INITIATOR_ADMIN_ROLES = {'HR_ADMIN', 'PORTAL_ADMIN', 'SYSTEM_ADMIN'}
 
 
+def _is_self(subject_id, u):
+    """Is the acting user the SUBJECT of this request? (KAN-203)
+
+    Compared as strings because the session carries `employee_id` as text while
+    callers may pass a UUID from the database.
+    """
+    emp_id = u.get('employee_id')
+    return bool(emp_id and subject_id and str(emp_id) == str(subject_id))
+
+
 def _can_initiate_for(subject_id, u):
-    """Requester must manage the subject (solid line) OR be HR/Portal/System admin.
+    """Requester must manage the subject (solid line) OR be HR/Portal/System admin
+    — and may never be the subject themselves.
 
     CLAUDE.md org-change invariant 2. This is a **business rule on top of** the
     feature gate, not a substitute for it — the feature flag alone is not
     sufficient. Every creation path must pass through here.
+
+    **KAN-203: the self case is refused FIRST, ahead of the admin exemption.**
+    That exemption exists so HR can move *other people*; it was never intended
+    to cover acting on oneself, and until KAN-203 an HR_ADMIN who is also an
+    employee could raise their own move. Refusing here rather than only in the
+    route means the display helpers below hide the affordance too.
     """
+    if _is_self(subject_id, u):
+        return False
     if _INITIATOR_ADMIN_ROLES & set(u.get('roles') or []):
         return True
     return employee_solid_manager(subject_id) == u.get('employee_id')
+
+
+def _audit_self_action_refused(what, company_id, subject_id, u):
+    """Record a refused self-action (KAN-203). Never raises into the caller.
+
+    The refusal IS the event — there is no other write to join, so this opens
+    its own transaction. That is the one deliberate exception to `record()`'s
+    "join the caller's transaction" rule (ADR-009): a refusal has no unit of
+    work to belong to, and a trail that only holds successful actions cannot
+    show that somebody tried.
+    """
+    try:
+        with transaction():
+            audit_service.record(
+                'ORG_CHANGE_SELF_ACTION_REFUSED',
+                'org_change_request', subject_id,
+                company_id=company_id,
+                actor=u,
+                subject_employee_id=subject_id,
+                reason=f'Refused: user attempted to {what.lower()} a position '
+                       f'change about themselves (KAN-203).',
+                outcome='FAILED',
+                error_code='SELF_ACTION_REFUSED',
+                retention_class='SECURITY',
+                metadata={'attempted': what},
+            )
+    except Exception:
+        # An audit failure must not convert a refusal into a 500 — the control
+        # is the refusal; the row is the record of it.
+        app.logger.exception('KAN-203: failed to audit refused self-%s', what.lower())
 
 
 def can_initiate_org_change_for(subject_id):
@@ -195,6 +245,14 @@ def api_org_change_request():
     company_id = subj['company_id']
     if u['company_id'] and company_id != u['company_id'] and 'SYSTEM_ADMIN' not in u['roles']:
         return jsonify({'error': 'Employee is not in your company'}), 403
+    # KAN-203 — nobody raises a position change about themselves, in any role.
+    # Checked before the general initiator rule so the refusal can say WHY;
+    # `_can_initiate_for` would refuse this anyway, with a message that would
+    # read as nonsense to an HR admin ("your own reports" — it IS them).
+    if _is_self(subject_id, u):
+        _audit_self_action_refused('INITIATE', company_id, subject_id, u)
+        return jsonify({'error': "You can't raise a position change for yourself. "
+                                 "Ask your manager or HR to raise it for you."}), 403
     # CLAUDE.md org-change invariant 2 — the feature gate alone is NOT sufficient.
     if not _can_initiate_for(subject_id, u):
         return jsonify({'error': 'You can only request moves for your own reports (or as HR/Portal admin).'}), 403

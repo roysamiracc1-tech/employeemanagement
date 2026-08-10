@@ -371,15 +371,17 @@ class TestCannotInitiateOwnMove:
             self, employee_client):
         """The feature flag alone must NOT be sufficient — AC-185-02.
 
-        Nobody is their own solid-line manager, so the stub returns the subject's
-        real boss: the caller IS the subject, and the rule still refuses.
+        Still a 403, but since KAN-203 it is refused by the **self** guard ahead
+        of the manager rule, so the message names the real reason instead of
+        talking about "your own reports" when the report in question is you.
         """
         with patch('app.routes.org_change.employee_solid_manager',
-                   return_value='their-boss'):
+                   return_value='their-boss'), \
+             patch('app.routes.org_change.audit_service'):
             res, mk = _post(employee_client,
                             dict(TRANSFER, employee_id='emp-sub'))  # emp-sub IS the caller
         assert res.status_code == 403
-        assert 'your own reports' in json.loads(res.data)['error']
+        assert 'yourself' in json.loads(res.data)['error']
         mk.assert_not_called()
 
     def test_employee_cannot_transfer_anyone_else_either(self, employee_client):
@@ -420,19 +422,26 @@ class TestCannotInitiateOwnMove:
             with patch('app.routes.org_change.employee_solid_manager', return_value='other'):
                 assert can_initiate_org_change_for('emp-sub') is False
 
-    def test_hr_self_transfer_follows_the_documented_rule(self, hr_client):
-        """HR/Portal/System admins may initiate for anyone *including themselves*.
+    def test_hr_admin_cannot_transfer_themselves_either(self, hr_client):
+        """INVERTED BY KAN-203 — and this test's previous docstring predicted it.
 
-        That is what CLAUDE.md org-change invariant 2 and AC-185-02 say, so this
-        test pins the documented behaviour rather than a stricter reading. The
-        UX spec's P3 ("entry point absent on your own profile") is enforced at
-        the *display* layer. Raised as an open question — if the rule is meant to
-        be "nobody, ever, at any privilege level", it changes `_can_initiate_for`,
-        which is a CLAUDE.md invariant and not this ticket's to redefine.
+        It used to assert that HR/Portal/System admins may initiate for anyone
+        *including themselves*, pinning the documented rule while explicitly
+        flagging the open question: *"if the rule is meant to be 'nobody, ever,
+        at any privilege level', it changes `_can_initiate_for`, which is a
+        CLAUDE.md invariant and not this ticket's to redefine."*
+
+        KAN-203 is the ticket that redefined it. The admin exemption exists so HR
+        can move **other people**; combined with `decide()` having no self-check,
+        the old behaviour let an HR_ADMIN raise their own move and then approve
+        it. The assertion is inverted rather than deleted so the trail from the
+        old rule to the new one survives in the suite.
         """
-        res, mk = _post(hr_client, dict(TRANSFER, employee_id='emp-hr'))
-        assert res.status_code == 200
-        mk.assert_called_once()
+        with patch('app.routes.org_change.audit_service'):
+            res, mk = _post(hr_client, dict(TRANSFER, employee_id='emp-hr'))
+        assert res.status_code == 403
+        assert 'yourself' in json.loads(res.data)['error']
+        mk.assert_not_called()
 
 
 # ── 3. Nothing is applied without the full chain ──────────────────────────────

@@ -16,9 +16,13 @@ Public API (used by app/routes/org_change.py):
 `user` is a light dict: {'user_id', 'employee_id', 'roles' (list), 'company_id'}.
 """
 import datetime
+import logging
 
 from app.db import query, execute, insert_returning, to_dict, transaction
+from app.services import audit_service
 from app.services import notification_service as notif
+
+logger = logging.getLogger(__name__)
 
 # Default chain when a company has not configured one: a single HR approval step.
 _DEFAULT_STEPS = [
@@ -80,12 +84,27 @@ def save_workflow(company_id, name, steps):
 
 # ── Approver resolution ───────────────────────────────────────────────────────
 
-def _step_approver_user_ids(company_id, step):
-    """User ids eligible to decide *step* within *company_id*."""
+def _step_approver_user_ids(company_id, step, subject_employee_id=None):
+    """User ids eligible to decide *step* within *company_id*.
+
+    *subject_employee_id* is excluded (KAN-203). The subject can never decide a
+    request about themselves, so putting "awaiting your approval" in their bell
+    would be a call to action that is refused the moment they answer it — the
+    exact DEF-001/2/3 failure mode, a control offered where it cannot work.
+    Excluding them here also means the badge count never includes it.
+
+    The argument is optional only so a step can still be resolved with no
+    request in hand; every caller in this engine passes the subject.
+    """
     if step['approver_type'] == 'EMPLOYEE':
+        if subject_employee_id and step.get('approver_employee_id') \
+                and str(step['approver_employee_id']) == str(subject_employee_id):
+            return []
         row = query("SELECT id::text FROM users WHERE employee_id=%s::uuid AND is_active LIMIT 1",
                     (step['approver_employee_id'],), one=True)
         return [row['id']] if row else []
+    # `IS DISTINCT FROM` rather than `<>` so a NULL subject (no exclusion asked
+    # for) keeps every approver instead of silently emptying the list.
     rows = query("""
         SELECT DISTINCT u.id::text AS id
         FROM users u
@@ -94,7 +113,8 @@ def _step_approver_user_ids(company_id, step):
         JOIN user_roles ur ON ur.user_id = u.id
         JOIN roles r ON r.id = ur.role_id AND r.name = %s
         WHERE u.is_active
-    """, (company_id, step['approver_role']))
+          AND u.employee_id IS DISTINCT FROM %s::uuid
+    """, (company_id, step['approver_role'], subject_employee_id))
     return [r['id'] for r in rows]
 
 
@@ -198,7 +218,7 @@ def create_request(company_id, subject_id, requester_user_id, proposed, reason):
     total = len(steps)
     # Notify first-step approvers. ORG_CHANGE_REQUESTED is the CALL TO ACTION —
     # it is retired the moment the level it belongs to is decided.
-    _notify(_step_approver_user_ids(company_id, steps[0]), 'ORG_CHANGE_REQUESTED',
+    _notify(_step_approver_user_ids(company_id, steps[0], subject_id), 'ORG_CHANGE_REQUESTED',
             f"Position change requested for {subj} — awaiting your approval (level 1 of {total}).",
             req_id=req_id)
     # Notify the requester. A DIFFERENT event type on purpose: this is a receipt,
@@ -219,6 +239,43 @@ _STEP_DECISION_SQL = """
 """
 
 
+def _is_self_subject(user, req):
+    """Is the deciding user the subject of *req*? (KAN-203)
+
+    String comparison: the session carries `employee_id` as text, the row as a
+    UUID cast to text.
+    """
+    emp_id = user.get('employee_id')
+    return bool(emp_id and req.get('employee_id')
+                and str(emp_id) == str(req['employee_id']))
+
+
+def _audit_self_decision_refused(req, user):
+    """Record a refused self-decision (KAN-203). Never raises into the caller.
+
+    Opens its own transaction: a refusal has no unit of work to join. See the
+    matching helper in `app/routes/org_change.py` for the reasoning.
+    """
+    try:
+        with transaction():
+            audit_service.record(
+                'ORG_CHANGE_SELF_ACTION_REFUSED',
+                'org_change_request', req['id'],
+                company_id=req['company_id'],
+                actor=user,
+                subject_employee_id=req['employee_id'],
+                reason='Refused: user attempted to decide a position change '
+                       'about themselves (KAN-203).',
+                outcome='FAILED',
+                error_code='SELF_ACTION_REFUSED',
+                retention_class='SECURITY',
+                metadata={'attempted': 'DECIDE',
+                          'step': req.get('current_step')},
+            )
+    except Exception:
+        logger.exception('KAN-203: failed to audit refused self-decision')
+
+
 def decide(request_id, user, decision, note):
     """Approve/reject the CURRENT step. Returns (ok, status_or_error)."""
     if decision not in ('approve', 'reject'):
@@ -234,6 +291,18 @@ def decide(request_id, user, decision, note):
     req = to_dict(req)
     if req['company_id'] != user.get('company_id') and 'SYSTEM_ADMIN' not in (user.get('roles') or []):
         return False, 'not your company'
+
+    # KAN-203 — nobody decides a request whose SUBJECT is themselves: any level,
+    # any role, SYSTEM_ADMIN included. This is an integrity control, not a
+    # judgement about an amount, so it is refused outright and is deliberately
+    # NOT subject to the advise-and-override rule that governs pay decisions.
+    # Checked ahead of the step lookup so a subject cannot use the error message
+    # to learn who is approving them.
+    if _is_self_subject(user, req):
+        _audit_self_decision_refused(req, user)
+        return False, ('you cannot decide a position change about yourself — '
+                       'another approver must decide it')
+
     if req['status'] != 'PENDING':
         return False, 'request is no longer pending'
 
@@ -289,7 +358,8 @@ def decide(request_id, user, decision, note):
         # level — several people can hold the approving role and only one acted —
         # then raise the call to action for level N+1 (DEF-003).
         _retire_call_to_action(request_id)
-        _notify(_step_approver_user_ids(req['company_id'], next_step), 'ORG_CHANGE_REQUESTED',
+        _notify(_step_approver_user_ids(req['company_id'], next_step, req['employee_id']),
+                'ORG_CHANGE_REQUESTED',
                 f"Position change for {subj} — awaiting your approval (level {nxt} of {total}).",
                 req_id=request_id)
         _notify([req['requested_by_user_id']], 'ORG_CHANGE_STEP_APPROVED',
@@ -448,7 +518,13 @@ def list_my_requests(user):
 
 
 def list_pending(user):
-    """Requests whose CURRENT step this user may decide."""
+    """Requests whose CURRENT step this user may decide.
+
+    Excludes requests whose SUBJECT is *user* (KAN-203) — they may not decide
+    those, and the inbox renders Approve/Reject on everything it returns, so
+    including them would put live controls in front of somebody `decide()` then
+    refuses. The refusal is the control; this keeps the surface honest about it.
+    """
     rows = query(f"""
         SELECT {_DETAIL_COLS},
                ca.approver_type, ca.approver_role,
@@ -461,6 +537,8 @@ def list_pending(user):
     out = []
     for r in rows:
         d = to_dict(r)
+        if _is_self_subject(user, d):        # KAN-203 — not your own move
+            continue
         step = {'approver_type': d['approver_type'], 'approver_role': d['approver_role'],
                 'approver_employee_id': d['approver_employee_id']}
         if _user_matches_step(user, step) or 'SYSTEM_ADMIN' in (user.get('roles') or []):

@@ -194,14 +194,21 @@ function buildNode(data) {
   }
 
   // ── Drag-and-drop to propose a position change ─────────────
+  // Being DRAGGED makes you the subject; being DROPPED ON makes you the new
+  // manager. The two halves are gated separately (KAN-203): your own card is
+  // never draggable — nobody raises a position change about themselves, at any
+  // privilege level — but it stays a drop target, because moving somebody else
+  // to report to you is an ordinary thing for a manager to propose.
   if (CAN_MOVE) {
-    card.setAttribute('draggable', 'true');
-    card.addEventListener('dragstart', e => {
-      e.dataTransfer.setData('text/plain', JSON.stringify({ id: data.id, name: fullName }));
-      e.dataTransfer.effectAllowed = 'move';
-      card.classList.add('ft-dragging');
-    });
-    card.addEventListener('dragend', () => card.classList.remove('ft-dragging'));
+    if (!isSelf) {
+      card.setAttribute('draggable', 'true');
+      card.addEventListener('dragstart', e => {
+        e.dataTransfer.setData('text/plain', JSON.stringify({ id: data.id, name: fullName }));
+        e.dataTransfer.effectAllowed = 'move';
+        card.classList.add('ft-dragging');
+      });
+      card.addEventListener('dragend', () => card.classList.remove('ft-dragging'));
+    }
     card.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; card.classList.add('ft-drop-target'); });
     card.addEventListener('dragleave', () => card.classList.remove('ft-drop-target'));
     card.addEventListener('drop', e => {
@@ -209,6 +216,9 @@ function buildNode(data) {
       card.classList.remove('ft-drop-target');
       let payload; try { payload = JSON.parse(e.dataTransfer.getData('text/plain')); } catch (_) { return; }
       if (!payload || payload.id === data.id) return;   // can't drop onto itself
+      // Display-only belt to the server's brace: a hand-crafted dataTransfer
+      // could still name you as the subject, and the API refuses that.
+      if (payload.id === OWN_ID) return;                // KAN-203 — never yourself
       openMoveModal(payload.id, payload.name, data.id, fullName);
     });
   }

@@ -84,6 +84,11 @@ ACTIONS = frozenset({
     'ORG_ASSIGNMENT_CLOSED',
     'VACATION_REQUEST_CANCELLED_BY_LIFECYCLE',
     'ORG_CHANGE_CANCELLED_BY_LIFECYCLE',
+    # KAN-203. Written when somebody is REFUSED — an attempt to raise or decide
+    # a position change about themselves. A refused integrity control is worth
+    # more in the trail than a successful one: it is the only record that the
+    # attempt happened at all.
+    'ORG_CHANGE_SELF_ACTION_REFUSED',
     'CHECKLIST_STARTED',
     'CHECKLIST_TASK_COMPLETED',
     'CHECKLIST_COMPLETED',

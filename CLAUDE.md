@@ -162,7 +162,11 @@ PGDATABASE=employee_ci_local python -m pytest -q --ignore=tests/ui
 Drag-and-drop employee moves (BU / functional unit / location / manager) go through a company-configurable, **sequential** multi-level approval chain before anything is applied. Key invariants — do not weaken:
 
 1. Pages/APIs are gated by `@require_feature_access('org_change', ...)`; the admin config page by `@require_feature_access('org_structure','w')`. Never hardcode role lists on these routes.
-2. **An individual employee can NEVER initiate their own move.** On top of the feature gate, `create_request` requires the initiator to be the subject's current `SOLID_LINE` manager **or** hold `HR_ADMIN`/`PORTAL_ADMIN`/`SYSTEM_ADMIN`. Keep this business-rule check (`_can_initiate_for`) — the feature flag alone is not sufficient.
+2. **NOBODY may initiate or decide a request whose subject is themselves — no exceptions, including `HR_ADMIN`, `PORTAL_ADMIN` and `SYSTEM_ADMIN`.** Two guards, both mandatory (KAN-203):
+   - **Subject ≠ initiator** — `_can_initiate_for` (`app/routes/org_change.py`) refuses the self case **before** the admin exemption is considered. Beyond that, the initiator must be the subject's current `SOLID_LINE` manager **or** hold `HR_ADMIN`/`PORTAL_ADMIN`/`SYSTEM_ADMIN`. That exemption exists so HR can move **other people**; it has never covered acting on oneself.
+   - **Subject ≠ decider** — `decide()` (`app/services/org_change_service.py`) refuses when the decider is the request's subject, at **any** level, in **any** role.
+
+   Both refusals are specific and are written to `audit_log` as `ORG_CHANGE_SELF_ACTION_REFUSED` (`retention_class='SECURITY'`, `outcome='FAILED'`). These are **integrity controls**: they are refused outright and are never subject to a flag-and-override. Keep both — the feature flag alone is not sufficient, and until KAN-203 an HR_ADMIN who was also an employee could raise their own move and then approve it.
 3. Approvals are **sequential**: level N+1 is only reached after level N approves; any single rejection sets `status=REJECTED` and applies **no** change. Nothing is applied until the final level approves.
 4. All org-change queries are **company-scoped** (`company_id = %s::uuid`) — same rule as everything else. Approver resolution matches role by **name** within the company (roles are per-company).
 5. The engine lives in `app/services/org_change_service.py`; reuse it — do not re-implement approval logic inline in routes.
