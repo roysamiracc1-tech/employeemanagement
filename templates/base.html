@@ -97,6 +97,19 @@
       <span class="nav-label">Org Tree</span>
     </a>
 
+    {# KAN-207 — the employee's own view of the ladder. Main nav and gated on
+       READ (seeded to every role): "visible to the employee — not optional",
+       because transparency is the entire stated purpose. #}
+    {% if has_feature_access('job_architecture') %}
+    <a href="{{ url_for('my_ladder') }}"
+       class="nav-link {% if request.endpoint == 'my_ladder' %}active{% endif %}">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path d="M4 20h16"/><path d="M7 20V9m5 11V5m5 15v-7"/>
+      </svg>
+      <span class="nav-label">My Ladder</span>
+    </a>
+    {% endif %}
+
     {# KAN-191 — a manager assesses their OWN reports' steps. `job_architecture:w`
        is exactly this grant: authoring for your own people, never the ladder.
        Deliberately OUTSIDE the org_change block: steps have nothing to do with

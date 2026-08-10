@@ -895,6 +895,113 @@ product has to be honest — is demoable.
 
 ---
 
+## 8e. Step roadmaps (KAN-207 · EP42 W1 · A1)
+
+**The object the owner actually asked for**, and it is **not** KAN-190's step expectation. The
+distinction is the whole story:
+
+| | Says what | Written for | Table |
+|---|---|---|---|
+| **Expectation** (KAN-190) | what step 1.2 means *here* | anybody at that step | `job_step_expectations` |
+| **Roadmap** (KAN-207) | what *you specifically* need to do to get there | one named person | `employee_step_roadmaps` |
+
+### ⚠️ It is not an assessment, and that is a compliance property
+
+There is **no** `score`, `rating`, `readiness`, `likelihood`, `percent_complete`, `potential` or
+`ranking` column, and there must never be one. A roadmap is a statement of **expectations**; a scored
+or automated judgement about a person is a **different legal object** — GDPR Art. 22 and the EU AI Act
+— with different obligations. `next_step_target()` returns *where* the next rung is and deliberately
+never decides whether somebody is **ready** for it. `TestARoadmapIsNotAnAssessment` parses the
+function body (not a grep — the docstring names the ban in order to state it) and checks the DDL in
+both the migration and `schema.sql`.
+
+### Versioned, never overwritten
+
+Roadmaps are re-agreed at each review, and *"what did we agree in March"* is the question the object
+exists to answer. A new version supersedes the previous one **inside the same transaction**, so
+`uq_esr_one_live` can never see two live rows, and the old version stays **readable**.
+
+**The from/target coordinates are denormalised on purpose.** Resolving the target through the live
+assignment would silently re-target every historical roadmap the moment somebody is promoted — so
+`from_job_level_id`, `from_step_no`, `target_job_level_id` and `target_step_no` are copied at authoring
+time. `authored_by_label` is likewise the author's name **at the time**, because a roadmap outlives a
+job change and *"authored by their manager"* must still read correctly when that person no longer is.
+
+### Acknowledgement records a DISCUSSION, not agreement
+
+> The button says **`Confirm we discussed this`**. The state says **"Discussed on 14 March"**. Never
+> *Accept*, never *agreed*.
+
+Recording agreement when somebody merely read it is a **false record about a person** (CFL-42-50), and
+a label is a claim (standing rule 6). The audit action is `STEP_ROADMAP_DISCUSSION_CONFIRMED` and its
+`reason` says explicitly that it records the discussion and not agreement — the trail has to survive
+being read in two years by somebody who was not in the room.
+
+- **Only the subject may confirm.** A manager confirming on their report's behalf would be exactly the
+  false record the wording avoids.
+- **Idempotent.** Confirming twice is not an error and does not move the date — the first confirmation
+  is when the conversation happened.
+- **An unconfirmed roadmap is still LIVE and blocks nothing.** A non-responsive employee must not be
+  able to freeze their own development plan, so there is **no blocking workflow for a conversation that
+  happens in a room**. The follow-up is surfaced to the manager instead
+  (`GET /api/roadmap/mine/unconfirmed`), which is what replaces it.
+
+### The employee is told, once, in-app
+
+**The owner overruled the BA's and UX's "no" here**, and his reasoning is why it exists: *a roadmap the
+employee does not know about delivers exactly zero transparency*, and "it appears on their profile"
+assumes they visit their profile.
+
+- In-app only, **no email** (his constraint).
+- **Retires on view** — it is an FYI, not a call to action, so it must not sit in the bell like an
+  approval waiting to be decided (DEF-003's lesson, applied in the other direction).
+- Sent **after** the unit of work commits: a notification cannot be rolled back (EP38 §5.4), so
+  announcing earlier risks telling somebody about a roadmap that does not exist. A failed notification
+  never undoes a written roadmap.
+- The message carries **no step number and no pay**, so it reads identically whether or not the company
+  displays steps.
+
+### Visibility
+
+**`/my-ladder` is a main-nav surface gated on `job_architecture:r`** — seeded to every role, because
+*"visible to the employee — not optional"*: if the employee cannot see it, we have not built it. It
+shows their role, their **job family** (an explicit part of what the owner asked for), their roadmap,
+their earlier roadmaps, and the whole ladder's expectations.
+
+A roadmap is about one named person and is nobody else's business: an employee reads their own, a
+manager their own reports', HR within their company. **Asserted at the payload, not only in the nav** —
+a URL is a guess anybody can make.
+
+### The step-disclosure switch — `companies.display_step_to_employee`
+
+> ⚠️ **This belonged to KAN-190 and was missed.** Recorded plainly rather than quietly folded in. It is
+> added in migration 14 because KAN-207 is the first surface that *consumes* it, and a switch with no
+> reader would have been untestable.
+
+Default **TRUE** — the owner asked for level-expectation transparency twice, so withholding is the
+exception a company invokes, not the default it has to switch off.
+
+**It governs the STEP, not the level.** In his own example the title *Junior Software Fullstack
+Engineer* **is** level 2, and the title is always visible — so a switch claiming to hide the level
+would hide nothing while claiming to. It is labelled *do not display*, never *hide*: the ladder stays
+readable either way, so it **prevents display, not inference**.
+
+**With the switch off (A2 option (b)):** the roadmap still reads **in full**, headed *"What the next set
+of expectations looks like"*, with **no step number and no "you are here" marker**. Hiding the roadmap
+too would discard the transparency he asked for twice in order to hide a label; hiding "the number
+only" while showing *"your next step is 2.4"* would disclose it anyway.
+
+### Readiness gate — a human check, not an automated one
+
+The Architect **declined to certify this story**, correctly: its principal risk is whether the copy
+reads as *expectations* rather than as an *assessment*, and no test can see that. The authoring screen
+does what it can — it shows the target step's own expectations while writing, tells the author
+**"they will read this"**, and says to write what they need to do rather than how they are performing —
+but **KAN-207 is Ready only when a human has reviewed the copy against the R-17 boundary, and the SPM
+owns that review.**
+
+---
+
 ## 9. Security Considerations
 
 | Area | Implementation |

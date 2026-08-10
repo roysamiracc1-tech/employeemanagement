@@ -20,6 +20,7 @@ rules worth testing are the ones that are expensive to get wrong later:
 All DB interaction is mocked; data is synthetic.
 """
 import json
+import re
 
 import pytest
 from unittest.mock import patch, MagicMock
@@ -1148,3 +1149,455 @@ class TestTheAuditRowsAreActuallyWritable:
              patch.object(svc, 'audit_service') as aud:
             svc.assign(CO, 'e1', LVL, actor={'user_id': 'u-hr'})
         assert aud.record.call_args.args[2] == 'a-new'
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# KAN-207 — step roadmaps
+#
+# **The object the owner actually asked for**, and it is NOT KAN-190's step
+# expectation:
+#   EXPECTATION  what step 1.2 means *here*, for anybody
+#   ROADMAP      what *you specifically* need to do to get there
+#
+# The tests that matter are the ones about what it must NEVER become: a rating, a
+# score, or a record that somebody "agreed".
+# ══════════════════════════════════════════════════════════════════════════════
+
+ROADMAP_ROW = {
+    'id': 'rm-1', 'version': 2, 'content': 'Own the payments area end to end.',
+    'review_context': 'PERFORMANCE_REVIEW', 'review_date': '2026-03-14',
+    'authored_by_label': 'Ana Costa', 'authored_at': '2026-03-14T10:00:00+00:00',
+    'acknowledged_at': None, 'superseded_at': None,
+    'from_step_no': 2, 'target_step_no': 3,
+    'from_ordinal': 1, 'from_title': 'Trainee', 'target_ordinal': 1,
+    'target_title': 'Trainee Software Engineer', 'family_name': 'Engineering',
+}
+
+
+class TestARoadmapIsNotAnAssessment:
+    """The boundary that keeps this out of GDPR Art. 22 / EU AI Act territory.
+
+    A roadmap is a statement of **expectations**. A scored or automated judgement
+    about a person is a different legal object with different obligations, so the
+    absence of any score is a compliance property, not a style choice.
+    """
+
+    FORBIDDEN = ('score', 'rating', 'readiness', 'likelihood', 'percent',
+                 'achieved', 'met_expectations', 'potential', 'ranking')
+
+    def _ddl(self, path):
+        with open(path) as f:
+            src = f.read()
+        for marker in ('CREATE TABLE IF NOT EXISTS employee_step_roadmaps',
+                       'CREATE TABLE public.employee_step_roadmaps'):
+            if marker in src:
+                block = src[src.index(marker):]
+                return block[:block.index(');')]
+        raise AssertionError(f'{path}: roadmap table not found')
+
+    def test_the_migration_has_no_assessment_column(self):
+        ddl = self._ddl('database/migrations/14_step_roadmaps.sql')
+        code = '\n'.join(l for l in ddl.splitlines() if not l.strip().startswith('--'))
+        for w in self.FORBIDDEN:
+            assert w not in code.lower(), f'{w!r} on the roadmap table — that is an assessment'
+
+    def test_the_schema_has_no_assessment_column(self):
+        ddl = self._ddl('database/schema.sql')
+        code = '\n'.join(l for l in ddl.splitlines() if not l.strip().startswith('--'))
+        for w in self.FORBIDDEN:
+            assert w not in code.lower(), f'{w!r} in schema.sql'
+
+    def test_the_reason_is_written_where_somebody_would_add_one(self):
+        with open('database/migrations/14_step_roadmaps.sql') as f:
+            sql = f.read()
+        assert 'Art. 22' in sql, 'the legal reason for the ban is not recorded'
+
+    def test_nothing_computes_a_readiness_judgement(self):
+        """`next_step_target` returns WHERE the next rung is. It must not decide
+        whether somebody is ready for it — that would be the assessment."""
+        import ast
+        import inspect
+        import textwrap
+        from app.services import job_architecture_service as svc
+        # Parse rather than grep: the docstring NAMES the ban in order to state
+        # it ("nothing here decides whether they are *ready*"), and a grep cannot
+        # tell that from a column read.
+        tree = ast.parse(textwrap.dedent(inspect.getsource(svc.next_step_target)))
+        fn = tree.body[0]
+        body = fn.body[1:] if (isinstance(fn.body[0], ast.Expr)
+                               and isinstance(fn.body[0].value, ast.Constant)) else fn.body
+        code = '\n'.join(ast.unparse(n) for n in body).lower()
+        for w in ('ready', 'eligible', 'qualif', 'score'):
+            assert w not in code, f'{w!r} in the body of next_step_target — a judgement'
+
+
+class TestAcknowledgementRecordsADiscussionNotAgreement:
+    """CFL-42-50. Recording "agreed" when somebody merely read it is a false
+    record about a person, and the label is a claim (standing rule 6)."""
+
+    def test_the_audit_action_says_discussion_not_accepted(self):
+        from app.services import audit_service
+        assert 'STEP_ROADMAP_DISCUSSION_CONFIRMED' in audit_service.ACTIONS
+        for a in audit_service.ACTIONS:
+            assert 'ROADMAP_ACCEPTED' not in a and 'ROADMAP_AGREED' not in a
+
+    def test_the_audit_reason_says_so_explicitly(self):
+        from app.services import job_architecture_service as svc
+        with patch.object(svc, 'query', side_effect=[
+                {'id': 'rm-1', 'version': 2, 'acknowledged_at': None}]), \
+             patch.object(svc, 'transaction', FakeTransaction()), \
+             patch.object(svc, 'execute'), \
+             patch.object(svc, 'audit_service') as aud:
+            svc.acknowledge_roadmap(CO, 'e1', actor={'user_id': 'u-e'})
+        reason = aud.record.call_args.kwargs['reason']
+        assert 'not' in reason.lower() and 'agreement' in reason.lower(), (
+            'the trail could be read as the employee agreeing with the content')
+
+    def test_the_button_says_confirm_we_discussed_this(self):
+        """The ban is on the BUTTON and the STATUS LABEL, not on prose.
+
+        The screen legitimately says "not that you agreed with it" — explaining
+        what confirming does NOT mean is the opposite of claiming agreement, and
+        a cruder check would have forced that sentence out.
+        """
+        with open('templates/employees/my_ladder.html') as f:
+            src = f.read()
+        assert 'Confirm we discussed this' in src
+        body = re.sub(r'\{#(?:.|\n)*?#\}', '', src)          # strip Jinja comments
+        # Every button's visible text, and the acknowledged status line.
+        buttons = re.findall(r'<button[^>]*>(.*?)</button>', body, re.S)
+        for label in buttons:
+            low = re.sub(r'<[^>]*>', '', label).strip().lower()
+            assert 'accept' not in low and 'agree' not in low, (
+                f'a button claims agreement: {low!r}')
+        status = re.findall(r'✓[^<]*', body)
+        for st in status:
+            assert 'agree' not in st.lower(), f'the status claims agreement: {st!r}'
+
+    def test_the_state_reads_discussed_on_a_date(self):
+        with open('templates/employees/my_ladder.html') as f:
+            src = f.read()
+        assert 'Discussed on' in src
+        assert 'not that you agreed with it' in src, (
+            'it does not tell the employee what confirming actually means')
+
+    def test_confirming_twice_is_not_an_error_and_does_not_move_the_date(self):
+        """The first confirmation is when the conversation happened."""
+        from app.services import job_architecture_service as svc
+        with patch.object(svc, 'query', side_effect=[
+                {'id': 'rm-1', 'version': 2, 'acknowledged_at': '2026-03-14T10:00:00+00:00'}]), \
+             patch.object(svc, 'execute') as exe, \
+             patch.object(svc, 'audit_service') as aud:
+            out = svc.acknowledge_roadmap(CO, 'e1', actor={'user_id': 'u-e'})
+        assert out['already'] is True
+        exe.assert_not_called()
+        aud.record.assert_not_called()
+
+    def test_only_the_subject_can_confirm(self):
+        """A manager confirming on their report's behalf would be exactly the
+        false record the wording avoids."""
+        import inspect
+        from app.routes import compensation as mod
+        src = inspect.getsource(mod.api_confirm_roadmap_discussed)
+        assert "session.get('employee_id')" in src
+        assert 'Only the person a roadmap is about' in src
+
+    def test_an_unconfirmed_roadmap_blocks_nothing(self):
+        """A non-responsive employee must not be able to freeze their own
+        development plan — so the follow-up goes to the manager instead."""
+        import inspect
+        from app.services import job_architecture_service as svc
+        assert hasattr(svc, 'unacknowledged_roadmaps')
+        doc = inspect.getdoc(svc.unacknowledged_roadmaps)
+        assert 'blocking workflow' in doc
+        with open('templates/employees/my_ladder.html') as f:
+            assert 'nothing is waiting on you' in f.read()
+
+
+class TestRoadmapsAreVersionedNotOverwritten:
+    """"What did we agree in March" is the question this object exists to answer."""
+
+    def _author(self, prev=None):
+        from app.services import job_architecture_service as svc
+        where = {'current': {'job_level_id': LVL, 'step_no': 2, 'ordinal': 1,
+                             'title': 'Trainee', 'step_count': 3,
+                             'job_family_id': FAM, 'family_name': 'Eng'},
+                 'target': {'job_level_id': LVL, 'step_no': 3, 'ordinal': 1,
+                            'level_title': 'Trainee', 'same_level': True},
+                 'reason': None}
+        txn = FakeTransaction()
+        exe = recording_execute(txn)
+        with patch.object(svc, 'next_step_target', return_value=where), \
+             patch.object(svc, 'query', side_effect=[prev, []]), \
+             patch.object(svc, 'transaction', txn), \
+             patch.object(svc, 'execute', exe), \
+             patch.object(svc, 'insert_returning', return_value={'id': 'rm-new'}) as ins, \
+             patch.object(svc, 'audit_service') as aud, \
+             patch.object(svc, 'notif'):
+            out = svc.author_roadmap(CO, 'e1', 'Own payments.', 'PERFORMANCE_REVIEW',
+                                     actor={'user_id': 'u-mgr'}, author_label='Ana')
+        return out, exe, ins, aud
+
+    def test_the_first_roadmap_is_version_1(self):
+        out, exe, _ins, _aud = self._author(prev=None)
+        assert out['version'] == 1
+        assert not [c for c in exe.call_args_list if 'superseded_at' in str(c.args[0])]
+
+    def test_a_second_roadmap_supersedes_the_first_in_the_same_transaction(self):
+        """`uq_esr_one_live` must never see two live rows."""
+        out, exe, _ins, _aud = self._author(prev={'id': 'rm-old', 'version': 1})
+        assert out['version'] == 2
+        sup = [c for c in exe.call_args_list if 'superseded_at=NOW()' in ' '.join(str(c.args[0]).split())]
+        assert len(sup) == 1
+        assert exe.inside and all(exe.inside), 'the supersede escaped the transaction'
+
+    def test_the_old_version_is_superseded_not_deleted(self):
+        _out, exe, _ins, _aud = self._author(prev={'id': 'rm-old', 'version': 1})
+        writes = ' '.join(str(c.args[0]) for c in exe.call_args_list)
+        assert 'DELETE' not in writes.upper()
+
+    def test_the_target_is_denormalised_so_history_survives_a_move(self):
+        """Resolving the target through the live assignment would silently
+        re-target every historical roadmap the moment somebody is promoted."""
+        _out, _exe, ins, _aud = self._author()
+        sql = ' '.join(str(ins.call_args.args[0]).split())
+        assert 'from_job_level_id' in sql and 'target_job_level_id' in sql
+        assert 'from_step_no' in sql and 'target_step_no' in sql
+
+    def test_the_database_permits_only_one_live_roadmap(self):
+        with open('database/migrations/14_step_roadmaps.sql') as f:
+            sql = f.read()
+        assert 'uq_esr_one_live' in sql and 'WHERE superseded_at IS NULL' in sql
+
+    def test_the_audit_row_records_the_version_and_no_content(self):
+        """The content is free text about a named person; it stays out of the
+        trail, along with anything pay-shaped (ADR-009)."""
+        _out, _exe, _ins, aud = self._author(prev={'id': 'rm-old', 'version': 1})
+        md = aud.record.call_args.kwargs['metadata']
+        assert md['version'] == 2 and md['superseded_version'] == 1
+        assert not any('content' in k or 'pay' in k for k in md)
+        assert 'Own payments' not in str(md), 'the roadmap text leaked into the trail'
+
+    def test_the_screen_says_the_old_one_is_kept(self):
+        with open('templates/employees/step_assessment.html') as f:
+            src = f.read()
+        assert 'kept, not overwritten' in src
+
+
+class TestTheEmployeeIsToldAndCanSeeIt:
+    """"Visible to the employee — not optional." If they cannot see it, we have
+    not built it. And the owner overruled the BA's and UX's "no" on notifying:
+    a roadmap the employee does not know about delivers zero transparency."""
+
+    def test_the_employee_is_notified_once_in_app(self):
+        from app.services import job_architecture_service as svc
+        where = {'current': {'job_level_id': LVL, 'step_no': 2, 'ordinal': 1,
+                             'title': 'T', 'step_count': 3, 'job_family_id': FAM,
+                             'family_name': 'Eng'},
+                 'target': {'job_level_id': LVL, 'step_no': 3, 'ordinal': 1,
+                            'level_title': 'T', 'same_level': True}, 'reason': None}
+        with patch.object(svc, 'next_step_target', return_value=where), \
+             patch.object(svc, 'query', side_effect=[None, [{'id': 'u-emp'}]]), \
+             patch.object(svc, 'transaction', FakeTransaction()), \
+             patch.object(svc, 'execute'), \
+             patch.object(svc, 'insert_returning', return_value={'id': 'rm-1'}), \
+             patch.object(svc, 'audit_service'), \
+             patch.object(svc, 'notif') as n:
+            svc.author_roadmap(CO, 'e1', 'Do X.', 'OFF_CYCLE', actor={'user_id': 'u-mgr'})
+        n.create_user_notification.assert_called_once()
+        args, kwargs = n.create_user_notification.call_args
+        assert args[0] == 'u-emp'
+        assert kwargs['link'] == '/my-ladder'
+        # No step number in the message — it must read the same whether or not the
+        # company displays steps.
+        assert not re.search(r'\d\.\d', args[2]), f'the message leaks a step: {args[2]!r}'
+
+    def test_the_notification_is_sent_after_the_commit(self):
+        """A notification cannot be rolled back, so announcing before the commit
+        risks telling somebody about a roadmap that does not exist."""
+        import inspect
+        from app.services import job_architecture_service as svc
+        src = inspect.getsource(svc.author_roadmap)
+        commit_end = src.index("retention_class='EMPLOYMENT')")
+        assert src.index('create_user_notification') > commit_end
+
+    def test_a_failed_notification_does_not_undo_the_roadmap(self):
+        import inspect
+        from app.services import job_architecture_service as svc
+        src = inspect.getsource(svc.author_roadmap)
+        assert 'except Exception' in src
+        assert 'must not undo a written roadmap' in src
+
+    def test_it_retires_on_view_because_it_is_an_fyi(self):
+        """An FYI must not sit in the bell like an approval waiting to be decided."""
+        import inspect
+        from app.services import job_architecture_service as svc
+        assert 'resolve_related' in inspect.getsource(svc.mark_roadmap_seen)
+        from app.routes import compensation as mod
+        assert 'mark_roadmap_seen' in inspect.getsource(mod.my_ladder)
+
+    def test_the_employees_own_view_is_gated_on_READ_not_write(self):
+        import inspect
+        from app.routes import compensation as mod
+        src = inspect.getsource(mod)
+        head = src[:src.index('def my_ladder(')]
+        assert "@require_feature_access('job_architecture')" in head[head.rindex('@app.route'):]
+
+    def test_a_roadmap_is_not_readable_by_a_colleague(self):
+        """Asserted at the PAYLOAD — a URL is a guess anybody can make."""
+        import inspect
+        from app.routes import compensation as mod
+        src = inspect.getsource(mod.api_roadmap)
+        assert 'is_own' in src and 'manages' in src and 'is_admin' in src
+        assert '403' in src
+
+
+class TestTheDisclosureOffRendering:
+    """A2 option (b). With the switch off the employee STILL sees their role,
+    their family and every level's expectations — the roadmap just carries no
+    step number and no "you are here". Hiding the roadmap too would discard the
+    transparency the owner asked for twice in order to hide a label."""
+
+    def test_the_switch_defaults_to_showing_the_step(self):
+        with open('database/migrations/14_step_roadmaps.sql') as f:
+            sql = f.read()
+        assert 'display_step_to_employee BOOLEAN NOT NULL DEFAULT TRUE' in sql
+
+    def test_it_is_in_the_schema_too_so_a_fresh_ci_database_agrees(self):
+        with open('database/schema.sql') as f:
+            assert 'display_step_to_employee boolean DEFAULT true NOT NULL' in f.read()
+
+    def test_an_absent_company_assumes_the_transparent_default(self):
+        from app.services import job_architecture_service as svc
+        with patch.object(svc, 'query', return_value=None):
+            assert svc.displays_step(CO) is True
+
+    def test_with_the_switch_on_the_target_carries_its_step_number(self):
+        from app.services import job_architecture_service as svc
+        with patch.object(svc, 'displays_step', return_value=True):
+            d = svc._decorate_roadmap(dict(ROADMAP_ROW), CO)
+        assert d['target_label'] == '1.3'
+        assert '1.3' in d['target_heading']
+
+    def test_with_the_switch_off_there_is_no_step_number_anywhere(self):
+        from app.services import job_architecture_service as svc
+        with patch.object(svc, 'displays_step', return_value=False):
+            d = svc._decorate_roadmap(dict(ROADMAP_ROW), CO)
+        assert d['target_label'] is None and d['from_label'] is None
+        assert not re.search(r'\d\.\d', d['target_heading']), d['target_heading']
+        assert d['target_heading'] == 'What the next set of expectations looks like'
+
+    def test_the_roadmap_content_itself_is_never_hidden(self):
+        """Hiding it would discard the transparency in order to hide a label."""
+        from app.services import job_architecture_service as svc
+        with patch.object(svc, 'displays_step', return_value=False):
+            d = svc._decorate_roadmap(dict(ROADMAP_ROW), CO)
+        assert d['content'] == ROADMAP_ROW['content']
+
+    def test_the_switch_governs_the_step_not_the_level(self):
+        """In the owner's own example the TITLE is the level, and the title is
+        always visible — so a switch claiming to hide the level would hide
+        nothing while claiming to."""
+        import inspect
+        from app.services import job_architecture_service as svc
+        doc = inspect.getdoc(svc.displays_step)
+        assert 'STEP, not the level' in doc
+        with open('templates/employees/my_ladder.html') as f:
+            src = f.read()
+        # The role title renders unconditionally; only the step is behind the flag.
+        block = src[src.index('My role'):src.index('My roadmap')]
+        assert '{{ where.current.title }}' in block
+        assert 'shows_step' in block, 'the step is not behind the switch'
+
+
+class TestARoadmapNeedsSomewhereToPoint:
+    def test_an_unassessed_step_has_no_next_step(self):
+        """Proposing one would assert where they are, which is exactly the claim
+        STEP_NOT_ASSESSED refuses to make (A6)."""
+        from app.services import job_architecture_service as svc
+        cur = {'job_level_id': LVL, 'step_no': None, 'ordinal': 1, 'title': 'T',
+               'step_count': 3, 'job_family_id': FAM, 'family_name': 'Eng'}
+        with patch.object(svc, 'query', side_effect=[cur]):
+            out = svc.next_step_target(CO, 'e1')
+        assert out['target'] is None
+        assert 'not been assessed' in out['reason']
+
+    def test_the_next_step_within_a_level_is_the_next_increment(self):
+        from app.services import job_architecture_service as svc
+        cur = {'job_level_id': LVL, 'step_no': 2, 'ordinal': 1, 'title': 'T',
+               'step_count': 3, 'job_family_id': FAM, 'family_name': 'Eng'}
+        with patch.object(svc, 'query', side_effect=[cur]):
+            out = svc.next_step_target(CO, 'e1')
+        assert out['target']['step_no'] == 3 and out['target']['same_level'] is True
+
+    def test_the_top_step_points_at_the_entry_step_of_the_next_level(self):
+        from app.services import job_architecture_service as svc
+        cur = {'job_level_id': LVL, 'step_no': 3, 'ordinal': 1, 'title': 'T',
+               'step_count': 3, 'job_family_id': FAM, 'family_name': 'Eng'}
+        nxt = {'id': 'lvl-2', 'ordinal': 2, 'title': 'Junior', 'step_count': 5}
+        with patch.object(svc, 'query', side_effect=[cur, nxt]):
+            out = svc.next_step_target(CO, 'e1')
+        assert out['target']['step_no'] == 0 and out['target']['ordinal'] == 2
+        assert out['target']['same_level'] is False
+
+    def test_the_top_of_the_highest_level_says_so_rather_than_inventing_one(self):
+        from app.services import job_architecture_service as svc
+        cur = {'job_level_id': LVL, 'step_no': 3, 'ordinal': 9, 'title': 'T',
+               'step_count': 3, 'job_family_id': FAM, 'family_name': 'Eng'}
+        with patch.object(svc, 'query', side_effect=[cur, None]):
+            out = svc.next_step_target(CO, 'e1')
+        assert out['target'] is None and 'top step' in out['reason']
+
+    def test_authoring_is_refused_when_there_is_nowhere_to_point(self):
+        from app.services import job_architecture_service as svc
+        with patch.object(svc, 'next_step_target',
+                          return_value={'current': {}, 'target': None,
+                                        'reason': 'Their step has not been assessed yet.'}):
+            with pytest.raises(svc.LadderError) as exc:
+                svc.author_roadmap(CO, 'e1', 'Do X.', 'OFF_CYCLE', actor={'user_id': 'u'})
+        assert 'not been assessed' in str(exc.value)
+
+    def test_empty_content_is_refused(self):
+        from app.services import job_architecture_service as svc
+        for empty in ('', '   ', None):
+            with pytest.raises(svc.LadderError) as exc:
+                svc.author_roadmap(CO, 'e1', empty, 'OFF_CYCLE', actor={'user_id': 'u'})
+            assert 'whole object' in str(exc.value)
+
+    def test_an_unknown_review_context_is_refused(self):
+        from app.services import job_architecture_service as svc
+        with pytest.raises(svc.LadderError):
+            svc.author_roadmap(CO, 'e1', 'Do X.', 'MADE_UP', actor={'user_id': 'u'})
+
+    def test_the_contexts_match_the_org_change_vocabulary(self):
+        """§14.5 — EP42 RECORDS that a step change happened at a review; it does
+        not build the review. The same four contexts, so the vocabulary is one."""
+        from app.services import job_architecture_service as svc
+        assert set(svc.REVIEW_CONTEXTS) == {
+            'PROBATION_REVIEW', 'MID_TERM_GOAL_REVIEW', 'PERFORMANCE_REVIEW', 'OFF_CYCLE'}
+
+
+class TestTheAuthoringSurfaceShowsWhatTheStepExpects:
+    """A roadmap that contradicts the step it points at is worse than none."""
+
+    def setup_method(self):
+        with open('templates/employees/step_assessment.html') as f:
+            self.src = f.read()
+
+    def test_the_target_steps_expectations_are_shown_while_writing(self):
+        assert 'rwShowTargetExpectations' in self.src
+        assert 'What that step expects' in self.src
+
+    def test_the_author_is_told_the_employee_will_read_it(self):
+        assert 'They will read this' in self.src
+
+    def test_the_author_is_told_not_to_write_an_assessment(self):
+        assert 'not how' in self.src and 'performing' in self.src
+        assert "don't put pay in it" in self.src.lower()
+
+    def test_a_blocked_case_explains_itself_rather_than_disabling_silently(self):
+        assert 'rw-blocked' in self.src and 'rw-blocked-msg' in self.src
+
+    def test_it_uses_the_shared_shell_primitives(self):
+        assert 'announce(' in self.src and 'escH(' in self.src
+        assert self.src.count('aria-live') == 0

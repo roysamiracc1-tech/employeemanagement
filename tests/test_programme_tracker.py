@@ -67,6 +67,8 @@ class TestNothingIsSilentlyDropped:
         answer, so a missing row reads as "not done"."""
         mod, src = parsed
         delivered = mod.parse_delivered(src)
+        # Counted from the DONE marker alone, so the count is independent of
+        # whatever trailing text a row adds after the date ("— W1 CLOSES").
         expected = len(re.findall(r'^\|\s*\|\s*\*\*✅\s*(?:KAN-\d+\s+)?DONE\s*\(',
                                   src, re.M))
         assert len(delivered) == expected, f'{expected} evidence rows, {len(delivered)} parsed'

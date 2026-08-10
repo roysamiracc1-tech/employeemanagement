@@ -403,3 +403,148 @@ def api_assess_step(employee_id):
     except LadderError as exc:
         return _fail(exc)
     return jsonify({'ok': True, **out})
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# KAN-207 — step roadmaps
+#
+# Two surfaces:
+#   /my-ladder        the EMPLOYEE's own view. `job_architecture:r` — seeded to
+#                     every role, because visibility is the entire point.
+#   the manager's authoring dialog, on /my-team/steps — `job_architecture:w`,
+#                     row-scoped to their own reports. This IS what the fourth
+#                     feature code was created for (CFL-42-35).
+# ══════════════════════════════════════════════════════════════════════════════
+
+@app.route('/my-ladder')
+@require_feature_access('job_architecture')
+def my_ladder():
+    """What the ladder means for ME. **Visible to the employee, not optional** —
+    transparency is the stated purpose, so if the employee cannot see it we have
+    not built it.
+
+    Renders whether or not the company displays step numbers: with the switch off
+    the roadmap still reads in full, without a step number and without a
+    "you are here" marker (A2 option (b)). Hiding the roadmap too would discard
+    the transparency the owner asked for twice in order to hide a label.
+    """
+    cid = current_company_id()
+    emp = session.get('employee_id')
+    if not cid or not emp:
+        return render_template('employees/my_ladder.html', has_context=False)
+
+    roadmap = svc.live_roadmap(cid, emp)
+    if roadmap:
+        # It is an FYI, not a call to action — retire it from the bell now that
+        # they have actually read it.
+        svc.mark_roadmap_seen(roadmap['id'])
+    return render_template(
+        'employees/my_ladder.html',
+        has_context=True,
+        where=svc.next_step_target(cid, emp),
+        roadmap=roadmap,
+        history=[r for r in svc.roadmap_history(cid, emp) if not r['is_live']],
+        shows_step=svc.displays_step(cid),
+        ladder=svc.ladder(cid),
+    )
+
+
+@app.route('/api/roadmap/<employee_id>')
+@require_feature_access('job_architecture')
+def api_roadmap(employee_id):
+    """A roadmap is about ONE named person and is nobody else's business.
+
+    An employee reads their own; a manager reads their own reports'; HR/Portal
+    admin may read within their company. Asserted **at the payload**, not only in
+    the nav — a URL is a guess anybody can make.
+    """
+    cid, err = _company_or_400()
+    if err:
+        return err
+    me = session.get('employee_id')
+    roles = session.get('roles', [])
+    is_admin = bool({'HR_ADMIN', 'PORTAL_ADMIN', 'SYSTEM_ADMIN'} & set(roles))
+    is_own = (str(employee_id) == str(me))
+    manages = any(r['employee_id'] == employee_id
+                  for r in svc.pending_assessments(cid, me)) if me else False
+    if not (is_own or manages or is_admin):
+        return jsonify({'error': 'A roadmap is only visible to the person it is '
+                                 'about, their manager, and HR.'}), 403
+    return jsonify({
+        'where': svc.next_step_target(cid, employee_id),
+        'live': svc.live_roadmap(cid, employee_id),
+        'history': svc.roadmap_history(cid, employee_id),
+        'contexts': [{'value': v, 'label': svc.REVIEW_CONTEXT_LABELS[v]}
+                     for v in svc.REVIEW_CONTEXTS],
+        'shows_step': svc.displays_step(cid),
+    })
+
+
+@app.route('/api/roadmap/<employee_id>', methods=['POST'])
+@require_feature_access('job_architecture', 'w')
+def api_author_roadmap(employee_id):
+    """Write a roadmap. Row-scoped to the author's own reports, or HR/Portal.
+
+    The feature gate says "may author roadmaps"; this says "may author for THIS
+    person". Same shape as the org-change initiator rule — the flag alone is
+    never sufficient.
+    """
+    cid, err = _company_or_400()
+    if err:
+        return err
+    me = session.get('employee_id')
+    roles = session.get('roles', [])
+    is_admin = bool({'HR_ADMIN', 'PORTAL_ADMIN', 'SYSTEM_ADMIN'} & set(roles))
+    manages = any(r['employee_id'] == employee_id
+                  for r in svc.pending_assessments(cid, me)) if me else False
+    if not (manages or is_admin):
+        return jsonify({'error': 'You can only write a roadmap for your own '
+                                 'direct reports.'}), 403
+    d = request.get_json() or {}
+    try:
+        out = svc.author_roadmap(
+            cid, employee_id, d.get('content'), d.get('review_context'),
+            review_date=(d.get('review_date') or None),
+            actor=_user(),
+            author_label=session.get('user_name') or 'Their manager')
+    except LadderError as exc:
+        return _fail(exc)
+    return jsonify({'ok': True, **out})
+
+
+@app.route('/api/roadmap/<employee_id>/confirm-discussed', methods=['POST'])
+@require_feature_access('job_architecture')
+def api_confirm_roadmap_discussed(employee_id):
+    """**The employee confirms the conversation happened. Not agreement.**
+
+    CFL-42-50 — recording "agreed" when somebody merely read it is a false record
+    about a person. Only the SUBJECT may do this: a manager confirming on their
+    report's behalf would be exactly the false record the wording avoids.
+    """
+    cid, err = _company_or_400()
+    if err:
+        return err
+    if str(employee_id) != str(session.get('employee_id')):
+        return jsonify({'error': 'Only the person a roadmap is about can confirm '
+                                 'they discussed it.'}), 403
+    try:
+        out = svc.acknowledge_roadmap(cid, employee_id, actor=_user())
+    except LadderError as exc:
+        return _fail(exc)
+    return jsonify({'ok': True, **out})
+
+
+@app.route('/api/roadmap/mine/unconfirmed')
+@require_feature_access('job_architecture', 'w')
+def api_unconfirmed_roadmaps():
+    """The author's own follow-up list — what replaces a blocking workflow.
+
+    An unacknowledged roadmap is still live and blocks nothing: a non-responsive
+    employee must not be able to freeze their own development plan. So the
+    follow-up goes to the person who can have the conversation.
+    """
+    cid, err = _company_or_400()
+    if err:
+        return err
+    return jsonify({'unconfirmed': svc.unacknowledged_roadmaps(
+        cid, session.get('user_id'))})

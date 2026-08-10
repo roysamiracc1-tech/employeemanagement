@@ -235,7 +235,7 @@ def parse_delivered(src):
         sm = re.match(r'^\|\s*(?:✅|⬜|🟡|⏸|⛔)?\s*(KAN-\d+)\s*\|', line)
         if sm:
             last_story = sm.group(1)
-        m = re.match(r'^\|\s*\|\s*\*\*✅\s*(?:(KAN-\d+)\s+)?DONE\s*\(([^)]*)\)\.?\*\*(.*)$', line)
+        m = re.match(r'^\|\s*\|\s*\*\*✅\s*(?:(KAN-\d+)\s+)?DONE\s*\(([^)]*)\)[^*]*\*\*(.*)$', line)
         if not m:
             continue
         story_id = m.group(1) or last_story

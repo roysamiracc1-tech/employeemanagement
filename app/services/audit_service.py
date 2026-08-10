@@ -111,6 +111,12 @@ ACTIONS = frozenset({
     'JOB_LEVEL_ASSIGNED',
     'JOB_LEVEL_CHANGED',
     'EMPLOYEE_STEP_ASSESSED',
+    # KAN-207 — step roadmaps. `..._DISCUSSION_CONFIRMED`, deliberately NOT
+    # `..._ACCEPTED`: recording agreement when somebody merely read it is a false
+    # record about a person (CFL-42-50). The verb has to survive being read back
+    # in two years by somebody who was not in the room.
+    'STEP_ROADMAP_AUTHORED',
+    'STEP_ROADMAP_DISCUSSION_CONFIRMED',
     'CHECKLIST_STARTED',
     'CHECKLIST_TASK_COMPLETED',
     'CHECKLIST_COMPLETED',

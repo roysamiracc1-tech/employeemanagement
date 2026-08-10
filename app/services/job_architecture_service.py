@@ -29,6 +29,7 @@ import logging
 from app.db import query, execute, insert_returning, to_dict, transaction
 from app.helpers import as_date
 from app.services import audit_service
+from app.services import notification_service as notif
 
 logger = logging.getLogger(__name__)
 
@@ -899,3 +900,348 @@ def assess_step(company_id, employee_id, step_no, actor=None, reason=None,
             retention_class='EMPLOYMENT')
     return {'step_no': n, 'label': f"{row['ordinal']}.{n}",
             'was_first_assessment': before is None}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# KAN-207 — step roadmaps
+#
+# **The object the owner actually asked for**, and it is NOT KAN-190's step
+# expectation. The distinction is the whole story:
+#
+#   EXPECTATION (KAN-190)  what step 1.2 means *here*, for anybody
+#   ROADMAP     (KAN-207)  what *you, specifically* need to do to get there
+#
+# ⚠ NO RATINGS, NO SCORES, NO ASSESSMENT OF ANY KIND. A roadmap is a statement of
+# expectations. That boundary is what keeps it out of GDPR Art. 22 and EU AI Act
+# territory: a scored or automated judgement about a person is a different legal
+# object with different obligations. Nothing here computes, ranks or predicts.
+# ══════════════════════════════════════════════════════════════════════════════
+
+REVIEW_CONTEXTS = ('PROBATION_REVIEW', 'MID_TERM_GOAL_REVIEW',
+                   'PERFORMANCE_REVIEW', 'OFF_CYCLE')
+
+REVIEW_CONTEXT_LABELS = {
+    'PROBATION_REVIEW':     'Probation review',
+    'MID_TERM_GOAL_REVIEW': 'Mid-term goal review',
+    'PERFORMANCE_REVIEW':   'Performance review',
+    'OFF_CYCLE':            'Off-cycle conversation',
+}
+
+
+def displays_step(company_id):
+    """Does this company show an employee their own STEP NUMBER? (A2 §6)
+
+    Governs **display, not inference** — the employee reads the whole ladder and
+    their own expectations either way, which is why the setting is labelled
+    *do not display* and never *hide* (standing rule 6: a label is a claim).
+
+    It governs the STEP, not the level: in the owner's own example the title
+    *Junior Software Fullstack Engineer* **is** level 2, and the title is always
+    visible, so a switch claiming to hide the level would hide nothing.
+    """
+    row = query("SELECT display_step_to_employee AS on FROM companies WHERE id=%s::uuid",
+                (company_id,), one=True)
+    # Absent company → assume the transparent default rather than the restrictive
+    # one: the owner asked for this twice, so withholding is the exception.
+    return True if row is None else bool(to_dict(row)['on'])
+
+
+def next_step_target(company_id, employee_id):
+    """Where this person is, and the next rung up. None if they are not placed.
+
+    "Next" is the next STEP in the same level, or the entry step of the next
+    level once they are at the top of theirs. Returned as data so the caller
+    renders it; nothing here decides whether they are *ready* — that would be an
+    assessment, which this object must never make.
+    """
+    cur = query("""
+        SELECT a.job_level_id::text AS job_level_id, a.step_no,
+               l.ordinal, l.title, l.step_count, l.job_family_id::text AS job_family_id,
+               f.name AS family_name
+        FROM employee_job_assignments a
+        JOIN job_levels   l ON l.id = a.job_level_id
+        JOIN job_families f ON f.id = l.job_family_id
+        WHERE a.employee_id=%s::uuid AND a.company_id=%s::uuid AND a.is_current
+    """, (employee_id, company_id), one=True)
+    if not cur:
+        return None
+    cur = to_dict(cur)
+
+    # A step that has never been assessed has no "next": proposing one would be
+    # asserting where they are, which is exactly the claim STEP_NOT_ASSESSED
+    # exists to refuse to make (A6).
+    if cur['step_no'] is None:
+        return {'current': cur, 'target': None,
+                'reason': 'Their step has not been assessed yet, so there is no '
+                          'next step to point at. Assess it first under Team Steps.'}
+
+    if cur['step_no'] < cur['step_count']:
+        target = {'job_level_id': cur['job_level_id'], 'step_no': cur['step_no'] + 1,
+                  'ordinal': cur['ordinal'], 'level_title': cur['title'],
+                  'same_level': True}
+    else:
+        nxt = query("""
+            SELECT id::text, ordinal, title, step_count FROM job_levels
+            WHERE company_id=%s::uuid AND job_family_id=%s::uuid
+              AND ordinal > %s AND is_active
+            ORDER BY ordinal LIMIT 1
+        """, (company_id, cur['job_family_id'], cur['ordinal']), one=True)
+        if not nxt:
+            return {'current': cur, 'target': None,
+                    'reason': 'They are at the top step of the highest level in '
+                              'this family, so there is no next step defined.'}
+        nxt = to_dict(nxt)
+        target = {'job_level_id': nxt['id'], 'step_no': 0,
+                  'ordinal': nxt['ordinal'], 'level_title': nxt['title'],
+                  'same_level': False}
+    return {'current': cur, 'target': target, 'reason': None}
+
+
+def live_roadmap(company_id, employee_id):
+    """The one live roadmap, or None. Superseded versions are read separately."""
+    row = query("""
+        SELECT r.id::text, r.version, r.content, r.review_context, r.review_date,
+               r.authored_by_label, r.authored_at, r.acknowledged_at,
+               r.from_step_no, r.target_step_no,
+               fl.ordinal AS from_ordinal, fl.title AS from_title,
+               tl.ordinal AS target_ordinal, tl.title AS target_title,
+               f.name AS family_name
+        FROM employee_step_roadmaps r
+        JOIN job_levels fl ON fl.id = r.from_job_level_id
+        JOIN job_levels tl ON tl.id = r.target_job_level_id
+        JOIN job_families f ON f.id = tl.job_family_id
+        WHERE r.employee_id=%s::uuid AND r.company_id=%s::uuid
+          AND r.superseded_at IS NULL
+    """, (employee_id, company_id), one=True)
+    return _decorate_roadmap(to_dict(row), company_id) if row else None
+
+
+def roadmap_history(company_id, employee_id):
+    """Every version, newest first. "What did we agree in March" is the point."""
+    rows = query("""
+        SELECT r.id::text, r.version, r.content, r.review_context, r.review_date,
+               r.authored_by_label, r.authored_at, r.acknowledged_at, r.superseded_at,
+               r.from_step_no, r.target_step_no,
+               fl.ordinal AS from_ordinal, fl.title AS from_title,
+               tl.ordinal AS target_ordinal, tl.title AS target_title,
+               f.name AS family_name
+        FROM employee_step_roadmaps r
+        JOIN job_levels fl ON fl.id = r.from_job_level_id
+        JOIN job_levels tl ON tl.id = r.target_job_level_id
+        JOIN job_families f ON f.id = tl.job_family_id
+        WHERE r.employee_id=%s::uuid AND r.company_id=%s::uuid
+        ORDER BY r.version DESC
+    """, (employee_id, company_id))
+    return [_decorate_roadmap(to_dict(r), company_id) for r in rows]
+
+
+def _decorate_roadmap(d, company_id):
+    """Render-ready labels, including the disclosure-off variant.
+
+    ⚠ THE ACKNOWLEDGEMENT LABEL IS THE POINT (CFL-42-50). "Discussed with Ravi on
+    14 March", never "agreed" — recording agreement when somebody merely read it
+    is a false record about a person.
+    """
+    show_step = displays_step(company_id)
+    d['review_context_label'] = REVIEW_CONTEXT_LABELS.get(d.get('review_context'),
+                                                          d.get('review_context'))
+    d['acknowledged'] = d.get('acknowledged_at') is not None
+    d['is_live'] = d.get('superseded_at') is None
+    if show_step:
+        d['from_label'] = step_label(d['from_ordinal'], d['from_step_no'])
+        d['target_label'] = step_label(d['target_ordinal'], d['target_step_no'])
+        d['target_heading'] = (f"Towards {d['target_label']} — {d['target_title']}")
+    else:
+        # A2 option (b). The roadmap still reads, in full — hiding it would
+        # discard the transparency he asked for twice in order to hide a label.
+        # But NO step number and NO "you are here" marker: showing "your next
+        # step is 2.4" would disclose the very thing the switch is for.
+        d['from_label'] = None
+        d['target_label'] = None
+        d['target_heading'] = 'What the next set of expectations looks like'
+    d['shows_step'] = show_step
+    return d
+
+
+def author_roadmap(company_id, employee_id, content, review_context,
+                   review_date=None, actor=None, author_label=None):
+    """Write a roadmap for one person. Supersedes the previous version.
+
+    **Versioned, never overwritten.** Roadmaps are re-agreed at each review, and
+    the previous version stays readable — that is the entire reason this is a
+    version chain rather than an `UPDATE`.
+
+    The from/target coordinates are **denormalised on purpose**: the target must
+    survive the employee moving, so "what did we agree in March" still reads
+    correctly after a level change. Resolving it through the live assignment
+    instead would silently re-target every historical roadmap on promotion.
+    """
+    content = (content or '').strip()
+    if not content:
+        raise LadderError('A roadmap needs to say what they need to do — that is '
+                          'the whole object.')
+    if review_context not in REVIEW_CONTEXTS:
+        raise LadderError('Say which conversation this came out of.')
+
+    where = next_step_target(company_id, employee_id)
+    if where is None:
+        raise LadderError('This person is not on a level yet, so there is no next '
+                          'step to write a roadmap towards.')
+    if where['target'] is None:
+        raise LadderError(where['reason'])
+
+    cur, tgt = where['current'], where['target']
+    prev = query("""
+        SELECT id::text, version FROM employee_step_roadmaps
+        WHERE employee_id=%s::uuid AND company_id=%s::uuid AND superseded_at IS NULL
+    """, (employee_id, company_id), one=True)
+    prev = to_dict(prev) if prev else None
+    version = (prev['version'] + 1) if prev else 1
+
+    corr = audit_service.new_correlation_id()
+    with transaction():
+        if prev:
+            # Superseded in the SAME transaction as the new version is written, so
+            # `uq_esr_one_live` can never see two live rows.
+            execute("UPDATE employee_step_roadmaps SET superseded_at=NOW() "
+                    "WHERE id=%s::uuid", (prev['id'],))
+        row = insert_returning("""
+            INSERT INTO employee_step_roadmaps
+              (company_id, employee_id, version,
+               from_job_level_id, from_step_no, target_job_level_id, target_step_no,
+               content, review_context, review_date,
+               authored_by_user_id, authored_by_label, correlation_id)
+            VALUES (%s::uuid, %s::uuid, %s,
+                    %s::uuid, %s, %s::uuid, %s,
+                    %s, %s, %s,
+                    %s::uuid, %s, %s::uuid)
+            RETURNING id::text
+        """, (company_id, employee_id, version,
+              cur['job_level_id'], cur['step_no'], tgt['job_level_id'], tgt['step_no'],
+              content, review_context, review_date,
+              (actor or {}).get('user_id'), (author_label or 'Their manager'), corr))
+        audit_service.record(
+            'STEP_ROADMAP_AUTHORED', 'employee_step_roadmap', row['id'],
+            company_id=company_id, actor=_actor(actor),
+            subject_employee_id=employee_id,
+            reason=(f'Step roadmap v{version} written towards '
+                    f"{tgt['ordinal']}.{tgt['step_no']}, out of a "
+                    f"{REVIEW_CONTEXT_LABELS[review_context].lower()}."),
+            correlation_id=corr,
+            # The step coordinates and the context — never the CONTENT, which is
+            # free text about a named person, and never a pay figure (ADR-009).
+            metadata={'version': version, 'from_step_no': cur['step_no'],
+                      'target_step_no': tgt['step_no'],
+                      'review_context': review_context,
+                      'superseded_version': (prev or {}).get('version')},
+            retention_class='EMPLOYMENT')
+
+    # ── Tell the employee, once, in-app ──────────────────────────────────────
+    #
+    # ⚠ THE OWNER OVERRULED THE BA'S AND UX'S "NO" HERE, and his reasoning is
+    # the reason this exists: **a roadmap the employee does not know about
+    # delivers exactly zero transparency**, and "it appears on their profile"
+    # assumes they visit their profile.
+    #
+    # Sent AFTER the unit of work has committed — a notification cannot be rolled
+    # back (EP38 technical design §5.4), so announcing before the commit risks
+    # telling somebody about a roadmap that does not exist.
+    #
+    # No email (his constraint). Retires on view — it is an FYI, not a call to
+    # action, so it must not sit in the bell like an approval waiting to be
+    # decided. And it carries NO pay information and no step number: the message
+    # is deliberately readable whether or not the company displays steps.
+    try:
+        for uid in _subject_user_ids_for(employee_id):
+            notif.create_user_notification(
+                uid, 'STEP_ROADMAP_AUTHORED',
+                'Your manager has written what your next step needs from you.',
+                link='/my-ladder',
+                related_type='STEP_ROADMAP', related_id=row['id'])
+    except Exception:
+        # A failed notification must not undo a written roadmap — the roadmap is
+        # the thing of value and it has already committed.
+        logger.exception('KAN-207: failed to notify employee about roadmap %s', row['id'])
+
+    return {'id': row['id'], 'version': version, 'correlation_id': corr}
+
+
+def _subject_user_ids_for(employee_id):
+    rows = query("SELECT id::text FROM users WHERE employee_id=%s::uuid AND is_active",
+                 (employee_id,))
+    return [r['id'] for r in rows]
+
+
+def acknowledge_roadmap(company_id, employee_id, actor=None):
+    """The employee confirms **the conversation happened**. Not agreement.
+
+    ⚠ CFL-42-50. Recording "agreed" when somebody merely read it is a false
+    record about a person, so nothing here stores agreement, the button says
+    *Confirm we discussed this*, and the rendered state says *Discussed with Ravi
+    on 14 March*.
+
+    Idempotent: confirming twice is not an error and does not move the date — the
+    first confirmation is when the conversation happened.
+    """
+    row = query("""
+        SELECT id::text, version, acknowledged_at FROM employee_step_roadmaps
+        WHERE employee_id=%s::uuid AND company_id=%s::uuid AND superseded_at IS NULL
+    """, (employee_id, company_id), one=True)
+    if not row:
+        raise LadderError('There is no current roadmap to confirm.')
+    row = to_dict(row)
+    if row['acknowledged_at']:
+        return {'already': True, 'at': row['acknowledged_at']}
+
+    with transaction():
+        execute("""
+            UPDATE employee_step_roadmaps
+            SET acknowledged_at = NOW(), acknowledged_by_user_id = %s::uuid
+            WHERE id = %s::uuid
+        """, ((actor or {}).get('user_id'), row['id']))
+        audit_service.record(
+            'STEP_ROADMAP_DISCUSSION_CONFIRMED', 'employee_step_roadmap', row['id'],
+            company_id=company_id, actor=_actor(actor),
+            subject_employee_id=employee_id,
+            # The wording matters in the trail too: this row must not later be
+            # read as the employee agreeing with the content.
+            reason=(f'Employee confirmed the roadmap conversation took place '
+                    f'(v{row["version"]}). This records the DISCUSSION, not '
+                    f'agreement with its content.'),
+            metadata={'version': row['version']},
+            retention_class='EMPLOYMENT')
+    return {'already': False}
+
+
+def mark_roadmap_seen(roadmap_id):
+    """Retire the FYI notification once the employee has looked at the roadmap.
+
+    It is an FYI, not a call to action, so it must **not** sit in the bell like an
+    approval waiting to be decided (DEF-003's lesson applied to the other
+    direction). Never raises: failing to tidy the bell must not break the page.
+    """
+    try:
+        notif.resolve_related('STEP_ROADMAP', roadmap_id, ['STEP_ROADMAP_AUTHORED'])
+    except Exception:
+        logger.exception('KAN-207: failed to retire the roadmap notification')
+
+
+def unacknowledged_roadmaps(company_id, author_user_id):
+    """Roadmaps this manager wrote that nobody has confirmed discussing.
+
+    **This is what replaces a blocking workflow.** An unacknowledged roadmap is
+    still live and nothing is blocked by it — a non-responsive employee must not
+    be able to freeze their own development plan — so the follow-up is surfaced
+    to the person who can have the conversation instead.
+    """
+    rows = query("""
+        SELECT r.id::text, r.version, r.authored_at,
+               e.first_name || ' ' || e.last_name AS name,
+               e.id::text AS employee_id
+        FROM employee_step_roadmaps r
+        JOIN employees e ON e.id = r.employee_id
+        WHERE r.company_id=%s::uuid AND r.authored_by_user_id=%s::uuid
+          AND r.acknowledged_at IS NULL AND r.superseded_at IS NULL
+        ORDER BY r.authored_at
+    """, (company_id, author_user_id))
+    return [to_dict(r) for r in rows]

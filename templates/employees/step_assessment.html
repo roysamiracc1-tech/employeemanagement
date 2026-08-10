@@ -105,6 +105,67 @@
     </div>
   </div>
 </div>
+{# ── Roadmap authoring (KAN-207) — the object the owner actually asked for ──
+     Distinct from the step EXPECTATION: the expectation says what step 1.2 means
+     here, for anybody; the ROADMAP says what this person specifically needs to do.
+
+     ⚠ No rating, no score, no readiness field, and no pay. A roadmap is a
+     statement of expectations — a scored judgement about a person is a different
+     legal object (GDPR Art. 22 / EU AI Act) with different obligations. #}
+<div id="rw-modal" class="modal-overlay open" style="display:none"
+     role="dialog" aria-modal="true" aria-labelledby="rw-title">
+  <div class="modal" style="padding:26px;width:700px;max-width:94vw;max-height:90vh;
+       display:flex;flex-direction:column">
+    <h3 id="rw-title" style="font-size:.95rem;font-weight:700;margin:0 0 4px"></h3>
+    <p id="rw-sub" style="font-size:.8rem;color:var(--muted);margin:0 0 14px"></p>
+
+    <div id="rw-blocked" role="note" style="display:none;background:#fffbeb;
+         border:1px solid #fcd34d;border-radius:8px;padding:12px 14px;margin-bottom:14px">
+      <p id="rw-blocked-msg" style="font-size:.8rem;color:#92400e;margin:0;line-height:1.55"></p>
+    </div>
+
+    <div id="rw-form" style="display:flex;flex-direction:column;min-height:0;flex:1">
+      {# The target step's own expectations, shown while writing — a roadmap that
+         contradicts the step it points at is worse than no roadmap. #}
+      <div id="rw-target-expect" style="display:none;background:var(--bg);border-radius:8px;
+           padding:12px 14px;margin-bottom:14px;font-size:.82rem;line-height:1.6"></div>
+
+      <div style="display:flex;gap:10px;margin-bottom:12px">
+        <div class="form-group" style="margin:0;flex:1">
+          <label for="rw-context">Which conversation is this from? *</label>
+          <select id="rw-context" class="form-control"></select>
+        </div>
+        <div class="form-group" style="margin:0;width:170px">
+          <label for="rw-date">Date of it</label>
+          <input type="date" id="rw-date" class="form-control">
+        </div>
+      </div>
+
+      <div class="form-group" style="margin:0 0 4px;display:flex;flex-direction:column;flex:1;min-height:0">
+        <label for="rw-content">What do they need to do to get there? *</label>
+        <textarea id="rw-content" class="form-control" rows="9" style="resize:vertical"
+                  aria-describedby="rw-content-help"
+                  placeholder="Written to them, about their work — not a rating."></textarea>
+        <div id="rw-content-help" style="font-size:.74rem;color:var(--muted);margin-top:4px;line-height:1.5">
+          <strong>They will read this.</strong> Write what they need to do, not how
+          they are performing — a roadmap is a statement of expectations, and it is
+          deliberately not an assessment. Don't put pay in it.
+        </div>
+      </div>
+
+      {# Versioned, never overwritten. #}
+      <div id="rw-supersede" role="note" style="display:none;font-size:.76rem;color:var(--muted);
+           margin-top:10px;line-height:1.5"></div>
+    </div>
+
+    <div id="rw-error" role="alert" style="display:none;color:#b91c1c;font-size:.78rem;
+         background:#fef2f2;padding:8px 12px;border-radius:6px;margin-top:12px"></div>
+    <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end">
+      <button class="btn btn-ghost btn-sm" onclick="rwClose()">Cancel</button>
+      <button class="btn btn-primary btn-sm" id="rw-save" onclick="rwSave()">Save roadmap</button>
+    </div>
+  </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -133,6 +194,7 @@ function saRender() {
         <button class="btn btn-ghost btn-sm" onclick="saOpen(${i})">
           ${r.assessed ? 'Change' : 'Assess'}
         </button>
+        <button class="btn btn-ghost btn-sm" onclick="rwOpen(${i})">Roadmap</button>
       </td>
     </tr>`).join('');
 }
@@ -241,5 +303,122 @@ async function saSave() {
 }
 
 saRender();
+
+// ══ KAN-207 — roadmap authoring ══════════════════════════════════════════════
+let rwCurrent = null, rwOpener = null, rwData = null;
+
+function rwEl(id) { return document.getElementById(id); }
+
+async function rwOpen(i) {
+  rwCurrent = SA_REPORTS[i];
+  rwEl('rw-error').style.display = 'none';
+  rwEl('rw-blocked').style.display = 'none';
+  rwEl('rw-form').style.display = 'flex';
+  rwEl('rw-content').value = '';
+  rwEl('rw-date').value = new Date().toISOString().slice(0, 10);
+  rwEl('rw-title').textContent = `Roadmap for ${rwCurrent.name}`;
+
+  const res = await fetch(`/api/roadmap/${encodeURIComponent(rwCurrent.employee_id)}`);
+  rwData = await res.json();
+  if (!res.ok) { announce(rwData.error || 'Could not load.', 'assertive'); return; }
+
+  rwEl('rw-context').innerHTML = (rwData.contexts || []).map(c =>
+    `<option value="${escH(c.value)}">${escH(c.label)}</option>`).join('');
+
+  const w = rwData.where;
+  // No target means no roadmap is possible, and the reason is the useful part —
+  // most often "their step has not been assessed yet", which is fixable right here.
+  if (!w || !w.target) {
+    rwEl('rw-form').style.display = 'none';
+    rwEl('rw-blocked').style.display = '';
+    rwEl('rw-blocked-msg').textContent =
+      (w && w.reason) || 'They are not on a level yet, so there is no next step to aim at.';
+    rwEl('rw-save').disabled = true;
+    rwEl('rw-sub').textContent = '';
+  } else {
+    rwEl('rw-save').disabled = false;
+    rwEl('rw-sub').textContent = rwData.shows_step
+      ? `Currently ${w.current.ordinal}.${w.current.step_no} · aiming at `
+        + `${w.target.ordinal}.${w.target.step_no} — ${w.target.level_title}`
+      : `Aiming at the next set of expectations in ${w.target.level_title}`;
+    await rwShowTargetExpectations(w.target);
+  }
+
+  // Versioned: say what happens to the existing one rather than silently
+  // replacing it.
+  if (rwData.live) {
+    rwEl('rw-supersede').style.display = '';
+    rwEl('rw-supersede').textContent =
+      `Saving replaces the current roadmap (v${rwData.live.version}, written by `
+      + `${rwData.live.authored_by_label}). The old one stays readable — it is kept, not overwritten.`;
+  } else {
+    rwEl('rw-supersede').style.display = 'none';
+  }
+
+  rwOpener = document.activeElement;
+  rwEl('rw-modal').style.display = 'flex';
+  document.addEventListener('keydown', rwKeydown);
+  rwEl('rw-content').focus();
+}
+
+async function rwShowTargetExpectations(target) {
+  // The target step's own expectations, while writing — a roadmap that
+  // contradicts the step it points at is worse than no roadmap.
+  const box = rwEl('rw-target-expect');
+  const res = await fetch(`/api/job-architecture/levels/${encodeURIComponent(target.job_level_id)}/steps`);
+  if (!res.ok) { box.style.display = 'none'; return; }
+  const data = await res.json();
+  const step = (data.steps || []).find(s => s.step_no === target.step_no);
+  if (!step || !step.authored) { box.style.display = 'none'; return; }
+  box.innerHTML =
+    `<div style="font-weight:600;margin-bottom:4px">What that step expects` +
+    `${rwData.shows_step ? ' — ' + escH(step.label) : ''}</div>` +
+    `<div style="white-space:pre-wrap">${escH(step.description || '')}</div>`;
+  box.style.display = '';
+}
+
+function rwClose() {
+  rwEl('rw-modal').style.display = 'none';
+  document.removeEventListener('keydown', rwKeydown);
+  if (rwOpener && rwOpener.focus) rwOpener.focus();
+}
+function rwKeydown(e) { if (e.key === 'Escape') rwClose(); }
+
+async function rwSave() {
+  const content = rwEl('rw-content').value.trim();
+  const err = rwEl('rw-error');
+  if (!content) {
+    err.textContent = 'A roadmap needs to say what they need to do — that is the whole object.';
+    err.style.display = ''; announce(err.textContent, 'assertive');
+    rwEl('rw-content').focus();
+    return;
+  }
+  const btn = rwEl('rw-save');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  let res, data;
+  try {
+    res = await fetch(`/api/roadmap/${encodeURIComponent(rwCurrent.employee_id)}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content,
+                             review_context: rwEl('rw-context').value,
+                             review_date: rwEl('rw-date').value || null })
+    });
+    data = await res.json();
+  } catch (_) {
+    btn.disabled = false; btn.textContent = 'Save roadmap';
+    err.textContent = 'That did not save. Nothing has been written — try again.';
+    err.style.display = ''; announce(err.textContent, 'assertive');
+    return;
+  }
+  btn.disabled = false; btn.textContent = 'Save roadmap';
+  if (!res.ok) {
+    err.textContent = data.error || 'That did not save.';
+    err.style.display = ''; announce(err.textContent, 'assertive');
+    return;
+  }
+  rwClose();
+  // Say that they will be told — the notification is the point of it.
+  announce(`Roadmap saved for ${rwCurrent.name}. They have been notified.`);
+}
 </script>
 {% endblock %}

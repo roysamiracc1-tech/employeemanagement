@@ -2686,3 +2686,70 @@ END $$;
 CREATE TRIGGER trg_eja_step_valid
     BEFORE INSERT OR UPDATE OF step_no, job_level_id ON public.employee_job_assignments
     FOR EACH ROW EXECUTE FUNCTION public.employee_job_assignment_step_valid();
+
+
+--
+-- ─────────────────────────────────────────────────────────────────────────────
+-- STEP ROADMAPS + THE STEP-DISCLOSURE SWITCH (KAN-207 · EP42 W1)
+--   migration 14_step_roadmaps.sql
+--
+-- ⚠ NO RATINGS, NO SCORES, NO ASSESSMENT COLUMNS, EVER. A roadmap is a statement
+-- of expectations; a scored judgement about a person is a different legal object
+-- (GDPR Art. 22 / EU AI Act) with different obligations. Guarded by
+-- TestNoAssessmentColumnsOnTheLadder.
+-- ─────────────────────────────────────────────────────────────────────────────
+--
+
+ALTER TABLE public.companies
+    ADD COLUMN IF NOT EXISTS display_step_to_employee boolean DEFAULT true NOT NULL;
+
+COMMENT ON COLUMN public.companies.display_step_to_employee IS 'Whether an employee is shown their own STEP NUMBER (EP42 KAN-190/207, A2 §6). Governs display only, never inference: the employee still reads the whole ladder and their own expectations either way. Default TRUE.';
+
+CREATE TABLE public.employee_step_roadmaps (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    company_id uuid NOT NULL,
+    employee_id uuid NOT NULL,
+    version integer NOT NULL,
+    from_job_level_id uuid NOT NULL,
+    from_step_no integer NOT NULL,
+    target_job_level_id uuid NOT NULL,
+    target_step_no integer NOT NULL,
+    content text NOT NULL,
+    review_context character varying(24) NOT NULL,
+    review_date date,
+    authored_by_user_id uuid NOT NULL,
+    authored_by_label character varying(255) NOT NULL,
+    authored_at timestamp with time zone DEFAULT now() NOT NULL,
+    acknowledged_at timestamp with time zone,
+    acknowledged_by_user_id uuid,
+    superseded_at timestamp with time zone,
+    correlation_id uuid NOT NULL,
+    CONSTRAINT chk_esr_ack CHECK (((acknowledged_at IS NULL) = (acknowledged_by_user_id IS NULL))),
+    CONSTRAINT chk_esr_content CHECK ((btrim(content) <> ''::text)),
+    CONSTRAINT chk_esr_context CHECK (((review_context)::text = ANY ((ARRAY['PROBATION_REVIEW'::character varying, 'MID_TERM_GOAL_REVIEW'::character varying, 'PERFORMANCE_REVIEW'::character varying, 'OFF_CYCLE'::character varying])::text[]))),
+    CONSTRAINT chk_esr_steps CHECK (((from_step_no >= 0) AND (target_step_no >= 0))),
+    CONSTRAINT chk_esr_version CHECK ((version >= 1))
+);
+
+ALTER TABLE ONLY public.employee_step_roadmaps ADD CONSTRAINT employee_step_roadmaps_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.employee_step_roadmaps ADD CONSTRAINT employee_step_roadmaps_employee_id_version_key UNIQUE (employee_id, version);
+
+ALTER TABLE ONLY public.employee_step_roadmaps
+    ADD CONSTRAINT employee_step_roadmaps_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.employee_step_roadmaps
+    ADD CONSTRAINT employee_step_roadmaps_employee_id_fkey FOREIGN KEY (employee_id) REFERENCES public.employees(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.employee_step_roadmaps
+    ADD CONSTRAINT employee_step_roadmaps_authored_by_user_id_fkey FOREIGN KEY (authored_by_user_id) REFERENCES public.users(id);
+ALTER TABLE ONLY public.employee_step_roadmaps
+    ADD CONSTRAINT employee_step_roadmaps_acknowledged_by_user_id_fkey FOREIGN KEY (acknowledged_by_user_id) REFERENCES public.users(id) ON DELETE SET NULL;
+ALTER TABLE ONLY public.employee_step_roadmaps
+    ADD CONSTRAINT fk_esr_target FOREIGN KEY (target_job_level_id, company_id) REFERENCES public.job_levels(id, company_id) ON DELETE RESTRICT;
+ALTER TABLE ONLY public.employee_step_roadmaps
+    ADD CONSTRAINT fk_esr_from FOREIGN KEY (from_job_level_id, company_id) REFERENCES public.job_levels(id, company_id) ON DELETE RESTRICT;
+
+-- Exactly one LIVE roadmap per employee. A new version supersedes the previous one
+-- inside the same transaction; the previous one stays READABLE, which is the whole
+-- reason this is versioned rather than updated in place.
+CREATE UNIQUE INDEX uq_esr_one_live ON public.employee_step_roadmaps USING btree (employee_id) WHERE (superseded_at IS NULL);
+CREATE INDEX idx_esr_unacknowledged ON public.employee_step_roadmaps USING btree (company_id, authored_by_user_id) WHERE ((acknowledged_at IS NULL) AND (superseded_at IS NULL));
+CREATE INDEX idx_esr_employee ON public.employee_step_roadmaps USING btree (employee_id, version DESC);
