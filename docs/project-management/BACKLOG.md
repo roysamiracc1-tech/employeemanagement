@@ -1225,6 +1225,13 @@ the point where a review touches the job ladder.
 
 ### Two open questions, both with recommended defaults, neither blocking
 
+> **OQ-10 — ✅ ANSWERED 10 Aug 2026: introduce a submission deadline.** His words: *"Introduce a
+> submission deadline. After the deadline, HR records 'Did not submit' and the manager can proceed with
+> the review."* Plus, explicitly: *"The system should clearly show that the employee did not submit
+> rather than treating it as an empty submission."* Recommendation confirmed in full, including the
+> distinction that matters most. Criteria below.
+>
+> *(The question as put:)*
 > **OQ-10 — what happens if the employee never submits their self-assessment?**
 > The ordering in A7 is enforced, so a non-submitting employee would **deadlock their own review and
 > block the cycle from closing**. This is the same shape as the roadmap-acknowledgement problem already
@@ -1235,6 +1242,11 @@ the point where a review touches the job ladder.
 > record shows they did not submit rather than pretending they had nothing to say.** The employee had
 > the opportunity and that fact is on the record, which is the protection actually worth having.
 >
+> **OQ-11 — ✅ ANSWERED 10 Aug 2026: three values.** His words: *"Achieved / Partially achieved / Not
+> achieved… This is more realistic because someone may have made substantial progress toward a goal
+> without completely achieving it."* Recommendation confirmed.
+>
+> *(The question as put:)*
 > **OQ-11 — may a goal be "partially achieved"?**
 > His words are *"whether each … has been successfully achieved"*, which reads binary. Real reviews are
 > not.
@@ -1242,6 +1254,134 @@ the point where a review touches the job ladder.
 > forcing a partially-met goal into "not achieved" makes managers record something untrue, and an
 > untrue per-goal record is worse than a coarse one. **Flagged as an addition to his words rather than
 > folded in silently.**
+
+### 📋 ACCEPTANCE CRITERIA — A7, written 10 Aug 2026 after OQ-10 and OQ-11 were answered
+
+Numbered so each is demonstrable. **A running theme worth reading once:** several of these are about
+keeping two *different facts* distinguishable, because collapsing them is how a record becomes a lie —
+*not submitted* vs *submitted with nothing in it*; *agreed* vs *seen*; *partially achieved* vs *failed*.
+
+#### KAN-221 — Business and Development goals
+
+- **AC-221-01** A goal carries a **type: `BUSINESS` or `DEVELOPMENT`**, rendered as **two named
+  sections**, not a filter or a tag. They are different conversations and the screen should look like it.
+- **AC-221-02** Goals belong to exactly **one cycle** and therefore one year (D-009(1)). **No automatic
+  carry-forward**: re-using last year's goal is an explicit copy that cites what it came from, because a
+  system that carried an unmet goal forward would be asserting it is still agreed.
+- **AC-221-03 The employee AGREES to their goals, and here "agreed" is the honest word.** This is
+  deliberately different from a step roadmap, where the button says *"Confirm we discussed this"*: a
+  roadmap is the manager's statement, whereas **goals are a mutual commitment** — the owner's own words
+  are *"discussed and agreed with employee"*. So the state reads **"Agreed by Paulo on 3 Feb"** and the
+  audit action is `GOAL_AGREED`.
+- **AC-221-04** **Non-agreement is recorded, not prevented, and does not block.** A manager may set a
+  business goal an employee does not accept; that fact is visible on the goal and to HR, and the goal is
+  still live. A goal nobody can set without consent would be unusable, and one that pretends to
+  agreement that never happened would be a false record.
+- **AC-221-05 Goals FREEZE when the cycle enters evaluation.** Nobody may rewrite the goals they are
+  being assessed against after the assessment starts. Amending a frozen goal is an **audited amendment
+  with a mandatory reason**, visible on the goal.
+- **AC-221-06** Versioned, so *"what did we agree in February"* survives a mid-year change of
+  priorities — same convention as roadmaps.
+- **AC-221-07** Row-scoped: a manager sees their own reports' goals and nobody else's; the employee sees
+  their own. Asserted at the payload.
+- **AC-221-08** No score, no weight, no percentage on a goal. A weighted goal is the first half of a
+  computed rating.
+
+#### KAN-222 — Milestones achieved
+
+- **AC-222-01** A milestone is **authored by the employee**, dated, and attached to **one specific goal**
+  — the owner's words are *"Employee will continue to add milestones acheived"*.
+- **AC-222-02 Not approved one at a time.** A year-long approval queue is how this feature dies. The
+  manager sees each milestone as it lands and weighs them all at evaluation.
+- **AC-222-03** Visible to the manager **immediately**, so nothing at the review is a surprise.
+- **AC-222-04 No percentage complete, no RAG status, no automatic goal status.** A milestone is dated
+  evidence of something done; a progress bar is a computed judgement wearing a friendly hat.
+- **AC-222-05** Editable by the author **until the cycle enters evaluation**, then frozen — an employee
+  should be able to fix a typo, not rewrite history after their manager has read it.
+- **AC-222-06** Milestones attach to the **goal**, not to a goal *version*, so amending a goal never
+  orphans the evidence recorded against it.
+- **AC-222-07** A goal with no milestones is shown as such at evaluation — **truthfully, and without
+  editorial**: "no milestones recorded" is a fact, not a verdict.
+
+#### KAN-224 — The employee's side, and the deadline (OQ-10)
+
+- **AC-224-01** The employee submits **a narrative AND their own rating** on the same scale the manager
+  uses (KAN-226).
+- **AC-224-02 The submission GATES the manager's rating**, not merely its visibility — A7 strengthens
+  D-009(3), which said the weaker thing.
+- **AC-224-03** The cycle carries a **self-assessment deadline** (KAN-219 gains it). The employee is
+  reminded before it, once.
+- **AC-224-04 After the deadline, HR — not the manager — may record `SELF_ASSESSMENT_NOT_SUBMITTED`.**
+  **The manager must not be the one who declares it**, because the manager is the person who benefits
+  from being unblocked. Same separation-of-duties reasoning as the self-approval work: whoever gains
+  from a state change should not be the one who records it.
+- **AC-224-05** The employee is **notified** when it is recorded, and the manager may then proceed.
+- **AC-224-06 ⚠ "DID NOT SUBMIT" AND "SUBMITTED WITH NOTHING IN IT" ARE DIFFERENT FACTS AND MUST NEVER
+  RENDER THE SAME.** The owner said this explicitly. An empty submission means *"I had nothing to add"*;
+  not-submitted means *"they did not respond"*. One is a statement, the other is an absence. The screen
+  says **"Did not submit by the deadline"**, never a blank panel and never an empty quotation.
+- **AC-224-07 A late submission is still accepted, and does not erase the fact.** Both facts stand: the
+  record shows it was not submitted by the deadline *and* what they later said, with the manager notified.
+  *(A small addition to his words, flagged as such: refusing a late submission would discard something
+  the employee wants on record, and silently replacing the "did not submit" fact would rewrite history.)*
+- **AC-224-08** Once submitted, it is the employee's **statement of record** and is not freely editable —
+  the manager has read it. A correction is an audited amendment with a reason.
+- **AC-224-09** Nothing is pre-selected on the self-rating (D4c).
+
+#### KAN-225 — The manager's assessment
+
+- **AC-225-01 Per goal**, the manager records an **outcome** — `ACHIEVED` · `PARTIALLY_ACHIEVED` ·
+  `NOT_ACHIEVED` (OQ-11) — **and a comment**. Partially achieved exists because forcing a half-met goal
+  into "not achieved" makes a manager record something untrue.
+- **AC-225-02** Then an **overall rating** on the company's scale.
+- **AC-225-03 ⚠ THE OVERALL RATING IS NEVER COMPUTED FROM THE PER-GOAL OUTCOMES.** It is the manager's
+  judgement, informed by them. **No arithmetic, no suggested rating, no "3 of 4 achieved → Meeting
+  expectation" hint anywhere on the screen** — a suggestion is a computed decision with a human
+  rubber-stamping it, which is the thing GDPR Art. 22 is about. The screen shows the outcomes; the
+  manager chooses.
+- **AC-225-04** Blocked until the employee has submitted **or** HR has recorded not-submitted
+  (AC-224-04). The block states which of those it is waiting for.
+- **AC-225-05 `Save` and `Submit` are different verbs with different buttons** (D-009(3)). A manager must
+  be able to write, leave, and reconsider without their report reading it mid-thought.
+- **AC-225-06** On submit it becomes **visible to the employee** and is no longer freely editable;
+  a change is an audited amendment with a reason, because silently rewriting an assessment somebody has
+  already read is worse than being wrong in public.
+- **AC-225-07** Cites the goals, the milestones recorded against each, and — where one exists — the step
+  roadmap, which is the owner's own logic made visible.
+- **AC-225-08** Nothing pre-selected on the rating; row-scoped to direct reports; HR override audited
+  with a mandatory reason.
+
+#### KAN-226 — The rating scale
+
+- **AC-226-01** Ships with **the owner's four labels as the default**: `Below expectation` ·
+  `Meeting expectation` · `Above expectation` · `Beyond expectation`.
+- **AC-226-02** Company-configurable and **versioned**. Every stored rating carries its **scale version
+  id**, so *"a rating from 2027 must still be readable in 2029 against the scale that produced it"* is a
+  property of the data rather than a hope.
+- **AC-226-03 Immutable once a cycle using it has left `DRAFT`.** Editing a live scale silently
+  re-labels ratings already given.
+- **AC-226-04 ⚠ Ordinal, with a sort order — and the order is NEVER displayed as a number and NEVER
+  summed or averaged.** The order exists so distribution can be reported (KAN-240) and calibration can
+  compare like with like. A visible numeric value invites exactly the arithmetic AC-225-03 forbids, so
+  the number stays internal.
+- **AC-226-05** Every value carries an **authored description**, because the scale's whole purpose is
+  that the words mean what the company means by them.
+
+#### KAN-228 — The conversation, and its conclusion
+
+- **AC-228-01** The discussion is recorded **per goal** — the owner's *"point of discussion on each
+  goal"* — with a date and both parties named.
+- **AC-228-02** The employee's button reads **`Confirm we discussed this`** and never *Accept*: seeing an
+  assessment is not agreeing with it (CFL-42-50, standing rule 6).
+- **AC-228-03** The **readiness outcome (KAN-241) is recorded as the conclusion of this conversation**,
+  not before it.
+
+#### KAN-219 — amended by OQ-10
+
+- **AC-219-11** The cycle carries a **self-assessment deadline** within its window, and the evaluation
+  stage cannot open before it is set. A deadline invented after the fact is not a deadline.
+
+---
 
 ### One property recorded, not argued
 
@@ -1583,8 +1723,8 @@ after it. **P3 gates P4's pay seam:** KAN-235 does not ship before KAN-232.
 | ⬜ KAN-221 | As an **employee and my manager**, I want to agree what I am working towards this period, so the review has something concrete behind it. | **⚠ A7:** goals carry a **type — `BUSINESS` or `DEVELOPMENT`** — rendered as two named sections, not a tag; both are **agreed with the employee at the start of the year** and the agreement is recorded. Goal/objective authoring by employee and manager, per cycle, versioned. Optional cascade from a parent goal — **cascade is a link, never an automatic copy or an enforced target**. Row-scoped: a manager sees their direct reports' goals and nobody else's. Audited. | Must · P2 |
 | ⬜ KAN-222 | As an **employee**, I want to record progress and check-ins during the period, so the review is not a memory test. | **⚠ A7 — reframed as MILESTONES ACHIEVED:** dated, authored by the **employee**, against a specific goal, visible to the manager, added throughout the year. **Not approved one by one** — a year-long approval queue is how this dies; the manager weighs them at review time. Narrative check-ins against a goal, timestamped, authored by either party, visible to both. **No score, no percentage complete, no RAG, no automatic status.** A completion percentage is a rating with a friendlier name and it is refused. | Must · P2 |
 | ⬜ KAN-223 | As a **customer admin**, I want a library of goal templates we wrote ourselves, so managers are not starting from a blank page. | Company-authored templates, versioned. **Nothing predetermined and nothing suggested** — the product ships no example goals and no "typical" text (A3-1's discipline, extended: a suggested goal is a recommendation about somebody's job we have no basis for). | Should · P3 |
-| ⬜ KAN-224 | As an **employee**, I want to write my own assessment before my manager writes theirs, so my view is on the record. | Self-assessment per cycle against the company's form. Visible to the manager on submission; **the manager's assessment is not visible to the employee until the cycle reaches its release point**, so a self-assessment is not anchored by a rating already given. Versioned; the employee may amend before submission and not after. | Must · P2 |
-| ⬜ KAN-225 | As a **manager**, I want to assess each of my people against what we agreed, so the conversation is prepared and recorded. | Manager assessment per employee per cycle, row-scoped to direct reports. Cites the goals from KAN-221 and, where one exists, **the step roadmap from EP42's KAN-207** — the owner's own narrative link (*"the expectation from the employee is if they satisfy in next level the compensation review based on that"*) made visible rather than implied. Audited; versioned. | Must · P2 |
+| ⬜ KAN-224 | As an **employee**, I want to write my own assessment before my manager writes theirs, so my view is on the record. | **⚠ A7 + OQ-10:** the employee submits **a narrative AND their own rating**, and that submission **GATES the manager's rating** (not merely its visibility). The cycle carries a **self-assessment deadline**; after it **HR — never the manager — may record `SELF_ASSESSMENT_NOT_SUBMITTED`**, the employee is notified, and the manager may proceed. **"Did not submit" and "submitted with nothing in it" must never render the same** — one is an absence, the other a statement. A late submission is accepted and does not erase the fact. Self-assessment per cycle against the company's form. Visible to the manager on submission; **the manager's assessment is not visible to the employee until the cycle reaches its release point**, so a self-assessment is not anchored by a rating already given. Versioned; the employee may amend before submission and not after. | Must · P2 |
+| ⬜ KAN-225 | As a **manager**, I want to assess each of my people against what we agreed, so the conversation is prepared and recorded. | **⚠ A7 + OQ-11:** **per goal** an outcome — `ACHIEVED` · `PARTIALLY_ACHIEVED` · `NOT_ACHIEVED` — plus a comment; **then** an overall rating. **The overall rating is NEVER computed from the per-goal outcomes and no suggested rating may appear on the screen** — a suggestion is a computed decision with a human rubber-stamping it. Blocked until the employee has submitted or HR has recorded not-submitted, and the block says which. Manager assessment per employee per cycle, row-scoped to direct reports. Cites the goals from KAN-221 and, where one exists, **the step roadmap from EP42's KAN-207** — the owner's own narrative link (*"the expectation from the employee is if they satisfy in next level the compensation review based on that"*) made visible rather than implied. Audited; versioned. | Must · P2 |
 | ⬜ KAN-226 | As a **customer admin**, I want to define our rating scale, so the words mean what we mean by them. | **⚠ A7 — the owner's four labels ship as the DEFAULT scale: `Below expectation` · `Meeting expectation` · `Above expectation` · `Beyond expectation`.** Still configurable and versioned as below. Company-defined **ordinal** scale with authored labels and descriptions, **versioned** — a rating from 2027 must still be readable in 2029 against the scale that produced it. **Nothing predetermined, nothing suggested**: no shipped scale, no default point count, no "typical" wording. A company that has not authored a scale **cannot open a cycle**. | Must · P2 |
 | ⬜ KAN-227 | As a **customer admin**, I want to define the review form, so it asks what we ask. | Company-authored sections and questions, versioned per cycle. Free-text, scale and goal-linked question types. **No scoring arithmetic across questions** — a weighted total is a computed rating, which is the thing KAN-232 gates. | Must · P2 |
 | ⬜ KAN-228 | As an **employee**, I want the review conversation recorded honestly, so the record says what actually happened. | The conversation is recorded with a date and both parties. **The employee confirms the conversation happened; they do not "accept" a rating** — the button reads **`Confirm we discussed this`, never `Accept`**, and the displayed state is **`Discussed with Ravi on 14 March`, never "agreed"** (standing rule 6 — a label is a claim; recording "agreed" when somebody merely read it is a false record about a person). **A right of reply is mandatory, not optional** (KAN-234). Non-acknowledgement blocks nothing and is surfaced back to the manager. | Must · P2 |
