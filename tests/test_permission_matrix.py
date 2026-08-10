@@ -6,7 +6,7 @@ feature access maps for all roles and features.
 import pytest
 from unittest.mock import patch, MagicMock, call
 from flask import g
-from tests.conftest import _set_session
+from tests.conftest import _set_session, tenant_on_role_denied
 
 FAKE_COMPANY_ID = '00000000-0000-0000-0000-000000000001'
 
@@ -248,7 +248,8 @@ def test_load_feature_access_none_company_id_uses_simple_query(app):
 def test_require_feature_access_denies_when_no_access(app, feature):
     """require_feature_access redirects when user lacks feature access."""
     c = make_client(app, ['EMPLOYEE'])
-    with patch('app.auth._load_feature_access', return_value={}):
+    with tenant_on_role_denied(), \
+         patch('app.auth._load_feature_access', return_value={}):
         r = c.get('/admin/skills-intelligence')
     assert r.status_code in (302, 308)
 
@@ -259,8 +260,7 @@ def test_require_feature_access_allows_when_has_access(app, feature):
     c = make_client(app, ['PORTAL_ADMIN'])
     full_map = {f: {'r': True, 'w': True, 'd': True} for f in FEATURE_CODES}
     with patch('app.auth._load_feature_access', return_value=full_map), \
-         patch('app.routes.skills_intelligence.query', return_value=[]), \
-         patch('app.routes.skills_intelligence._si_enabled', return_value=True):
+         patch('app.routes.skills_intelligence.query', return_value=[]):
         r = c.get('/admin/skills-intelligence')
     assert r.status_code != 302 or r.status_code in (200, 302)
 
@@ -529,8 +529,7 @@ def test_skills_intelligence_page_with_access(app, role):
     c = make_client(app, [role])
     access_map = {'skills_intelligence': {'r': True, 'w': True, 'd': True}}
     with patch('app.auth._load_feature_access', return_value=access_map), \
-         patch('app.routes.skills_intelligence.query', return_value=[]), \
-         patch('app.routes.skills_intelligence._si_enabled', return_value=True):
+         patch('app.routes.skills_intelligence.query', return_value=[]):
         r = c.get('/admin/skills-intelligence')
     assert r.status_code != 500
 
@@ -539,7 +538,8 @@ def test_skills_intelligence_page_with_access(app, role):
 def test_skills_intelligence_page_without_access_redirect(app, role):
     """Skills Intelligence page redirects when role lacks access."""
     c = make_client(app, [role])
-    with patch('app.auth._load_feature_access', return_value={}):
+    with tenant_on_role_denied(), \
+         patch('app.auth._load_feature_access', return_value={}):
         r = c.get('/admin/skills-intelligence')
     assert r.status_code in (302, 308)
 

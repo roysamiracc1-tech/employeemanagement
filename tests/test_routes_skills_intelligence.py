@@ -2,6 +2,7 @@
 import json
 import pytest
 from unittest.mock import patch
+from tests.conftest import tenant_feature_off, tenant_feature_on
 
 
 # ── fixtures ──────────────────────────────────────────────────────────────────
@@ -101,34 +102,39 @@ class TestPageAccess:
             r = sa_client.get('/admin/skills-intelligence')
             assert r.status_code == 200
 
-    def test_portal_admin_sees_locked_when_disabled(self, pa_client):
-        with patch('app.routes.skills_intelligence._si_enabled', return_value=False):
+    def test_portal_admin_sees_the_off_state_screen_when_disabled(self, pa_client):
+        """KAN-188: a real explanatory screen at 200 — never a 403, never a
+        silent bounce to the dashboard. Nothing is broken and the user has done
+        nothing wrong; their company does not have the feature."""
+        with tenant_feature_off('skills_intelligence'):
             r = pa_client.get('/admin/skills-intelligence')
-            assert r.status_code == 200
-            assert b'Not Enabled' in r.data or b'not enabled' in r.data.lower()
+        assert r.status_code == 200
+        assert b'switched on' in r.data, 'the off state does not explain itself'
+        assert b'Feature' in r.data, 'it does not say who can change it' 
 
     def test_portal_admin_allowed_when_enabled(self, pa_client):
-        with patch('app.routes.skills_intelligence._si_enabled', return_value=True):
+        with tenant_feature_on():
             r = pa_client.get('/admin/skills-intelligence')
             assert r.status_code == 200
 
     def test_hr_admin_allowed_when_si_enabled(self, hr_client):
-        with patch('app.routes.skills_intelligence._si_enabled', return_value=True):
+        with tenant_feature_on():
             r = hr_client.get('/admin/skills-intelligence')
             assert r.status_code == 200
 
-    def test_hr_admin_sees_locked_when_si_disabled(self, hr_client):
-        with patch('app.routes.skills_intelligence._si_enabled', return_value=False):
+    def test_hr_admin_sees_the_off_state_screen_when_disabled(self, hr_client):
+        """Same screen for every role — it is a property of the company."""
+        with tenant_feature_off('skills_intelligence'):
             r = hr_client.get('/admin/skills-intelligence')
-            assert r.status_code == 200
-            assert b'not enabled' in r.data.lower() or b'Not Enabled' in r.data
+        assert r.status_code == 200
+        assert b'switched on' in r.data
 
 
 # ── KPI endpoint ──────────────────────────────────────────────────────────────
 
 class TestKpiEndpoint:
     def test_sa_gets_kpi(self, sa_client):
-        with patch('app.routes.skills_intelligence._check_si_company_access', return_value=(True, None)), \
+        with tenant_feature_on('skills_intelligence'), \
              patch('app.routes.skills_intelligence.svc.get_kpi_summary', return_value=_FAKE_KPI):
             r = sa_client.get('/api/admin/skills-intelligence/kpi?company_id=co-001')
             assert r.status_code == 200
@@ -137,12 +143,12 @@ class TestKpiEndpoint:
             assert d['coverage_pct'] == 80.0
 
     def test_blocked_when_feature_disabled(self, pa_client):
-        with patch('app.routes.skills_intelligence._si_enabled', return_value=False):
+        with tenant_feature_off('skills_intelligence'):
             r = pa_client.get('/api/admin/skills-intelligence/kpi?company_id=co-001')
             assert r.status_code == 403
 
     def test_hr_gets_kpi_when_si_enabled(self, hr_client):
-        with patch('app.routes.skills_intelligence._check_si_company_access', return_value=(True, None)), \
+        with tenant_feature_on('skills_intelligence'), \
              patch('app.routes.skills_intelligence.svc.get_kpi_summary', return_value=_FAKE_KPI):
             r = hr_client.get('/api/admin/skills-intelligence/kpi?company_id=co-001')
             assert r.status_code == 200
@@ -152,7 +158,7 @@ class TestKpiEndpoint:
 
 class TestGapsEndpoint:
     def test_returns_gaps(self, sa_client):
-        with patch('app.routes.skills_intelligence._check_si_company_access', return_value=(True, None)), \
+        with tenant_feature_on('skills_intelligence'), \
              patch('app.routes.skills_intelligence.svc.get_benchmark_gaps', return_value=_FAKE_GAPS):
             r = sa_client.get('/api/admin/skills-intelligence/gaps?company_id=co-001')
             assert r.status_code == 200
@@ -163,7 +169,7 @@ class TestGapsEndpoint:
             assert d[1]['signal'] == 'gap'
 
     def test_gap_shape(self, sa_client):
-        with patch('app.routes.skills_intelligence._check_si_company_access', return_value=(True, None)), \
+        with tenant_feature_on('skills_intelligence'), \
              patch('app.routes.skills_intelligence.svc.get_benchmark_gaps', return_value=_FAKE_GAPS):
             r = sa_client.get('/api/admin/skills-intelligence/gaps?company_id=co-001')
             row = json.loads(r.data)[0]
@@ -178,7 +184,7 @@ class TestGapsEndpoint:
 
 class TestHeatmapEndpoint:
     def test_returns_heatmap(self, sa_client):
-        with patch('app.routes.skills_intelligence._check_si_company_access', return_value=(True, None)), \
+        with tenant_feature_on('skills_intelligence'), \
              patch('app.routes.skills_intelligence.svc.get_proficiency_heatmap', return_value=_FAKE_HEATMAP):
             r = sa_client.get('/api/admin/skills-intelligence/heatmap?company_id=co-001')
             assert r.status_code == 200
@@ -191,7 +197,7 @@ class TestHeatmapEndpoint:
 
 class TestTrendsEndpoint:
     def test_returns_trends(self, sa_client):
-        with patch('app.routes.skills_intelligence._check_si_company_access', return_value=(True, None)), \
+        with tenant_feature_on('skills_intelligence'), \
              patch('app.routes.skills_intelligence.svc.get_trend_alignment', return_value=_FAKE_TRENDS):
             r = sa_client.get('/api/admin/skills-intelligence/trends?company_id=co-001')
             assert r.status_code == 200
@@ -204,7 +210,7 @@ class TestTrendsEndpoint:
 
 class TestCoverageEndpoint:
     def test_returns_coverage(self, sa_client):
-        with patch('app.routes.skills_intelligence._check_si_company_access', return_value=(True, None)), \
+        with tenant_feature_on('skills_intelligence'), \
              patch('app.routes.skills_intelligence.svc.get_category_coverage', return_value=_FAKE_COVERAGE):
             r = sa_client.get('/api/admin/skills-intelligence/coverage?company_id=co-001')
             assert r.status_code == 200
@@ -217,7 +223,7 @@ class TestCoverageEndpoint:
 
 class TestJobCoverageEndpoint:
     def test_returns_job_coverage(self, sa_client):
-        with patch('app.routes.skills_intelligence._check_si_company_access', return_value=(True, None)), \
+        with tenant_feature_on('skills_intelligence'), \
              patch('app.routes.skills_intelligence.svc.get_job_title_coverage', return_value=_FAKE_JOB_COVERAGE):
             r = sa_client.get('/api/admin/skills-intelligence/job-coverage?company_id=co-001')
             assert r.status_code == 200
@@ -229,7 +235,7 @@ class TestJobCoverageEndpoint:
 
 class TestValidationEndpoint:
     def test_returns_funnel(self, sa_client):
-        with patch('app.routes.skills_intelligence._check_si_company_access', return_value=(True, None)), \
+        with tenant_feature_on('skills_intelligence'), \
              patch('app.routes.skills_intelligence.svc.get_validation_funnel', return_value=_FAKE_VALIDATION):
             r = sa_client.get('/api/admin/skills-intelligence/validation?company_id=co-001')
             assert r.status_code == 200
@@ -242,7 +248,7 @@ class TestValidationEndpoint:
 
 class TestGrowthEndpoint:
     def test_returns_growth(self, sa_client):
-        with patch('app.routes.skills_intelligence._check_si_company_access', return_value=(True, None)), \
+        with tenant_feature_on('skills_intelligence'), \
              patch('app.routes.skills_intelligence.svc.get_skill_growth', return_value=_FAKE_GROWTH):
             r = sa_client.get('/api/admin/skills-intelligence/growth?company_id=co-001')
             assert r.status_code == 200
@@ -261,7 +267,7 @@ class TestHrToggleEndpoint:
         assert r.status_code == 302
 
     def test_portal_admin_can_enable(self, pa_client):
-        with patch('app.routes.skills_intelligence._si_enabled', return_value=True), \
+        with tenant_feature_on(), \
              patch('app.routes.skills_intelligence.query') as mock_q, \
              patch('app.routes.skills_intelligence.execute') as mock_e:
             mock_q.return_value = {'id': 'feat-id-001'}
@@ -272,7 +278,7 @@ class TestHrToggleEndpoint:
             assert d['enabled_for_hr'] is True
 
     def test_blocked_when_feature_not_enabled(self, pa_client):
-        with patch('app.routes.skills_intelligence._si_enabled', return_value=False):
+        with tenant_feature_off('skills_intelligence'):
             r = pa_client.post('/api/admin/skills-intelligence/toggle-hr',
                                json={'enabled': True})
             assert r.status_code == 403
@@ -280,14 +286,35 @@ class TestHrToggleEndpoint:
 
 # ── Feature gate helpers ──────────────────────────────────────────────────────
 
-class TestFeatureGateHelpers:
-    def test_si_enabled_returns_false_for_no_company(self, app):
-        with app.app_context():
-            from app.routes.skills_intelligence import _si_enabled
-            assert _si_enabled('') is False
-            assert _si_enabled(None) is False
+class TestTenantSwitchResolution:
+    """`_si_enabled` was DELETED by KAN-188; these guard its replacement.
 
-    def test_si_enabled_returns_false_for_none(self, app):
-        with app.app_context():
-            from app.routes.skills_intelligence import _si_enabled
-            assert _si_enabled(None) is False
+    The property that mattered — "no company context means no access" — still
+    holds, but it is now answered by `tenant_feature_state()` in the one
+    resolver rather than by a private helper inside this route module.
+    """
+
+    def test_no_company_context_resolves_to_unknown_not_to_yes(self, app):
+        """An absent or malformed company must never resolve to 'enabled'."""
+        import importlib
+        auth = importlib.import_module('app.auth')
+        with app.test_request_context('/'):
+            from flask import session
+            session['roles'] = ['PORTAL_ADMIN']
+            for bad in ('', None, 'co-001', 'not-a-uuid'):
+                session['company_id'] = bad
+                assert auth.tenant_feature_state('skills_intelligence') is None, (
+                    f'{bad!r} resolved to a definite answer; only a real company '
+                    f'can have a tenant switch state')
+
+    def test_an_unknown_feature_code_is_unknown_not_enabled(self, app):
+        """A typo in a feature code must not silently grant the tenant switch."""
+        import importlib
+        auth = importlib.import_module('app.auth')
+        with app.test_request_context('/'):
+            from flask import session
+            session['roles'] = ['PORTAL_ADMIN']
+            session['company_id'] = '00000000-0000-0000-0000-0000000000ff'
+            with patch('app.db.query', return_value=None):
+                assert auth.tenant_feature_state('no_such_feature') is None
+

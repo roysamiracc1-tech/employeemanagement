@@ -62,6 +62,100 @@ def assert_single_atomic_unit(txn, exe):
     assert exe.inside and all(exe.inside), 'a write ran outside the transaction'
 
 
+# ── The tenant feature switch (KAN-188) ───────────────────────────────────────
+#
+# Replaces the per-feature `_si_enabled` / `_analytics_enabled` mocks that tests
+# used before KAN-188. Those patched a hand-rolled gate that lived inside two
+# route modules; there is now ONE resolver, so a test that wants to say "this
+# company does not have this feature" should say exactly that, once, rather than
+# reach into whichever module happens to implement it this week.
+#
+# Both helpers patch `can_access_feature` AND `tenant_feature_state` together,
+# because the decorator consults both and they must agree: the first decides
+# whether to refuse, the second decides WHICH refusal — the explanatory
+# "your company doesn't have this" screen, or the generic "you don't have
+# access" flash. Patching only one produces a state the product cannot reach.
+
+def _auth_module():
+    """`app.auth`, fetched by full dotted name.
+
+    NOT `from app import auth` — `app/routes/auth.py` also exists and binds
+    itself as the `auth` attribute of the `app` package once imported, so the
+    plain form silently hands back the routes module and the patch lands on the
+    wrong object.
+    """
+    import importlib
+    return importlib.import_module('app.auth')
+
+
+@contextmanager
+def tenant_feature_off(feature_code):
+    """The company does NOT have *feature_code*; every other feature is fine.
+
+    **Honours the SYSTEM_ADMIN bypass**, because the real resolver does: a system
+    admin administers the switch, so being locked out by it would make a
+    mis-toggle unrecoverable through the UI. A helper that ignored that would
+    make "SA can still reach it" tests fail against correct code — and, worse,
+    would let a real regression in the bypass pass unnoticed.
+
+    `tenant_feature_state` still reports False even for a system admin: the
+    switch IS off, and the off-state screen uses exactly that to tell them so
+    rather than letting them demo a page nobody else can see.
+    """
+    from flask import session, has_request_context
+    auth = _auth_module()
+
+    def _is_sa():
+        return has_request_context() and 'SYSTEM_ADMIN' in (session.get('roles') or [])
+
+    def _access(code, action='r'):
+        return True if _is_sa() else code != feature_code
+
+    def _state(code, company_id=None):
+        return code != feature_code
+
+    # `_role_grants` answers "would their role allow it if the company had the
+    # feature?" — True here, because these tests are about the SWITCH, not the
+    # grant. Without it the decorator falls through to the generic denial and
+    # the off-state screen is never reached.
+    with patch.object(auth, 'can_access_feature', side_effect=_access), \
+         patch.object(auth, 'tenant_feature_state', side_effect=_state), \
+         patch.object(auth, '_role_grants', return_value=True):
+        yield
+
+
+@contextmanager
+def tenant_feature_on(feature_code=None):
+    """The company HAS the feature (and the role grant allows it).
+
+    `feature_code` is accepted and ignored — it documents intent at the call
+    site. Everything resolves to allowed, which is what the old
+    `_si_enabled=True` / `_analytics_enabled=True` mocks meant.
+    """
+    auth = _auth_module()
+    with patch.object(auth, 'can_access_feature', return_value=True), \
+         patch.object(auth, 'tenant_feature_state', return_value=True):
+        yield
+
+
+@contextmanager
+def tenant_on_role_denied():
+    """The company HAS the feature but the user's ROLE does not grant it.
+
+    The other refusal, and it must stay distinguishable from the tenant-off one:
+    this is a permissions conversation (redirect + flash), the other is a
+    licensing one (explanatory screen). Tests that patch `_load_feature_access`
+    to a partial map are asserting THIS case, so they have to pin the tenant
+    switch ON — otherwise a fixture company with no `company_features` rows
+    reads as tenant-off and the wrong refusal wins, which says nothing about
+    the rule under test.
+    """
+    auth = _auth_module()
+    with patch.object(auth, 'tenant_feature_state', return_value=True), \
+         patch.object(auth, '_role_grants', return_value=False):
+        yield
+
+
 # ── App / client fixtures ────────────────────────────────────────────────────
 
 @pytest.fixture

@@ -44,7 +44,11 @@ def step1_migrate(cur):
         code       VARCHAR(100) UNIQUE NOT NULL,
         label      VARCHAR(150) NOT NULL,
         description TEXT,
-        sort_order INT NOT NULL DEFAULT 0
+        sort_order INT NOT NULL DEFAULT 0,
+        -- KAN-188: whether a company with no company_features row gets this
+        -- feature. TRUE, because a new tenant should get the product, not a
+        -- blank portal they have to have switched on feature by feature.
+        default_enabled BOOLEAN NOT NULL DEFAULT TRUE
     )""")
 
     cur.execute("""CREATE TABLE IF NOT EXISTS role_feature_access (

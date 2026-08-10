@@ -453,7 +453,6 @@ def test_analytics_scoped_to_company(app, role):
     """Analytics API scopes to company_id from session."""
     c = make_client(app, [role], company_id=FAKE_COMPANY_ID)
     with patch('app.routes.analytics.query', return_value=[]), \
-         patch('app.routes.analytics._analytics_enabled', return_value=True), \
          patch('app.routes.analytics.current_company_id', return_value=FAKE_COMPANY_ID), \
          patch('app.auth._load_feature_access', return_value={
              'reports': {'r': True, 'w': True, 'd': True}
@@ -467,7 +466,6 @@ def test_analytics_manager_scoped(app, role):
     """Analytics API for manager roles scopes to their team."""
     c = make_client(app, [role], company_id=FAKE_COMPANY_ID)
     with patch('app.routes.analytics.query', return_value=[]), \
-         patch('app.routes.analytics._analytics_enabled', return_value=True), \
          patch('app.routes.analytics.current_company_id', return_value=FAKE_COMPANY_ID), \
          patch('app.db.query', return_value=[]), \
          patch('app.auth._load_feature_access', return_value={
@@ -625,7 +623,6 @@ def test_si_kpi_scoped_to_company(app, role):
     """SI KPI endpoint scoped to company."""
     c = make_client(app, [role], company_id=FAKE_COMPANY_ID)
     with patch('app.routes.skills_intelligence.query', return_value=[]), \
-         patch('app.routes.skills_intelligence._si_enabled', return_value=True), \
          patch('app.auth._load_feature_access', return_value={
              'skills_intelligence': {'r': True, 'w': True, 'd': True}
          }):

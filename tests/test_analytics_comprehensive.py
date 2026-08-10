@@ -5,7 +5,8 @@ Tests all 9 roles × 6 endpoints, date ranges, scoping, disabled/enabled states.
 import json
 import pytest
 from unittest.mock import patch, MagicMock
-from tests.conftest import _set_session
+from tests.conftest import (_set_session, tenant_feature_off, tenant_feature_on,
+                            FakeTransaction, tenant_on_role_denied)
 
 FAKE_COMPANY_ID = '00000000-0000-0000-0000-000000000001'
 FAKE_COMPANY_ID_2 = '00000000-0000-0000-0000-000000000002'
@@ -92,7 +93,6 @@ def test_analytics_api_no_500_all_roles(app, role, route):
     c = make_client(app, [role])
     mock_data = {'total': 0, 'active': 0, 'data': []}
     with patch('app.routes.analytics.query', return_value=[]), \
-         patch('app.routes.analytics._analytics_enabled', side_effect=mock_analytics_enabled), \
          patch('app.routes.analytics.current_company_id', return_value=FAKE_COMPANY_ID), \
          patch('app.services.analytics_service.get_overview', return_value=mock_data), \
          patch('app.services.analytics_service.get_org_analytics', return_value=mock_data), \
@@ -115,7 +115,7 @@ def test_analytics_api_no_500_all_roles(app, role, route):
 def test_analytics_disabled_returns_403(app, role, route):
     """When analytics disabled, non-SA roles get 403."""
     c = make_client(app, [role])
-    with patch('app.routes.analytics._analytics_enabled', side_effect=mock_analytics_disabled), \
+    with tenant_feature_off('reports'), \
          patch('app.routes.analytics.current_company_id', return_value=FAKE_COMPANY_ID), \
          patch('app.auth._load_feature_access', return_value=REPORTS_MAP):
         r = c.get(route)
@@ -127,7 +127,7 @@ def test_analytics_disabled_sa_still_accessible(app, route):
     """SYSTEM_ADMIN can access analytics even when disabled for company."""
     c = make_client(app, ['SYSTEM_ADMIN'])
     with patch('app.routes.analytics.query', return_value=[]), \
-         patch('app.routes.analytics._analytics_enabled', side_effect=mock_analytics_disabled), \
+         tenant_feature_off('reports'), \
          patch('app.routes.analytics.current_company_id', return_value=FAKE_COMPANY_ID), \
          patch('app.services.analytics_service.get_overview', return_value=MOCK_DATA), \
          patch('app.services.analytics_service.get_org_analytics', return_value=MOCK_DATA), \
@@ -148,7 +148,6 @@ def test_analytics_date_range_param(app, range_param, route):
     """Analytics API handles all date range parameters."""
     c = make_client(app, ['PORTAL_ADMIN'])
     with patch('app.routes.analytics.query', return_value=[]), \
-         patch('app.routes.analytics._analytics_enabled', side_effect=mock_analytics_enabled), \
          patch('app.routes.analytics.current_company_id', return_value=FAKE_COMPANY_ID), \
          patch('app.services.analytics_service.get_overview', return_value=MOCK_DATA), \
          patch('app.services.analytics_service.get_org_analytics', return_value=MOCK_DATA), \
@@ -167,7 +166,6 @@ def test_analytics_custom_date_range(app, start, end, route):
     """Analytics API handles custom date range parameters."""
     c = make_client(app, ['PORTAL_ADMIN'])
     with patch('app.routes.analytics.query', return_value=[]), \
-         patch('app.routes.analytics._analytics_enabled', side_effect=mock_analytics_enabled), \
          patch('app.routes.analytics.current_company_id', return_value=FAKE_COMPANY_ID), \
          patch('app.services.analytics_service.get_overview', return_value=MOCK_DATA), \
          patch('app.services.analytics_service.get_org_analytics', return_value=MOCK_DATA), \
@@ -201,7 +199,6 @@ def test_analytics_invalid_dates_no_500(app, start, end, route):
     """Analytics API handles invalid date parameters gracefully."""
     c = make_client(app, ['PORTAL_ADMIN'])
     with patch('app.routes.analytics.query', return_value=[]), \
-         patch('app.routes.analytics._analytics_enabled', side_effect=mock_analytics_enabled), \
          patch('app.routes.analytics.current_company_id', return_value=FAKE_COMPANY_ID), \
          patch('app.services.analytics_service.get_overview', return_value=MOCK_DATA), \
          patch('app.services.analytics_service.get_vacation_analytics', return_value=MOCK_DATA), \
@@ -219,7 +216,7 @@ def test_analytics_missing_company_id(app, role, route):
     """Analytics API handles missing company_id gracefully."""
     c = make_client(app, [role], company_id=None)
     with patch('app.routes.analytics.query', return_value=[]), \
-         patch('app.routes.analytics._analytics_enabled', return_value=False), \
+         tenant_feature_off('reports'), \
          patch('app.routes.analytics.current_company_id', return_value=None), \
          patch('app.db.query', return_value=[]), \
          patch('app.auth._load_feature_access', return_value=REPORTS_MAP):
@@ -237,7 +234,6 @@ def test_analytics_manager_scoped(app, role, route):
     """Manager roles get scoped analytics."""
     c = make_client(app, [role])
     with patch('app.routes.analytics.query', return_value=[]), \
-         patch('app.routes.analytics._analytics_enabled', side_effect=mock_analytics_enabled), \
          patch('app.routes.analytics.current_company_id', return_value=FAKE_COMPANY_ID), \
          patch('app.services.analytics_service.get_overview', return_value=MOCK_DATA), \
          patch('app.services.analytics_service.get_org_analytics', return_value=MOCK_DATA), \
@@ -256,7 +252,6 @@ def test_analytics_overview_returns_json(app):
     """Analytics overview returns JSON response."""
     c = make_client(app, ['PORTAL_ADMIN'])
     with patch('app.routes.analytics.query', return_value=[]), \
-         patch('app.routes.analytics._analytics_enabled', side_effect=mock_analytics_enabled), \
          patch('app.routes.analytics.current_company_id', return_value=FAKE_COMPANY_ID), \
          patch('app.services.analytics_service.get_overview', return_value=MOCK_DATA), \
          patch('app.db.query', return_value=[]), \
@@ -269,7 +264,6 @@ def test_analytics_vacation_returns_json(app):
     """Analytics vacation returns JSON response."""
     c = make_client(app, ['PORTAL_ADMIN'])
     with patch('app.routes.analytics.query', return_value=[]), \
-         patch('app.routes.analytics._analytics_enabled', side_effect=mock_analytics_enabled), \
          patch('app.routes.analytics.current_company_id', return_value=FAKE_COMPANY_ID), \
          patch('app.services.analytics_service.get_vacation_analytics', return_value=MOCK_DATA), \
          patch('app.db.query', return_value=[]), \
@@ -282,7 +276,6 @@ def test_analytics_skills_returns_json(app):
     """Analytics skills returns JSON response."""
     c = make_client(app, ['PORTAL_ADMIN'])
     with patch('app.routes.analytics.query', return_value=[]), \
-         patch('app.routes.analytics._analytics_enabled', side_effect=mock_analytics_enabled), \
          patch('app.routes.analytics.current_company_id', return_value=FAKE_COMPANY_ID), \
          patch('app.services.analytics_service.get_skills_analytics', return_value=MOCK_DATA), \
          patch('app.db.query', return_value=[]), \
@@ -295,7 +288,6 @@ def test_analytics_org_returns_json(app):
     """Analytics org returns JSON response."""
     c = make_client(app, ['PORTAL_ADMIN'])
     with patch('app.routes.analytics.query', return_value=[]), \
-         patch('app.routes.analytics._analytics_enabled', side_effect=mock_analytics_enabled), \
          patch('app.routes.analytics.current_company_id', return_value=FAKE_COMPANY_ID), \
          patch('app.services.analytics_service.get_org_analytics', return_value=MOCK_DATA), \
          patch('app.db.query', return_value=[]), \
@@ -335,7 +327,6 @@ def test_admin_analytics_page_accessible(app, role):
     """Admin analytics page accessible to admin roles."""
     c = make_client(app, [role])
     with patch('app.routes.analytics.query', return_value=[]), \
-         patch('app.routes.analytics._analytics_enabled', side_effect=mock_analytics_enabled), \
          patch('app.routes.analytics.current_company_id', return_value=FAKE_COMPANY_ID), \
          patch('app.auth._load_feature_access', return_value=REPORTS_MAP):
         r = c.get('/admin/analytics')
@@ -347,7 +338,8 @@ def test_admin_analytics_page_accessible(app, role):
 def test_admin_analytics_page_no_feature_access_blocked(app, role):
     """Admin analytics page blocked when user lacks feature access."""
     c = make_client(app, [role])
-    with patch('app.auth._load_feature_access', return_value={}):
+    with tenant_on_role_denied(), \
+         patch('app.auth._load_feature_access', return_value={}):
         r = c.get('/admin/analytics')
     assert r.status_code in (302, 308)
 
@@ -359,7 +351,6 @@ def test_analytics_export_csv_admin_no_500(app, role):
     """Analytics CSV export accessible for admin roles."""
     c = make_client(app, [role])
     with patch('app.routes.analytics.query', return_value=[]), \
-         patch('app.routes.analytics._analytics_enabled', side_effect=mock_analytics_enabled), \
          patch('app.routes.analytics.current_company_id', return_value=FAKE_COMPANY_ID), \
          patch('app.services.analytics_service.get_overview', return_value=MOCK_DATA), \
          patch('app.services.analytics_service.get_org_analytics', return_value=MOCK_DATA), \
@@ -377,7 +368,6 @@ def test_analytics_export_csv_types(app, export_type):
     """Analytics CSV export handles various export types."""
     c = make_client(app, ['PORTAL_ADMIN'])
     with patch('app.routes.analytics.query', return_value=[]), \
-         patch('app.routes.analytics._analytics_enabled', side_effect=mock_analytics_enabled), \
          patch('app.routes.analytics.current_company_id', return_value=FAKE_COMPANY_ID), \
          patch('app.services.analytics_service.get_overview', return_value=MOCK_DATA), \
          patch('app.services.analytics_service.get_org_analytics', return_value=MOCK_DATA), \
@@ -424,7 +414,6 @@ def test_analytics_empty_db_result(app, route):
     """Analytics handles empty DB results gracefully."""
     c = make_client(app, ['PORTAL_ADMIN'])
     with patch('app.routes.analytics.query', return_value=[]), \
-         patch('app.routes.analytics._analytics_enabled', side_effect=mock_analytics_enabled), \
          patch('app.routes.analytics.current_company_id', return_value=FAKE_COMPANY_ID), \
          patch('app.services.analytics_service.get_overview', return_value=MOCK_DATA), \
          patch('app.services.analytics_service.get_org_analytics', return_value=MOCK_DATA), \
@@ -442,8 +431,10 @@ def test_analytics_empty_db_result(app, route):
 def test_toggle_company_feature_sa_only(app):
     """Feature toggle endpoint accessible to SYSTEM_ADMIN only."""
     c = make_client(app, ['SYSTEM_ADMIN'])
-    with patch('app.routes.analytics.query', return_value={'id': 'feature-id'}), \
-         patch('app.routes.analytics.execute', return_value=None):
+    with patch('app.routes.analytics.query', return_value={'id': '00000000-0000-0000-0000-0000000000f1'}), \
+         patch('app.routes.analytics.execute', return_value=None), \
+         patch('app.routes.analytics.transaction', FakeTransaction()), \
+         patch('app.routes.analytics.audit_service'):
         r = c.post(
             f'/api/admin/company-features/{FAKE_COMPANY_ID}/toggle',
             data=json.dumps({'feature_code': 'reports', 'enabled': True}),
@@ -478,7 +469,6 @@ def test_analytics_overview_various_params(app, params):
     """Analytics overview handles various query params."""
     c = make_client(app, ['PORTAL_ADMIN'])
     with patch('app.routes.analytics.query', return_value=[]), \
-         patch('app.routes.analytics._analytics_enabled', side_effect=mock_analytics_enabled), \
          patch('app.routes.analytics.current_company_id', return_value=FAKE_COMPANY_ID), \
          patch('app.services.analytics_service.get_overview', return_value=MOCK_DATA), \
          patch('app.db.query', return_value=[]), \
@@ -492,7 +482,6 @@ def test_analytics_org_various_params(app, params):
     """Analytics org handles various query params."""
     c = make_client(app, ['PORTAL_ADMIN'])
     with patch('app.routes.analytics.query', return_value=[]), \
-         patch('app.routes.analytics._analytics_enabled', side_effect=mock_analytics_enabled), \
          patch('app.routes.analytics.current_company_id', return_value=FAKE_COMPANY_ID), \
          patch('app.services.analytics_service.get_org_analytics', return_value=MOCK_DATA), \
          patch('app.db.query', return_value=[]), \

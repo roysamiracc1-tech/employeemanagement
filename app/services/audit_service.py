@@ -89,6 +89,12 @@ ACTIONS = frozenset({
     # more in the trail than a successful one: it is the only record that the
     # attempt happened at all.
     'ORG_CHANGE_SELF_ACTION_REFUSED',
+    # KAN-188. A tenant switch changes what an ENTIRE COMPANY can reach, in one
+    # click, for every role at once — a far wider blast radius than any single
+    # role grant. "Who turned reports off for Telia, and when?" has to be
+    # answerable, so every toggle is attributed whichever way it moved.
+    'COMPANY_FEATURE_ENABLED',
+    'COMPANY_FEATURE_DISABLED',
     'CHECKLIST_STARTED',
     'CHECKLIST_TASK_COMPLETED',
     'CHECKLIST_COMPLETED',

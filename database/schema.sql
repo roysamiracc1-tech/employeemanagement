@@ -614,7 +614,8 @@ CREATE TABLE public.portal_features (
     code character varying(100) NOT NULL,
     label character varying(150) NOT NULL,
     description text,
-    sort_order integer DEFAULT 0 NOT NULL
+    sort_order integer DEFAULT 0 NOT NULL,
+    default_enabled boolean DEFAULT true NOT NULL
 );
 
 

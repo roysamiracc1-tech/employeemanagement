@@ -12,27 +12,18 @@ _FEATURE_CODE = 'skills_intelligence'
 
 # ── company-level gate (separate from role permissions) ───────────────────────
 
-def _si_enabled(company_id: str) -> bool:
-    """Is Skills Intelligence licensed/enabled for this company?"""
-    if not company_id:
-        return False
-    row = query("""
-        SELECT cf.is_enabled
-        FROM company_features cf
-        JOIN portal_features pf ON pf.id = cf.feature_id
-        WHERE cf.company_id = %s::uuid AND pf.code = %s
-    """, (company_id, _FEATURE_CODE), one=True)
-    return bool(row and row['is_enabled'])
-
-
-def _check_si_company_access(company_id: str):
-    """Check company-level enablement only. Role access is handled by @require_feature_access."""
-    roles = session.get('roles', [])
-    if 'SYSTEM_ADMIN' in roles:
-        return True, None
-    if not _si_enabled(company_id):
-        return False, (jsonify({'error': 'Skills Intelligence not enabled for this company'}), 403)
-    return True, None
+# `_si_enabled` and `_check_si_company_access` were DELETED by KAN-188.
+#
+# They were a hand-rolled tenant switch: a per-feature read of
+# `company_features.is_enabled`, bolted on beside the real permission system and
+# duplicated almost verbatim in `analytics.py`. Two copies of an idea that
+# belongs in exactly one place (CLAUDE.md: access is decided by the two access
+# tables, in one resolver), and every OTHER feature simply went without.
+#
+# `@require_feature_access('skills_intelligence')` now carries the tenant switch
+# itself — effective access is `tenant switch AND role grant` — so these routes
+# need no company-level check of their own. Do not reintroduce one: a per-feature
+# gate beside the resolver is the `enabled_for_hr` mistake wearing a new hat.
 
 
 def _resolve_si_scope():
@@ -55,10 +46,6 @@ def admin_skills_intelligence():
     company_id = current_company_id()
     is_sa = 'SYSTEM_ADMIN' in roles
 
-    if not is_sa:
-        if not _si_enabled(company_id):
-            return render_template('admin/skills_intelligence_locked.html')
-
     companies = []
     if is_sa:
         companies = [dict(r) for r in query("SELECT id::text, name FROM companies ORDER BY name")]
@@ -75,9 +62,6 @@ def admin_skills_intelligence():
 @require_feature_access('skills_intelligence')
 def api_si_kpi():
     company_id, emp_ids, is_scoped = _resolve_si_scope()
-    ok, err = _check_si_company_access(company_id)
-    if not ok:
-        return err
     data = svc.get_kpi_summary(company_id, emp_ids=emp_ids)
     return jsonify({**data, '_scoped': is_scoped})
 
@@ -88,9 +72,6 @@ def api_si_kpi():
 @require_feature_access('skills_intelligence')
 def api_si_coverage():
     company_id, emp_ids, _ = _resolve_si_scope()
-    ok, err = _check_si_company_access(company_id)
-    if not ok:
-        return err
     return jsonify(svc.get_category_coverage(company_id, emp_ids=emp_ids))
 
 
@@ -100,9 +81,6 @@ def api_si_coverage():
 @require_feature_access('skills_intelligence')
 def api_si_top_skills():
     company_id, emp_ids, _ = _resolve_si_scope()
-    ok, err = _check_si_company_access(company_id)
-    if not ok:
-        return err
     return jsonify(svc.get_top_skills(company_id, emp_ids=emp_ids))
 
 
@@ -113,9 +91,6 @@ def api_si_top_skills():
 def api_si_gaps():
     company_id, emp_ids, _ = _resolve_si_scope()
     year = int(request.args.get('year', 2025))
-    ok, err = _check_si_company_access(company_id)
-    if not ok:
-        return err
     return jsonify(svc.get_benchmark_gaps(company_id, year, emp_ids=emp_ids))
 
 
@@ -125,9 +100,6 @@ def api_si_gaps():
 @require_feature_access('skills_intelligence')
 def api_si_heatmap():
     company_id, emp_ids, _ = _resolve_si_scope()
-    ok, err = _check_si_company_access(company_id)
-    if not ok:
-        return err
     return jsonify(svc.get_proficiency_heatmap(company_id, emp_ids=emp_ids))
 
 
@@ -138,9 +110,6 @@ def api_si_heatmap():
 def api_si_trends():
     company_id, emp_ids, _ = _resolve_si_scope()
     year = int(request.args.get('year', 2025))
-    ok, err = _check_si_company_access(company_id)
-    if not ok:
-        return err
     return jsonify(svc.get_trend_alignment(company_id, year, emp_ids=emp_ids))
 
 
@@ -150,9 +119,6 @@ def api_si_trends():
 @require_feature_access('skills_intelligence')
 def api_si_job_coverage():
     company_id, emp_ids, _ = _resolve_si_scope()
-    ok, err = _check_si_company_access(company_id)
-    if not ok:
-        return err
     return jsonify(svc.get_job_title_coverage(company_id, emp_ids=emp_ids))
 
 
@@ -162,9 +128,6 @@ def api_si_job_coverage():
 @require_feature_access('skills_intelligence')
 def api_si_validation():
     company_id, emp_ids, _ = _resolve_si_scope()
-    ok, err = _check_si_company_access(company_id)
-    if not ok:
-        return err
     return jsonify(svc.get_validation_funnel(company_id, emp_ids=emp_ids))
 
 
@@ -174,9 +137,6 @@ def api_si_validation():
 @require_feature_access('skills_intelligence')
 def api_si_growth():
     company_id, emp_ids, _ = _resolve_si_scope()
-    ok, err = _check_si_company_access(company_id)
-    if not ok:
-        return err
     return jsonify(svc.get_skill_growth(company_id, emp_ids=emp_ids))
 
 
@@ -185,12 +145,26 @@ def api_si_growth():
 @app.route('/api/admin/skills-intelligence/toggle-hr', methods=['POST'])
 @require_feature_access('skills_intelligence', 'w')
 def api_si_toggle_hr():
-    """PORTAL_ADMIN can enable/disable Skills Intelligence for HR Admins in their company."""
+    """PORTAL_ADMIN can enable/disable Skills Intelligence for HR Admins in their company.
+
+    ⚠ **TD-17 — `enabled_for_hr` HAS NO CONSUMER.** Nothing reads this column: the
+    check that once did was the sub-flag removed for blocking HR_ADMIN even after
+    they had been granted access (`CLAUDE.md`, "past mistakes to never repeat").
+    KAN-188 deliberately does NOT give it one — a per-feature, per-role side
+    channel beside the two access tables is the exact mistake that removal
+    corrected, and reviving it would make this the third tenant switch.
+
+    **Removal path:** drop the toggle from `admin/skills_intelligence.html`, delete
+    this route, then drop the column. Left in place here only so that removing it
+    is a decision somebody takes on purpose rather than a side effect of this
+    story. Until then it is a write-only field, and that is the honest state.
+
+    The company-level check that used to sit here is gone — the decorator's
+    `skills_intelligence:w` now carries the tenant switch itself.
+    """
     company_id = current_company_id()
     if not company_id:
         return jsonify({'error': 'No company context'}), 400
-    if not _si_enabled(company_id):
-        return jsonify({'error': 'Feature not enabled for this company'}), 403
 
     data = request.get_json(silent=True) or {}
     enabled = bool(data.get('enabled', False))

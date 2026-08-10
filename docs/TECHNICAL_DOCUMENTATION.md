@@ -655,6 +655,113 @@ animation at once, so no screen has to remember:
 
 ---
 
+## 8c. The tenant feature switch (KAN-188 · R7)
+
+> **effective access = TENANT SWITCH **AND** ROLE GRANT**
+
+Two different questions, and neither substitutes for the other:
+
+| Table | Question | Set by |
+|---|---|---|
+| `company_features.is_enabled` | Does this **company** have the feature at all? | SYSTEM_ADMIN, per company |
+| `role_feature_access` (+ `company_role_feature_access`) | May this **role** use it? | SYSTEM_ADMIN / PORTAL_ADMIN |
+
+Turning a feature off for one tenant must not mean editing ten role grants, and granting a role
+access must not silently license a feature the tenant has not bought.
+
+### One join, one resolver
+
+The whole implementation is a `LEFT JOIN` on the query `_load_feature_access()` already ran, plus the
+switch as a term in each `bool_or`. It lives in `app/auth.py` because **there is exactly one place
+effective access is decided**.
+
+It replaced two hand-rolled tenant switches — `_analytics_enabled` and `_si_enabled`, near-identical
+copies inside `analytics.py` and `skills_intelligence.py`. Neither consulted role access, both
+answered with a bare 403, and **every other feature had no tenant switch at all**.
+`TestTenantSwitchHasOneImplementation` in `tests/test_regression.py` fails the build if any module
+outside the resolver and the toggle route reads `company_features`, or if either deleted gate returns.
+
+### The default for a missing row is DATA
+
+`COALESCE(cf.is_enabled, pf.default_enabled)` — `portal_features.default_enabled`, a column, not a
+Python constant, so onboarding policy is administrable rather than a deploy.
+
+> **The two licensed features default to OFF; everything else defaults to ON.** `reports` and
+> `skills_intelligence` were the only features ever gated, and the deleted gates read *"no row"* as
+> **denied**. A blanket `TRUE` therefore **grants** them to any company that never had a row — which
+> is exactly what the first cut of migration 11 did to one tenant. Everything else was ungated, i.e.
+> effectively always on, so `TRUE` is correct for those.
+>
+> **`default_enabled` must be set in BOTH migration 11 and `seed_rbac.sql`.** It is data, a fresh CI
+> database is `schema.sql` + `seed_rbac.sql`, and migrations are never replayed (§10) — so a value set
+> only in the migration reverts to the column default on every fresh build while every developer
+> machine reads the migrated value. That is DEF-004, and KAN-188 walked into it. Guarded by
+> `test_the_seed_and_the_migration_agree_on_every_default`.
+
+### The two refusals are different answers
+
+Collapsing them into one 403 tells the user nothing and sends them to the wrong person.
+
+| Cause | Page | API |
+|---|---|---|
+| **Tenant switch off** | **200** + `feature_unavailable.html` — a real screen naming the feature and who can turn it on. Never a 403, never a silent bounce to the dashboard. | **403** + JSON with `reason: "tenant_feature_disabled"` — a JSON client cannot render a screen, and 200-with-HTML would be a lie about the outcome. |
+| **Role grant missing** | Flash + redirect to dashboard, as before. | Same. |
+
+Decided on the request (`/api/` prefix or `Accept`), so no route has to remember.
+
+**The off-state screen is shown only to somebody the switch is actually costing** — i.e. whose role
+*would* grant the feature if the company had it (`_role_grants()`). Two reasons, and the second
+matters more: to a user with no role grant the message is simply untrue (they would still be refused),
+and it would otherwise **leak the tenant's licensing** to anyone who pokes a URL. A plain employee
+should not learn which features their employer has not bought.
+
+### SYSTEM_ADMIN bypasses both terms — and is told so
+
+A system admin administers the switch, so being locked out by it would make a mis-toggle
+unrecoverable through the UI. That bypass is **signposted, not silent**: the off-state screen carries
+an explicit note that they can see the page and nobody else at that company can. Without it they would
+reasonably demo a feature the customer does not have — the "it worked on my login" failure the Demo
+Readiness Gate exists to catch.
+
+### `feature_access_for(user_id, company_id)`
+
+The same two terms, the same precedence, resolved for a user who is **not** the requester — for
+KAN-196, which must ask *"does this approver hold `compensation:r`?"* about a whole chain before
+allowing a money-bearing request (CFL-42-12). Deliberately **not** cached in `g`: the answer is about
+somebody else, and a request-global key would hand the next caller the wrong person's access.
+
+Answering that question by reading `role_feature_access` directly would be a second implementation of
+effective access that ignores the tenant switch — the exact bug class KAN-188 deletes.
+
+### Every toggle is audited
+
+`COMPANY_FEATURE_ENABLED` / `COMPANY_FEATURE_DISABLED`, `retention_class='SECURITY'`, recording the
+transition (`was_enabled` → `now_enabled`), in **one transaction with the write** (ADR-006). A switch
+changes what an entire company can reach in one click — a far wider blast radius than any single role
+grant — so *"who turned reports off for Telia, and when?"* has to be answerable.
+
+### Verifying a change to this
+
+The acceptance gate is a **330-cell before/after matrix** (3 companies × 11 features × 10 roles),
+captured through the real resolver **before** any code change:
+
+```bash
+PGDATABASE=employee python3 tests/fixtures/capture_feature_matrix.py before
+#  … change code, run the migration …
+PGDATABASE=employee python3 tests/fixtures/capture_feature_matrix.py after
+PGDATABASE=employee python3 tests/fixtures/capture_feature_matrix.py diff   # exits non-zero on any unexplained move
+```
+
+`EXPECTED_CHANGES` in that file is an explicit allow-list — access may only be **removed** by a listed
+exception, never added, and `SYSTEM_ADMIN` cells may never move at all.
+
+> **Know its blind spot.** The snapshot measures `_load_feature_access()`. Before KAN-188 the two
+> hand-rolled gates lived *outside* it, so their denials were invisible here — which is exactly where
+> the over-granting defect hid while the matrix reported "identical". When a check is layered outside
+> the thing you are diffing, compare it directly.
+
+---
+
 ## 9. Security Considerations
 
 | Area | Implementation |

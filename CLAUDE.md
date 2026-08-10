@@ -121,18 +121,23 @@ directly. Keep them current: when a change alters a flow they cover, update the 
 
 ## Access Control — NEVER hardcode role checks for feature visibility
 
-**Access to features is controlled entirely by two tables:**
+**Access to features is controlled entirely by these tables:**
 
+- `company_features.is_enabled` — the **tenant switch**: does this company have the feature at all? Set by SYSTEM_ADMIN per company (KAN-188)
 - `role_feature_access` — global ceiling, set by SYSTEM_ADMIN via Roles & Permissions
 - `company_role_feature_access` — per-company overrides, set by PORTAL_ADMIN via Feature Access tab
+
+**effective access = TENANT SWITCH AND ROLE GRANT**, resolved in ONE place (`_load_feature_access` in `app/auth.py`). Never re-implement either half in a route — two hand-rolled per-feature tenant switches were deleted in KAN-188 and a regression test fails the build if `company_features` is read outside the resolver and the toggle route. For a user who is not the requester, use `feature_access_for(user_id, company_id)`; never query the access tables directly.
 
 **The rules:**
 
 1. Route guards use `@require_feature_access('feature_code')` — never `@require_roles(...)` for feature pages.
 2. Nav links use `{% if has_feature_access('feature_code') %}` — never hardcoded `has_role(...)` for feature links.
 3. Do NOT add extra per-feature role checks inside routes (e.g. `_si_enabled_for_hr`, `enabled_for_hr` checks). These bypass the permission system and block roles that have been correctly granted access.
-4. SYSTEM_ADMIN always has full access — handled automatically in `_load_feature_access()`.
-5. If a role has access in `role_feature_access` and is not overridden by `company_role_feature_access`, they get access. Period.
+4. SYSTEM_ADMIN always has full access — handled automatically in `_load_feature_access()`, and bypasses the **tenant switch** too (they administer it, so it must not be able to trap them). That bypass is **signposted** on the off-state screen, never silent — otherwise they demo a feature the customer does not have.
+5. If a role has access in `role_feature_access`, is not overridden by `company_role_feature_access`, **and the company's tenant switch is on**, they get access. Period.
+6. **The two refusals are different answers and must stay distinguishable.** Tenant switch off → a real explanatory screen at **200** for a page (never a 403, never a silent redirect), or **403 JSON** with `reason: "tenant_feature_disabled"` for an API. Role grant missing → flash + redirect. The off-state screen is shown **only** to a user whose role would otherwise allow the feature, because to anyone else it is both untrue and a leak of the tenant's licensing.
+7. **`portal_features.default_enabled` decides what a company with no `company_features` row gets.** It is DATA, so it goes in the migration **and** `seed_rbac.sql` — set it only in the migration and every fresh CI database silently disagrees with every developer machine (the DEF-004 trap; it caught `reports`/`skills_intelligence` during KAN-188 itself). `reports` and `skills_intelligence` default **OFF** (they were the only features ever gated, and "no row" historically meant denied); everything else defaults **ON**.
 
 **Adding a new feature — all FOUR places, or it does not exist outside your machine:**
 - Add it to `portal_features` in `setup_db.py` **and** a migration SQL under `database/migrations/`

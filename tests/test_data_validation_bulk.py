@@ -533,7 +533,6 @@ ANALYTICS_FEATURE_MAP = {
 def test_analytics_invalid_range_handled(app, bad_range):
     c = make_client(app, ['PORTAL_ADMIN'])
     with patch('app.auth._load_feature_access', return_value=ANALYTICS_FEATURE_MAP), \
-         patch('app.routes.analytics._analytics_enabled', return_value=True), \
          patch('app.services.analytics_service.get_overview', return_value={'totals': {}, 'dau': [], 'top_pages': [], 'feature_adoption': [], 'bulk_import': {}}):
         r = c.get(f'/api/analytics/overview?range={bad_range}')
         assert r.status_code in (200, 400)
@@ -544,7 +543,6 @@ VALID_DATE_RANGES = ['7d', '14d', '30d', '60d', '90d', '180d', '365d']
 def test_analytics_valid_range_accepted(app, good_range):
     c = make_client(app, ['PORTAL_ADMIN'])
     with patch('app.auth._load_feature_access', return_value=ANALYTICS_FEATURE_MAP), \
-         patch('app.routes.analytics._analytics_enabled', return_value=True), \
          patch('app.services.analytics_service.get_overview', return_value={'totals': {}, 'dau': [], 'top_pages': [], 'feature_adoption': [], 'bulk_import': {}}):
         r = c.get(f'/api/analytics/overview?range={good_range}')
         assert r.status_code in (200, 400)

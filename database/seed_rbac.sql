@@ -31,16 +31,16 @@ INSERT INTO public.companies (id, name, industry, website, logo_url, hq_address,
 -- Data for Name: portal_features; Type: TABLE DATA; Schema: public; Owner: -
 --
 
-INSERT INTO public.portal_features (id, code, label, description, sort_order) VALUES ('41ff7908-f914-43fd-9643-7cd004b223f9', 'employee_profiles', 'Employee Profiles', 'View and manage employee personal, role and org data', 1);
-INSERT INTO public.portal_features (id, code, label, description, sort_order) VALUES ('cc53bdea-fad5-4119-9a82-8145f94dc436', 'org_structure', 'Organisation Structure', 'Manage business units, locations and functional units', 2);
-INSERT INTO public.portal_features (id, code, label, description, sort_order) VALUES ('40da374e-6ad3-45cb-aa82-8de661ae05a2', 'user_accounts', 'User Accounts', 'Create, enable/disable and assign roles to portal users', 3);
-INSERT INTO public.portal_features (id, code, label, description, sort_order) VALUES ('ad909142-12fc-453c-95b5-b0f388983df4', 'skills', 'Skills & Certifications', 'View, validate and manage skill profiles', 4);
-INSERT INTO public.portal_features (id, code, label, description, sort_order) VALUES ('07d7fd6e-b786-4811-b91c-2d1a4e7a3e1f', 'vacations', 'Vacations & Leave', 'Manage vacation types, entitlements and leave requests', 5);
-INSERT INTO public.portal_features (id, code, label, description, sort_order) VALUES ('dbfd34d9-57ae-42fd-8ddd-de6499d802ee', 'reports', 'Reports & Analytics', 'Access competency dashboards and analytics', 6);
-INSERT INTO public.portal_features (id, code, label, description, sort_order) VALUES ('074152aa-7422-4cfb-8f12-caf46c425b2f', 'company_settings', 'Company Settings', 'Edit company branding, logo, theme and metadata', 7);
-INSERT INTO public.portal_features (id, code, label, description, sort_order) VALUES ('9f6182e7-4c92-4e0d-ae98-2f3a7b6e12e9', 'system_config', 'System Configuration', 'Widget settings and global platform config', 8);
-INSERT INTO public.portal_features (id, code, label, description, sort_order) VALUES ('89148e24-5192-4c13-bbe5-5a3dd4d81c3f', 'skills_intelligence', 'Skills Intelligence', 'Benchmark skill gaps and strengths against SO 2025 survey data', 9);
-INSERT INTO public.portal_features (id, code, label, description, sort_order) VALUES ('e15c2322-f23c-48a0-b94a-5c517c8e9f86', 'org_change', 'Position Change Requests', 'Raise and approve employee business unit / department / manager changes', 10);
+INSERT INTO public.portal_features (id, code, label, description, sort_order, default_enabled) VALUES ('41ff7908-f914-43fd-9643-7cd004b223f9', 'employee_profiles', 'Employee Profiles', 'View and manage employee personal, role and org data', 1, true);
+INSERT INTO public.portal_features (id, code, label, description, sort_order, default_enabled) VALUES ('cc53bdea-fad5-4119-9a82-8145f94dc436', 'org_structure', 'Organisation Structure', 'Manage business units, locations and functional units', 2, true);
+INSERT INTO public.portal_features (id, code, label, description, sort_order, default_enabled) VALUES ('40da374e-6ad3-45cb-aa82-8de661ae05a2', 'user_accounts', 'User Accounts', 'Create, enable/disable and assign roles to portal users', 3, true);
+INSERT INTO public.portal_features (id, code, label, description, sort_order, default_enabled) VALUES ('ad909142-12fc-453c-95b5-b0f388983df4', 'skills', 'Skills & Certifications', 'View, validate and manage skill profiles', 4, true);
+INSERT INTO public.portal_features (id, code, label, description, sort_order, default_enabled) VALUES ('07d7fd6e-b786-4811-b91c-2d1a4e7a3e1f', 'vacations', 'Vacations & Leave', 'Manage vacation types, entitlements and leave requests', 5, true);
+INSERT INTO public.portal_features (id, code, label, description, sort_order, default_enabled) VALUES ('dbfd34d9-57ae-42fd-8ddd-de6499d802ee', 'reports', 'Reports & Analytics', 'Access competency dashboards and analytics', 6, false);
+INSERT INTO public.portal_features (id, code, label, description, sort_order, default_enabled) VALUES ('074152aa-7422-4cfb-8f12-caf46c425b2f', 'company_settings', 'Company Settings', 'Edit company branding, logo, theme and metadata', 7, true);
+INSERT INTO public.portal_features (id, code, label, description, sort_order, default_enabled) VALUES ('9f6182e7-4c92-4e0d-ae98-2f3a7b6e12e9', 'system_config', 'System Configuration', 'Widget settings and global platform config', 8, true);
+INSERT INTO public.portal_features (id, code, label, description, sort_order, default_enabled) VALUES ('89148e24-5192-4c13-bbe5-5a3dd4d81c3f', 'skills_intelligence', 'Skills Intelligence', 'Benchmark skill gaps and strengths against SO 2025 survey data', 9, false);
+INSERT INTO public.portal_features (id, code, label, description, sort_order, default_enabled) VALUES ('e15c2322-f23c-48a0-b94a-5c517c8e9f86', 'org_change', 'Position Change Requests', 'Raise and approve employee business unit / department / manager changes', 10, true);
 
 
 --
@@ -201,9 +201,15 @@ INSERT INTO public.role_feature_access (role_id, feature_id, can_read, can_write
 -- role list above. Idempotent — safe if the migration has already run.
 -- ─────────────────────────────────────────────────────────────────────────────
 
-INSERT INTO public.portal_features (id, code, label, description, sort_order) VALUES
+-- `default_enabled` is stated explicitly, not left to the column default.
+-- KAN-188 made it DATA (which tenant gets a feature by default), so it belongs
+-- in the seed like any other column — a fresh CI database is built from
+-- schema.sql + this file and NEVER replays migrations, so a value set only in a
+-- migration silently reverts to the column default here. That is the DEF-004
+-- trap, and it caught `reports` / `skills_intelligence` during KAN-188 itself.
+INSERT INTO public.portal_features (id, code, label, description, sort_order, default_enabled) VALUES
     ('3f7c1d92-8a41-4e3b-9c6d-5b2e7a0f4c18', 'audit_log', 'Audit Log',
-     'View the immutable audit trail of changes within the company', 13)
+     'View the immutable audit trail of changes within the company', 13, true)
 ON CONFLICT (code) DO NOTHING;
 
 -- Read-only for PORTAL_ADMIN and HR_ADMIN. The table is append-only and there is
