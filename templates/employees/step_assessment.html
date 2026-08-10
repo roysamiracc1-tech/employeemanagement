@@ -1,0 +1,247 @@
+{% extends 'base.html' %}
+{% block title %}Assess your team's steps — HR Portal{% endblock %}
+{% block page_title %}Your team's steps{% endblock %}
+
+{#
+  KAN-191 (part B) — step assessment, amendment A6's core rule.
+
+  A6 forbids deriving a step from a salary. So a step is a MANAGER'S JUDGEMENT
+  against the expectations authored in KAN-190, and this screen is where it is
+  made. Three things it must do and one it must never:
+
+    • NOTHING IS PRE-SELECTED. A pre-selection is a system claim about somebody's
+      job content, and D4c's discipline applies to the one field A6 exists to
+      protect. The select opens on "Choose…".
+    • THE EXPECTATIONS ARE SHOWN AT THE POINT OF CHOICE. An assessment made
+      without reading what the step asks is a guess, and this is the only
+      mechanism that makes reading likely (R-20).
+    • "Step not yet assessed" is a REAL STATE, shown as itself — never 2.0,
+      never a dash, never blank.
+    • It must NEVER show or use pay. There is nothing here a manager could read a
+      salary from, and nothing pay-shaped is sent to this page.
+
+  Distributed on purpose: one HR person assessing 146 people is a project nobody
+  finishes; forty managers doing three or four each is a ten-minute task.
+#}
+
+{% block content %}
+<div class="page">
+
+  {% if not reports %}
+  <div class="card" style="max-width:600px;margin:40px auto;padding:32px;text-align:center">
+    <h2 style="font-size:1rem;font-weight:700;margin:0 0 10px">Nothing to assess</h2>
+    <p style="font-size:.86rem;color:var(--muted);margin:0;line-height:1.6">
+      Either you have no direct reports, or none of them is on a level yet.
+      HR places people on levels first; then their step is yours to judge.
+    </p>
+  </div>
+  {% else %}
+
+  <div class="card" style="padding:18px 20px;margin-bottom:16px">
+    <h2 style="font-size:.95rem;font-weight:700;margin:0 0 6px">
+      {{ reports | selectattr('assessed', 'equalto', false) | list | length }}
+      of {{ reports | length }} still to assess
+    </h2>
+    <p style="font-size:.82rem;color:var(--muted);margin:0;line-height:1.55">
+      A step says how far into a level somebody is. Read what the step asks, then
+      pick the one they have <strong>demonstrably reached</strong> — not the one
+      you would like them to reach. Nothing is pre-selected, because only you can
+      judge this.
+    </p>
+  </div>
+
+  <div class="table-card">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Level</th>
+          <th style="width:190px">Step</th>
+          <th style="width:150px"><span class="sr-only">Actions</span></th>
+        </tr>
+      </thead>
+      <tbody id="sa-body"></tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+
+{# ── Assessment dialog — the expectations are the substance of it ──────────── #}
+<div id="sa-modal" class="modal" style="display:none;position:fixed;inset:0;z-index:999;
+     background:rgba(0,0,0,.45);align-items:center;justify-content:center"
+     role="dialog" aria-modal="true" aria-labelledby="sa-title">
+  <div class="modal-box" style="background:var(--card);border-radius:14px;padding:26px;
+       width:680px;max-width:94vw;max-height:88vh;display:flex;flex-direction:column">
+    <h3 id="sa-title" style="font-size:.95rem;font-weight:700;margin:0 0 4px"></h3>
+    <p id="sa-sub" style="font-size:.8rem;color:var(--muted);margin:0 0 14px"></p>
+
+    <div class="form-group" style="margin-bottom:14px">
+      <label for="sa-step">Which step have they reached? *</label>
+      <select id="sa-step" class="form-control" onchange="saShowStep()"
+              aria-describedby="sa-step-help">
+        <option value="">Choose…</option>
+      </select>
+      <div id="sa-step-help" style="font-size:.74rem;color:var(--muted);margin-top:4px">
+        Nothing is pre-selected on purpose. Pick what they have demonstrably
+        reached; the expectations for each step appear below as you choose.
+      </div>
+    </div>
+
+    {# The expectations, at the point of choice. Without this the assessment is a
+       guess against a number, which is what R-20 warns about. #}
+    <div id="sa-expect" style="overflow:auto;flex:1;background:var(--bg);border-radius:8px;
+         padding:0;display:none">
+    </div>
+
+    <div class="form-group" style="margin:14px 0 0">
+      <label for="sa-reason" id="sa-reason-label">Note (optional)</label>
+      <textarea id="sa-reason" class="form-control" rows="2" style="resize:vertical"
+                placeholder="Why this step — useful to whoever reads this later."></textarea>
+    </div>
+
+    <div id="sa-error" role="alert" style="display:none;color:#b91c1c;font-size:.78rem;
+         background:#fef2f2;padding:8px 12px;border-radius:6px;margin-top:12px"></div>
+    <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end">
+      <button class="btn btn-ghost btn-sm" onclick="saClose()">Cancel</button>
+      <button class="btn btn-primary btn-sm" id="sa-save" onclick="saSave()">Record assessment</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let SA_REPORTS = {{ reports | tojson }};
+let saCurrent = null, saSteps = [], saOpener = null;
+
+function saEl(id) { return document.getElementById(id); }
+
+function saRender() {
+  const body = saEl('sa-body');
+  if (!body) return;
+  body.innerHTML = SA_REPORTS.map((r, i) => `
+    <tr>
+      <td>
+        <div class="manager-cell">
+          <span class="manager-name">${escH(r.name)}</span>
+          ${r.job_title ? `<span class="manager-desig">${escH(r.job_title)}</span>` : ''}
+        </div>
+      </td>
+      <td>${escH(r.family_name)} · ${r.ordinal} — ${escH(r.level_title)}</td>
+      <td>${r.assessed
+             ? `<strong style="font-family:ui-monospace,monospace">${escH(r.step_display)}</strong>`
+             : `<span style="color:#b45309">${escH(r.step_display)}</span>`}</td>
+      <td class="row-actions">
+        <button class="btn btn-ghost btn-sm" onclick="saOpen(${i})">
+          ${r.assessed ? 'Change' : 'Assess'}
+        </button>
+      </td>
+    </tr>`).join('');
+}
+
+async function saOpen(i) {
+  saCurrent = SA_REPORTS[i];
+  saEl('sa-error').style.display = 'none';
+  saEl('sa-reason').value = '';
+  saEl('sa-title').textContent = `${saCurrent.name} — ${saCurrent.ordinal} ${saCurrent.level_title}`;
+  saEl('sa-sub').textContent =
+    `This level runs ${saCurrent.ordinal}.0 to ${saCurrent.ordinal}.${saCurrent.step_count}`
+    + ` (${saCurrent.step_count + 1} steps). Currently: ${saCurrent.step_display}.`;
+
+  // Load the AUTHORED expectations. If a step has none, it cannot be chosen —
+  // assessing against an undescribed step is assessing against nothing.
+  const res = await fetch(`/api/job-architecture/levels/${encodeURIComponent(saCurrent.job_level_id)}/steps`);
+  const data = await res.json();
+  saSteps = (data.steps || []);
+
+  const sel = saEl('sa-step');
+  // "Choose…" stays selected — NOTHING is pre-selected, not even their current
+  // step, because pre-filling the current value invites confirming it unread.
+  sel.innerHTML = '<option value="">Choose…</option>' + saSteps.map(s =>
+    `<option value="${s.step_no}"${s.authored ? '' : ' disabled'}>`
+    + `${escH(s.label)} — ${escH(s.summary)}${s.authored ? '' : ' (not described yet)'}</option>`
+  ).join('');
+  saEl('sa-expect').style.display = 'none';
+  saEl('sa-expect').innerHTML = '';
+
+  saOpener = document.activeElement;
+  saEl('sa-modal').style.display = 'flex';
+  document.addEventListener('keydown', saKeydown);
+  sel.focus();
+}
+
+function saShowStep() {
+  const n = saEl('sa-step').value;
+  const box = saEl('sa-expect');
+  if (n === '') { box.style.display = 'none'; return; }
+  const step = saSteps.find(s => String(s.step_no) === String(n));
+  if (!step) { box.style.display = 'none'; return; }
+  // Show the chosen step AND the one below, so "have they reached this?" is a
+  // comparison rather than an abstract judgement.
+  const prev = saSteps.find(s => s.step_no === step.step_no - 1);
+  box.innerHTML =
+    `<div style="padding:14px 16px">
+       <div style="font-weight:700;font-size:.84rem;margin-bottom:6px">
+         ${escH(step.label)} — ${escH(step.summary)}
+       </div>
+       <div style="font-size:.82rem;line-height:1.6;white-space:pre-wrap">${escH(step.description || '')}</div>
+       ${step.drafted_by ? `<div style="font-size:.72rem;color:var(--muted);margin-top:8px">
+         Drafted by ${escH(step.drafted_by)}</div>` : ''}
+     </div>`
+    + (prev && prev.authored ? `<div style="padding:12px 16px;border-top:1px solid var(--border)">
+         <div style="font-size:.74rem;color:var(--muted);margin-bottom:4px">The step below —
+           ${escH(prev.label)}</div>
+         <div style="font-size:.78rem;color:var(--muted);line-height:1.55">${escH(prev.summary)}</div>
+       </div>` : '');
+  box.style.display = '';
+  announce(`Expectations for step ${step.label} shown.`);
+}
+
+function saClose() {
+  saEl('sa-modal').style.display = 'none';
+  document.removeEventListener('keydown', saKeydown);
+  if (saOpener && saOpener.focus) saOpener.focus();
+}
+function saKeydown(e) { if (e.key === 'Escape') saClose(); }
+
+async function saSave() {
+  const n = saEl('sa-step').value;
+  if (n === '') {
+    const e = saEl('sa-error');
+    e.textContent = 'Choose the step they have reached — nothing is pre-selected because only you can judge it.';
+    e.style.display = '';
+    announce(e.textContent, 'assertive');
+    saEl('sa-step').focus();
+    return;
+  }
+  const btn = saEl('sa-save');
+  btn.disabled = true; btn.textContent = 'Recording…';
+  let res, data;
+  try {
+    res = await fetch(`/api/step-assessment/${encodeURIComponent(saCurrent.employee_id)}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ step_no: n, reason: saEl('sa-reason').value.trim() })
+    });
+    data = await res.json();
+  } catch (_) {
+    btn.disabled = false; btn.textContent = 'Record assessment';
+    const e = saEl('sa-error');
+    e.textContent = 'That did not save. Nothing has been recorded — try again.';
+    e.style.display = ''; announce(e.textContent, 'assertive');
+    return;
+  }
+  btn.disabled = false; btn.textContent = 'Record assessment';
+  if (!res.ok) {
+    const e = saEl('sa-error');
+    e.textContent = data.error || 'That did not save.';
+    e.style.display = ''; announce(e.textContent, 'assertive');
+    return;
+  }
+  saClose();
+  announce(`${saCurrent.name} assessed at step ${data.label}.`);
+  location.reload();
+}
+
+saRender();
+</script>
+{% endblock %}

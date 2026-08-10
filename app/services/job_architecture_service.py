@@ -27,6 +27,7 @@ import datetime
 import logging
 
 from app.db import query, execute, insert_returning, to_dict, transaction
+from app.helpers import as_date
 from app.services import audit_service
 
 logger = logging.getLogger(__name__)
@@ -473,3 +474,428 @@ def ladder_completeness(company_id):
         'pct': round(authored * 100.0 / total, 1) if total else None,
         'levels_incomplete': [l['title'] for l in levels if not l['fully_authored']],
     }
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# KAN-191 — everyone on a level
+#
+# Two jobs that look similar and are not:
+#
+#   A. THE MAPPING PROJECT — every employee gets a LEVEL, driven from their
+#      existing free-text `job_title`. 41 distinct titles at Acme, 75 at Telia,
+#      for 146 people (R-2). Bulk, HR-driven, one sitting or several.
+#
+#   B. STEP ASSESSMENT — a MANAGER judges each direct report against the step
+#      expectations authored in KAN-190. Distributed, per person, and it is the
+#      only legitimate way a step is decided (amendment A6: a step may never be
+#      derived from a salary).
+#
+# Keeping them apart matters. One HR person assessing 146 people is a project
+# nobody finishes; forty managers assessing three or four each is a ten-minute
+# task, and they are the only people who can do it correctly.
+# ══════════════════════════════════════════════════════════════════════════════
+
+# `step_no IS NULL` — a DISTINCT state, and NOT step 0 (A6). "Everyone defaults
+# to .0" was itself a claim that a person is at entry level. Somebody in this
+# state has no derived base pay, is not evaluable by the equity check, and is
+# listed for assessment.
+STEP_NOT_ASSESSED_LABEL = 'Step not yet assessed'
+
+
+def step_label(ordinal, step_no):
+    """`2.3`, or the honest empty state — never `2.0`, a dash, or a blank.
+
+    One implementation, because a step rendered as `2.0` when nobody has assessed
+    it is a false claim, and D7's empty-state rule applies to steps too.
+    """
+    if ordinal is None:
+        return '—'
+    if step_no is None:
+        return STEP_NOT_ASSESSED_LABEL
+    return f'{ordinal}.{step_no}'
+
+
+# ── A. The mapping project ────────────────────────────────────────────────────
+
+def title_counts(company_id):
+    """Every distinct working title for ACTIVE employees, with headcount.
+
+    One `GROUP BY`, company-scoped. Ordered by headcount descending so the
+    titles that place the most people are at the top — that ordering is the
+    difference between a screen somebody finishes and one they abandon.
+    """
+    rows = query("""
+        SELECT COALESCE(NULLIF(btrim(e.job_title), ''), '(no title recorded)') AS job_title,
+               COUNT(*)::int AS headcount,
+               COUNT(a.id)::int AS already_placed,
+               MAX(m.job_level_id::text) AS mapped_level_id,
+               MAX(l.title)   AS mapped_level_title,
+               MAX(l.ordinal) AS mapped_level_ordinal,
+               MAX(f.name)    AS mapped_family_name
+        FROM employees e
+        LEFT JOIN job_title_level_map m
+               ON m.company_id = e.company_id
+              AND m.job_title = COALESCE(NULLIF(btrim(e.job_title), ''), '(no title recorded)')
+        LEFT JOIN job_levels  l ON l.id = m.job_level_id
+        LEFT JOIN job_families f ON f.id = l.job_family_id
+        LEFT JOIN employee_job_assignments a
+               ON a.employee_id = e.id AND a.is_current
+        WHERE e.company_id = %s::uuid AND e.employment_status = 'ACTIVE'
+        GROUP BY 1
+        ORDER BY 2 DESC, 1
+    """, (company_id,))
+    return [to_dict(r) for r in rows]
+
+
+def save_title_map(company_id, mappings, actor=None):
+    """Record title -> level decisions. Does NOT place anybody.
+
+    Deliberately separate from `apply_title_map`: deciding what a title means and
+    changing 146 people's records are different acts, and somebody mapping titles
+    over an afternoon must be able to save and come back.
+
+    `mappings` is [{'job_title': str, 'job_level_id': str}, ...]. A NULL or empty
+    level clears that title's mapping.
+    """
+    if not mappings:
+        return 0
+    n = 0
+    with transaction():
+        for m in mappings:
+            title = (m.get('job_title') or '').strip()
+            if not title:
+                continue
+            level_id = m.get('job_level_id') or None
+            if level_id:
+                execute("""
+                    INSERT INTO job_title_level_map
+                      (company_id, job_title, job_level_id, mapped_by_user_id, updated_at)
+                    VALUES (%s::uuid, %s, %s::uuid, %s::uuid, NOW())
+                    ON CONFLICT (company_id, job_title) DO UPDATE
+                      SET job_level_id = EXCLUDED.job_level_id,
+                          mapped_by_user_id = EXCLUDED.mapped_by_user_id,
+                          updated_at = NOW()
+                """, (company_id, title, level_id, (actor or {}).get('user_id')))
+            else:
+                execute("DELETE FROM job_title_level_map "
+                        "WHERE company_id=%s::uuid AND job_title=%s",
+                        (company_id, title))
+            n += 1
+        # ONE audit row for the sitting, carrying counts — not one per title
+        # (ADR-009 §3.5). 75 rows saying "a title was mapped" is noise that
+        # buries the rows somebody actually needs to find.
+        # entity_id is the COMPANY: this is one decision about the company's
+        # mapping, not 75 decisions about 75 rows. `audit_service` requires a
+        # real UUID rather than accepting None — it refuses to write a row that
+        # points at nothing, which is the correct strictness.
+        audit_service.record(
+            'JOB_TITLE_MAP_SAVED', 'company_job_title_map', company_id,
+            company_id=company_id, actor=_actor(actor),
+            reason=f'{n} working title(s) mapped to levels.',
+            metadata={'titles': n})
+    return n
+
+
+def apply_title_map(company_id, actor=None, dry_run=True, effective_date=None):
+    """Place every ACTIVE employee whose working title has a mapping.
+
+    **Dry run first, always.** The screen shows what WOULD happen before anything
+    is written, because this touches everybody at once and "undo" is not a thing.
+
+    Employees already on a level are **skipped, never silently overwritten** — a
+    bulk re-run must not quietly undo a manager's or HR's deliberate correction.
+    Their step is left as it is: this story places people on LEVELS, and the step
+    is a manager's judgement (A6), not a side effect of a bulk apply.
+
+    Returns {'create': [...], 'skip': [...], 'error': [...], 'applied': bool}.
+    """
+    eff = effective_date or datetime.date.today()
+    rows = query("""
+        SELECT e.id::text AS employee_id,
+               e.first_name || ' ' || e.last_name AS name,
+               COALESCE(NULLIF(btrim(e.job_title), ''), '(no title recorded)') AS job_title,
+               m.job_level_id::text AS job_level_id,
+               l.ordinal, l.title AS level_title,
+               a.id::text AS existing_assignment
+        FROM employees e
+        JOIN job_title_level_map m
+          ON m.company_id = e.company_id
+         AND m.job_title = COALESCE(NULLIF(btrim(e.job_title), ''), '(no title recorded)')
+        JOIN job_levels l ON l.id = m.job_level_id
+        LEFT JOIN employee_job_assignments a
+               ON a.employee_id = e.id AND a.is_current
+        WHERE e.company_id = %s::uuid AND e.employment_status = 'ACTIVE'
+        ORDER BY e.last_name, e.first_name
+    """, (company_id,))
+
+    create, skip = [], []
+    for r in rows:
+        d = to_dict(r)
+        target = {'employee_id': d['employee_id'], 'name': d['name'],
+                  'job_title': d['job_title'], 'job_level_id': d['job_level_id'],
+                  'level': f"{d['ordinal']} — {d['level_title']}"}
+        if d['existing_assignment']:
+            target['reason'] = 'already on a level'
+            skip.append(target)
+        else:
+            create.append(target)
+
+    if dry_run:
+        return {'create': create, 'skip': skip, 'error': [], 'applied': False,
+                'effective_date': eff.isoformat()}
+
+    # ONE transaction for the whole apply. A failure part-way through must leave
+    # ZERO assignments and ZERO audit rows — a half-placed workforce is worse
+    # than an unplaced one, because nobody can tell which half is real.
+    errors = []
+    with transaction():
+        for c in create:
+            execute("""
+                INSERT INTO employee_job_assignments
+                  (company_id, employee_id, job_level_id, step_no,
+                   effective_from, is_current, assigned_by_user_id, reason)
+                VALUES (%s::uuid, %s::uuid, %s::uuid, NULL, %s, TRUE, %s::uuid, %s)
+            """, (company_id, c['employee_id'], c['job_level_id'], eff,
+                  (actor or {}).get('user_id'),
+                  f"Bulk placement from working title \"{c['job_title']}\"."))
+        # One audit row with counts, not 146 rows (ADR-009 §3.5).
+        # One row for the whole apply, so the entity is the company's workforce
+        # rather than any single assignment (ADR-009 §3.5).
+        audit_service.record(
+            'JOB_LEVEL_BULK_ASSIGNED', 'company_job_level_assignments', company_id,
+            company_id=company_id, actor=_actor(actor),
+            reason=(f'{len(create)} employee(s) placed on a level from their '
+                    f'working title; {len(skip)} already placed and skipped. '
+                    f'Steps left unassessed — a step is a manager judgement.'),
+            metadata={'placed': len(create), 'skipped': len(skip),
+                      'effective_date': eff.isoformat()})
+    return {'create': create, 'skip': skip, 'error': errors, 'applied': True,
+            'effective_date': eff.isoformat()}
+
+
+def assign(company_id, employee_id, job_level_id, step_no=None,
+           effective_date=None, reason=None, actor=None):
+    """Place or move ONE employee, closing their current row on the same date.
+
+    ADR-020's half-open `[from, to)`: the outgoing row's `effective_to` and the
+    incoming row's `effective_from` are the SAME date, so the periods abut with
+    no overlap and no gap. The database enforces that independently
+    (`excl_eja_no_overlap`), so a bug here fails loudly rather than quietly
+    producing two answers to "which level was she on in March?".
+    """
+    eff = effective_date or datetime.date.today()
+    lvl = query("""
+        SELECT ordinal, title, step_count FROM job_levels
+        WHERE id = %s::uuid AND company_id = %s::uuid
+    """, (job_level_id, company_id), one=True)
+    if not lvl:
+        raise LadderError('That level does not exist in this company.')
+    lvl = to_dict(lvl)
+
+    if step_no is not None:
+        try:
+            step_no = int(step_no)
+        except (TypeError, ValueError):
+            raise LadderError('A step must be a whole number.')
+        if step_no < 0 or step_no > lvl['step_count']:
+            raise LadderError(
+                f"Step {step_no} is not on {lvl['title']}: it runs "
+                f"{lvl['ordinal']}.0 to {lvl['ordinal']}.{lvl['step_count']}.")
+
+    current = query("""
+        SELECT id::text, job_level_id::text AS job_level_id, step_no, effective_from
+        FROM employee_job_assignments
+        WHERE employee_id = %s::uuid AND company_id = %s::uuid AND is_current
+    """, (employee_id, company_id), one=True)
+    current = to_dict(current) if current else None
+
+    if current and as_date(current['effective_from']) and as_date(current['effective_from']) > eff:
+        raise LadderError(
+            'That date is before this employee\'s current level started. '
+            'Correct the existing record rather than inserting behind it.')
+
+    with transaction():
+        if current:
+            execute("""
+                UPDATE employee_job_assignments
+                SET is_current = FALSE, effective_to = %s
+                WHERE id = %s::uuid
+            """, (eff, current['id']))
+        new_row = insert_returning("""
+            INSERT INTO employee_job_assignments
+              (company_id, employee_id, job_level_id, step_no,
+               effective_from, is_current, assigned_by_user_id, reason)
+            VALUES (%s::uuid, %s::uuid, %s::uuid, %s, %s, TRUE, %s::uuid, %s)
+            RETURNING id::text
+        """, (company_id, employee_id, job_level_id, step_no, eff,
+              (actor or {}).get('user_id'), (reason or None)))
+        audit_service.record(
+            'JOB_LEVEL_CHANGED' if current else 'JOB_LEVEL_ASSIGNED',
+            'employee_job_assignment', new_row['id'],
+            company_id=company_id, actor=_actor(actor),
+            subject_employee_id=employee_id,
+            reason=(reason or
+                    f"Placed on level {lvl['ordinal']} \"{lvl['title']}\" "
+                    f"at step {step_label(lvl['ordinal'], step_no)}."),
+            metadata={'level_ordinal': lvl['ordinal'], 'step_no': step_no,
+                      'effective_date': eff.isoformat(),
+                      'previous_step_no': (current or {}).get('step_no')})
+
+
+def coverage(company_id):
+    """Level coverage as a named figure WITH its denominator (D7).
+
+    The unplaced are **counted and listed**, never silently dropped — an
+    unplaced employee is invisible to the equity check, so a coverage figure
+    without its remainder hides exactly the population that matters.
+    """
+    row = query("""
+        SELECT COUNT(*)::int AS total,
+               COUNT(a.id)::int AS placed,
+               COUNT(a.id) FILTER (WHERE a.step_no IS NOT NULL)::int AS step_assessed
+        FROM employees e
+        LEFT JOIN employee_job_assignments a
+               ON a.employee_id = e.id AND a.is_current
+        WHERE e.company_id = %s::uuid AND e.employment_status = 'ACTIVE'
+    """, (company_id,), one=True)
+    d = to_dict(row) if row else {'total': 0, 'placed': 0, 'step_assessed': 0}
+
+    unplaced = [to_dict(r) for r in query("""
+        SELECT e.id::text AS employee_id,
+               e.first_name || ' ' || e.last_name AS name,
+               COALESCE(NULLIF(btrim(e.job_title), ''), '(no title recorded)') AS job_title
+        FROM employees e
+        LEFT JOIN employee_job_assignments a
+               ON a.employee_id = e.id AND a.is_current
+        WHERE e.company_id = %s::uuid AND e.employment_status = 'ACTIVE'
+          AND a.id IS NULL
+        ORDER BY e.last_name, e.first_name
+        LIMIT 200
+    """, (company_id,))]
+
+    total = d['total'] or 0
+    return {
+        'total': total,
+        'placed': d['placed'] or 0,
+        'unplaced': total - (d['placed'] or 0),
+        'step_assessed': d['step_assessed'] or 0,
+        # NOT assessed is derived from PLACED, not from total: you cannot assess
+        # a step for somebody who is not on a level yet.
+        'step_not_assessed': (d['placed'] or 0) - (d['step_assessed'] or 0),
+        'level_pct': round((d['placed'] or 0) * 100.0 / total, 1) if total else None,
+        'step_pct': round((d['step_assessed'] or 0) * 100.0 / total, 1) if total else None,
+        'unplaced_sample': unplaced,
+    }
+
+
+# ── B. Step assessment — a manager's judgement, never a derivation ────────────
+
+def pending_assessments(company_id, manager_employee_id):
+    """This manager's direct reports who are on a level but have no step.
+
+    Scoped to their own reports on purpose. They are the only people who can do
+    this correctly, and distributing it is the difference between the exercise
+    finishing and not.
+    """
+    rows = query("""
+        SELECT e.id::text AS employee_id,
+               e.first_name || ' ' || e.last_name AS name,
+               COALESCE(NULLIF(btrim(e.job_title), ''), '') AS job_title,
+               a.id::text AS assignment_id, a.step_no,
+               l.id::text AS job_level_id, l.ordinal, l.title AS level_title,
+               l.step_count, f.name AS family_name
+        FROM manager_relationships mr
+        JOIN employees e ON e.id = mr.employee_id AND e.employment_status = 'ACTIVE'
+        JOIN employee_job_assignments a ON a.employee_id = e.id AND a.is_current
+        JOIN job_levels   l ON l.id = a.job_level_id
+        JOIN job_families f ON f.id = l.job_family_id
+        WHERE mr.manager_id = %s::uuid
+          AND mr.relationship_type = 'SOLID_LINE' AND mr.is_current
+          AND e.company_id = %s::uuid
+        ORDER BY (a.step_no IS NOT NULL), e.last_name, e.first_name
+    """, (manager_employee_id, company_id))
+    out = []
+    for r in rows:
+        d = to_dict(r)
+        d['step_display'] = step_label(d['ordinal'], d['step_no'])
+        d['assessed'] = d['step_no'] is not None
+        out.append(d)
+    return out
+
+
+def assess_step(company_id, employee_id, step_no, actor=None, reason=None,
+                is_hr_override=False):
+    """Record a manager's assessment of a report's step. A6's core rule.
+
+    **NOTHING is pre-selected, nothing is suggested, and nothing is derived from
+    pay.** A pre-selection is a system claim about somebody's job content, and
+    D4c's discipline — mandatory to answer, nothing pre-selected — applies to the
+    one field amendment A6 exists to protect.
+
+    HR may override, and then a reason is **mandatory**: HR is not the person who
+    can judge the work, so an override has to say why it was made anyway.
+    """
+    if step_no is None or step_no == '':
+        raise LadderError('Choose the step this person is at — there is nothing '
+                          'pre-selected, because only you can judge it.')
+    if is_hr_override and not (reason or '').strip():
+        raise LadderError('An HR override needs a reason: you are recording a '
+                          'judgement that is normally the manager\'s to make.')
+
+    row = query("""
+        SELECT a.id::text, a.step_no, a.job_level_id::text AS job_level_id,
+               l.ordinal, l.title, l.step_count
+        FROM employee_job_assignments a
+        JOIN job_levels l ON l.id = a.job_level_id
+        WHERE a.employee_id = %s::uuid AND a.company_id = %s::uuid AND a.is_current
+    """, (employee_id, company_id), one=True)
+    if not row:
+        raise LadderError('This employee is not on a level yet, so there is no '
+                          'ladder to assess them against.')
+    row = to_dict(row)
+
+    try:
+        n = int(step_no)
+    except (TypeError, ValueError):
+        raise LadderError('A step must be a whole number.')
+    if n < 0 or n > row['step_count']:
+        raise LadderError(
+            f"Step {n} is not on {row['title']}: it runs {row['ordinal']}.0 to "
+            f"{row['ordinal']}.{row['step_count']}.")
+
+    # The step must have DESCRIBED expectations. A6 makes the authored text the
+    # only legitimate input to an assessment, so assessing against an undescribed
+    # step is assessing against nothing — a hard dependency, not a nicety (R-18).
+    described = query("""
+        SELECT 1 FROM job_step_expectations
+        WHERE job_level_id = %s::uuid AND step_no = %s
+    """, (row['job_level_id'], n), one=True)
+    if not described:
+        raise LadderError(
+            f"Step {row['ordinal']}.{n} has no description yet, so there is "
+            f"nothing to assess against. Ask HR to describe it first.")
+
+    before = row['step_no']
+    with transaction():
+        execute("""
+            UPDATE employee_job_assignments
+            SET step_no = %s, assigned_by_user_id = %s::uuid,
+                reason = COALESCE(%s, reason)
+            WHERE id = %s::uuid
+        """, (n, (actor or {}).get('user_id'), (reason or None), row['id']))
+        audit_service.record(
+            'EMPLOYEE_STEP_ASSESSED', 'employee_job_assignment', row['id'],
+            company_id=company_id, actor=_actor(actor),
+            subject_employee_id=employee_id,
+            reason=(reason or
+                    f"Assessed at step {row['ordinal']}.{n} against the "
+                    f"described expectations for that step."),
+            # The step, never a pay figure — amounts stay out of the trail
+            # entirely (ADR-009). The pay consequence is derived on read by a
+            # `compensation:r` holder.
+            metadata={'step_before': before, 'step_after': n,
+                      'level_ordinal': row['ordinal'],
+                      'hr_override': bool(is_hr_override)},
+            retention_class='EMPLOYMENT')
+    return {'step_no': n, 'label': f"{row['ordinal']}.{n}",
+            'was_first_assessment': before is None}

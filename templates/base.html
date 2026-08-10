@@ -97,6 +97,21 @@
       <span class="nav-label">Org Tree</span>
     </a>
 
+    {# KAN-191 — a manager assesses their OWN reports' steps. `job_architecture:w`
+       is exactly this grant: authoring for your own people, never the ladder.
+       Deliberately OUTSIDE the org_change block: steps have nothing to do with
+       position changes, and nesting it there would hide it for any tenant with
+       org_change switched off. #}
+    {% if has_feature_access('job_architecture', 'w') %}
+    <a href="{{ url_for('my_team_steps') }}"
+       class="nav-link {% if request.endpoint == 'my_team_steps' %}active{% endif %}">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path d="M4 18h4v-5H4zM10 18h4V9h-4zM16 18h4V5h-4z"/>
+      </svg>
+      <span class="nav-label">Team Steps</span>
+    </a>
+    {% endif %}
+
     {% if has_feature_access('org_change') %}
     <a href="{{ url_for('org_change_inbox') }}"
        class="nav-link {% if request.endpoint == 'org_change_inbox' %}active{% endif %}">
@@ -229,6 +244,17 @@
         <path d="M4 19h4v-6H4zM10 19h4V9h-4zM16 19h4V5h-4z"/>
       </svg>
       <span class="nav-label">Job Architecture</span>
+    </a>
+    {% endif %}
+    {# KAN-191 — the mapping project. `org_structure:w`, same gate as the ladder
+       configurator: it is a company-wide decision, not a per-report one. #}
+    {% if has_feature_access('org_structure', 'w') and has_feature_access('job_architecture') %}
+    <a href="{{ url_for('admin_job_mapping') }}"
+       class="nav-link {% if request.endpoint == 'admin_job_mapping' %}active{% endif %}">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path d="M3 6h7M3 12h7M3 18h7"/><path d="M14 8l3 3 4-5"/>
+      </svg>
+      <span class="nav-label">Place on Ladder</span>
     </a>
     {% endif %}
     {% if has_feature_access('reports') %}

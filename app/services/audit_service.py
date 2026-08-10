@@ -104,6 +104,13 @@ ACTIONS = frozenset({
     'JOB_LEVEL_UPDATED',
     'JOB_STEP_EXPECTATION_AUTHORED',
     'JOB_STEP_EXPECTATION_UPDATED',
+    # KAN-191. Placement on a level, and the manager's step assessment. The
+    # bulk apply writes ONE row carrying counts, not 146 (ADR-009 §3.5).
+    'JOB_TITLE_MAP_SAVED',
+    'JOB_LEVEL_BULK_ASSIGNED',
+    'JOB_LEVEL_ASSIGNED',
+    'JOB_LEVEL_CHANGED',
+    'EMPLOYEE_STEP_ASSESSED',
     'CHECKLIST_STARTED',
     'CHECKLIST_TASK_COMPLETED',
     'CHECKLIST_COMPLETED',
