@@ -57,8 +57,8 @@
 | EP33 | Frontend Modernization | KAN-172 · KAN-173 · KAN-174 · KAN-175 · KAN-176 · KAN-177 | ⬜ Planned · ⏸ **S5** (shares code with the escaping sweep; a11y applied as a design standard meanwhile — pending Q5) |
 | EP34 | Architecture & Structure | KAN-178 · KAN-179 · KAN-180 · KAN-181 · KAN-182 | ⬜ Planned |
 | EP38 | Employee Lifecycle Workflows | KAN-187 · KAN-183 · KAN-184 · KAN-185 · KAN-186 | 🟡 In progress · **first roadmap growth epic in the backlog** (BG4) — build stage **S3** (D-004); ✅ KAN-187 (audit), 🟡 KAN-185 (transfer); KAN-186 is **Later** |
-| EP42 | Compensation, Job Architecture & Pay Equity | **W0** KAN-203 · KAN-204 · KAN-188 · KAN-189 · **W1** KAN-190 · KAN-191 · KAN-207 · **W2** KAN-199 · KAN-206 · KAN-210 · KAN-193 · KAN-194 · KAN-218 · KAN-195 · KAN-209 · **W3** KAN-196 · KAN-197 · KAN-198 · KAN-192 · **W4** KAN-200 · KAN-201 · KAN-202 · *(conditional)* KAN-208 | ⬜ Planned · **BG7** — W0 builds in **S2**, W1–W4 in **S3** (D-004). **23 stories in 5 waves** (A1 · Wave-5 · A2 · A3 · **A4–A6**). **⚠ A6 overturned the pay/step model**: the job decides the step, the step decides base pay, **pay never decides the step**. KAN-218 (additional pay) is new, KAN-209 is repurposed as the pay reconciliation, KAN-205 moved to Later, KAN-208 is conditional. Carries **KAN-203, a P0 Critical pre-existing defect fix** — **✅ landed 10 Aug 2026, DEF-42-4 + DEF-42-5 closed** — and **unblocks KAN-185** |
-| EP44 | Performance Management **(D-008: Option C; requirements OPEN, P0 written; ⚠ AMENDED BY A7 — goal types, milestones, the four-level scale, the enforced self-first ordering, and KAN-241 the readiness outcome)** | **P0** KAN-219 · KAN-220 · **P1** KAN-221 · KAN-222 · KAN-223 · **P2** KAN-224 · KAN-225 · KAN-226 · KAN-227 · KAN-228 · **P3** KAN-229 · KAN-230 · KAN-231 · KAN-232 · **P4** KAN-233 · KAN-234 · KAN-235 · KAN-236 · KAN-237 · **P5** KAN-238 · KAN-239 · KAN-240 | ⬜ Planned · **BG7** · **entered by A4/A5** — the owner chose full performance management over the 2-story input, **accepting the delay in his own words** (Decision D-006). **22 stories**, stage **S3**, **sequenced after EP42 and before EP43**. Outline depth — entering **S1**, not build. Carries the **EU AI Act / GDPR Art. 22 gate as stories (KAN-232, KAN-240), not notes**, and works-council inspectability (KAN-238) |
+| EP42 | Compensation, Job Architecture & Pay Equity **(W0+W1 ✅ done; W2–W4 follow EP44 per D-010)** | **W0** KAN-203 · KAN-204 · KAN-188 · KAN-189 · **W1** KAN-190 · KAN-191 · KAN-207 · **W2** KAN-199 · KAN-206 · KAN-210 · KAN-193 · KAN-194 · KAN-218 · KAN-195 · KAN-209 · **W3** KAN-196 · KAN-197 · KAN-198 · KAN-192 · **W4** KAN-200 · KAN-201 · KAN-202 · *(conditional)* KAN-208 | ⬜ Planned · **BG7** — W0 builds in **S2**, W1–W4 in **S3** (D-004). **23 stories in 5 waves** (A1 · Wave-5 · A2 · A3 · **A4–A6**). **⚠ A6 overturned the pay/step model**: the job decides the step, the step decides base pay, **pay never decides the step**. KAN-218 (additional pay) is new, KAN-209 is repurposed as the pay reconciliation, KAN-205 moved to Later, KAN-208 is conditional. Carries **KAN-203, a P0 Critical pre-existing defect fix** — **✅ landed 10 Aug 2026, DEF-42-4 + DEF-42-5 closed** — and **unblocks KAN-185** |
+| EP44 | Performance Management **(⚠ D-010 — BUILT FIRST, compensation follows; requirements OPEN, P0 written; ⚠ AMENDED BY A7 — goal types, milestones, the four-level scale, the enforced self-first ordering, and KAN-241 the readiness outcome)** | **P0** KAN-219 · KAN-220 · **P1** KAN-221 · KAN-222 · KAN-223 · **P2** KAN-224 · KAN-225 · KAN-226 · KAN-227 · KAN-228 · **P3** KAN-229 · KAN-230 · KAN-231 · KAN-232 · **P4** KAN-233 · KAN-234 · KAN-235 · KAN-236 · KAN-237 · **P5** KAN-238 · KAN-239 · KAN-240 | ⬜ Planned · **BG7** · **entered by A4/A5** — the owner chose full performance management over the 2-story input, **accepting the delay in his own words** (Decision D-006). **22 stories**, stage **S3**, **sequenced after EP42 and before EP43**. Outline depth — entering **S1**, not build. Carries the **EU AI Act / GDPR Art. 22 gate as stories (KAN-232, KAN-240), not notes**, and works-council inspectability (KAN-238) |
 | EP43 | Annual Compensation Review Cycle | KAN-216 · KAN-211 · KAN-213 · KAN-214 · KAN-215 | ⬜ Planned · **BG7** · new in A2, **reduced by A6 from 7 stories to 5**. KAN-212 withdrawn (merged into KAN-216 and EP42's rate schedule); KAN-217 withdrawn (superseded by EP44). A6 collapsed the per-employee hike percentage, so this is now a **round-management** epic, not a differentiation one. **Sequenced last**, stage **S3**. **The natural descope if S3 runs long** |
 
 > **EP28–EP34** are sourced from the architecture review in [`docs/ARCHITECTURE_REVIEW.md`](../ARCHITECTURE_REVIEW.md)
@@ -1162,6 +1162,31 @@ file carries the numbered, individually testable criteria.
 > *Not asked, because A6 already settled it:* whether a rating sets pay. The review justifies the
 > **step**, the step determines **base pay**, and nothing lets a rating set an amount.
 
+> **Decision D-010 — 2026-08-10 — performance is built FIRST; compensation follows it.**
+> His words: *"Proceed with Performance Review development. I'll review and sign off the roadmap wording
+> separately. Compensation can follow after the performance module is completed."*
+>
+> **This supersedes the parallelism in D-008 (Option C).** Option C ran performance P0–P2 *alongside*
+> compensation W1–W3, on the assumption of extra capacity. The order is now **sequential**: the
+> performance module completes, then compensation W2–W4.
+>
+> *Read as:* performance entirely before the remaining compensation waves — not "performance first
+> within the parallel plan". **Flagged, because the two readings differ by about a quarter.** He has
+> also decoupled the KAN-207 copy sign-off from the critical path by taking it himself, which is what
+> lets this proceed today.
+>
+> *What it costs, stated once and not re-litigated:* **EP42 W2 was the minimum shippable slice** — pay
+> markets, what each step is worth, and the effective-dated pay record. All of it moves behind the
+> performance module, so **the first pay data in the product, and the hike cycle behind it, arrive later
+> than Option C projected.** Against that: the ordering is now coherent with how the product actually
+> works — a review produces the judgement, the judgement moves somebody on the ladder, and the ladder
+> decides pay — and he has just specified performance in detail, so it is being built while the design
+> is fresh rather than reconstructed in a quarter.
+>
+> *What does NOT change:* the ladder (W1) is already delivered, so promotion has somewhere to point;
+> A6 still holds (a rating never sets an amount); and KAN-241's readiness outcome still creates nothing
+> automatically.
+
 ## AMENDMENT A7 — the performance evaluation the owner actually wants (2026-08-10)
 
 > **Recorded verbatim, because two of these are NEW REQUIREMENTS that appear nowhere in the existing
@@ -1492,7 +1517,7 @@ unplaced warning and the "not yet assessed" state, which are three of the things
 
 ---
 
-## SEQUENCING — where performance management goes (**Decision D-008 — RESOLVED: Option C**)
+## SEQUENCING — where performance management goes (**D-008: Option C — ⚠ SUPERSEDED BY D-010, sequential**)
 
 > **Raised 10 Aug 2026.** The owner challenged the sequencing directly: *"You said yesterday to implement
 > Level base people alignment and then aligning that to promotion you need finalise implement the performance
