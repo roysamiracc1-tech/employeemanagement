@@ -1,0 +1,424 @@
+{% extends 'base.html' %}
+{% block title %}Review rounds — HR Portal{% endblock %}
+{% block page_title %}Review rounds{% endblock %}
+
+{#
+  EP44 P0 — review cycles and eligibility.
+
+  Two things on this screen carry the design, and the copy has to make both
+  visible or the user will be surprised later:
+
+    1. ONE ROUND AT A TIME. Annual cadence makes that a real constraint, not a
+       cap. The screen says so before you try to create a second.
+    2. OPENING TAKES A SNAPSHOT. Participation is frozen at that moment, not
+       resolved live — so the preview is shown first, because this touches
+       everybody at once and there is no undo.
+
+  And a round cannot be reopened once closed. That is stated on the close button,
+  not discovered afterwards.
+#}
+
+{% block content %}
+<div class="page">
+
+  {% if not has_company %}
+  <div class="card" style="max-width:560px;margin:40px auto;padding:32px;text-align:center">
+    <h2 style="font-size:1rem;font-weight:700;margin:0 0 8px">Pick a company first</h2>
+    <p style="font-size:.86rem;color:var(--muted);margin:0">A review round belongs to one company.</p>
+  </div>
+  {% else %}
+
+  <div class="card" style="padding:18px 20px;margin-bottom:16px">
+    <div style="display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;align-items:flex-start">
+      <div style="flex:1;min-width:280px">
+        <h2 style="font-size:.95rem;font-weight:700;margin:0 0 6px">Your review rounds</h2>
+        <p style="font-size:.82rem;color:var(--muted);margin:0;line-height:1.55">
+          One round per year. <strong>Only one can be running at a time</strong> —
+          two would make “which round am I in?” ambiguous for everybody downstream.
+        </p>
+      </div>
+      {% if not active %}
+      <button class="btn btn-primary btn-sm" onclick="pcOpenNew()">+ New round</button>
+      {% endif %}
+    </div>
+
+    {% if active %}
+    <div role="note" style="margin-top:14px;background:var(--bg);border:1px solid var(--border);
+                            border-radius:8px;padding:10px 12px">
+      <p style="font-size:.79rem;color:var(--muted);margin:0;line-height:1.5">
+        <strong>{{ active.name }}</strong> is running ({{ active.status_label }}).
+        You can start the next round once this one is closed.
+      </p>
+    </div>
+    {% endif %}
+  </div>
+
+  {% if cycles %}
+  <div class="table-card">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Round</th>
+          <th style="width:110px">Year</th>
+          <th style="width:190px">Period</th>
+          <th style="width:160px">Self-assessment by</th>
+          <th style="width:170px">Stage</th>
+          <th style="width:130px">Participants</th>
+          <th style="width:210px"><span class="sr-only">Actions</span></th>
+        </tr>
+      </thead>
+      <tbody id="pc-body"></tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="card" style="max-width:620px;margin:8px auto 40px;padding:36px;text-align:center">
+    <h2 style="font-size:1rem;font-weight:700;margin:0 0 10px">No review rounds yet</h2>
+    <p style="font-size:.86rem;color:var(--muted);margin:0 0 6px;line-height:1.6">
+      A round is the container everything else hangs off — goals, milestones,
+      assessments and the conversation all belong to one.
+    </p>
+    <p style="font-size:.82rem;color:var(--muted);margin:0 0 20px;line-height:1.6">
+      You will see who is in it <strong>before</strong> it opens, and
+      <strong>a round cannot be reopened once closed</strong>, so it is worth
+      getting the dates right first.
+    </p>
+    <button class="btn btn-primary btn-sm" onclick="pcOpenNew()">Create your first round</button>
+  </div>
+  {% endif %}
+  {% endif %}
+</div>
+
+{# ── New round ───────────────────────────────────────────────────────────── #}
+<div id="pc-new-modal" class="modal-overlay open" style="display:none"
+     role="dialog" aria-modal="true" aria-labelledby="pc-new-title">
+  <div class="modal" style="padding:26px;width:560px;max-width:94vw">
+    <h3 id="pc-new-title" style="font-size:.95rem;font-weight:700;margin:0 0 4px">New review round</h3>
+    <p style="font-size:.79rem;color:var(--muted);margin:0 0 16px">
+      Created as a draft. Nothing happens to anybody until you open it.
+    </p>
+
+    <div class="form-group" style="margin-bottom:12px">
+      <label for="pc-name">Name *</label>
+      <input id="pc-name" class="form-control" placeholder="2026 Annual Review">
+    </div>
+    <div style="display:flex;gap:10px;margin-bottom:12px">
+      <div class="form-group" style="margin:0;width:110px">
+        <label for="pc-year">Year *</label>
+        <input id="pc-year" class="form-control" type="number" min="2000" max="2100">
+      </div>
+      <div class="form-group" style="margin:0;flex:1">
+        <label for="pc-opens">Period starts *</label>
+        <input id="pc-opens" class="form-control" type="date">
+      </div>
+      <div class="form-group" style="margin:0;flex:1">
+        <label for="pc-closes">Period ends *</label>
+        <input id="pc-closes" class="form-control" type="date"
+               aria-describedby="pc-closes-help">
+      </div>
+    </div>
+    <div id="pc-closes-help" style="font-size:.74rem;color:var(--muted);margin:-6px 0 12px">
+      The last day the round covers. A round is <strong>annual</strong> — there is
+      no quarterly option, and adding one later would be a real change rather than a setting.
+    </div>
+
+    <div class="form-group" style="margin-bottom:12px">
+      <label for="pc-deadline">Self-assessment deadline</label>
+      <input id="pc-deadline" class="form-control" type="date" aria-describedby="pc-deadline-help">
+      <div id="pc-deadline-help" style="font-size:.74rem;color:var(--muted);margin-top:4px;line-height:1.5">
+        Can be set later, but it is <strong>required before assessments start</strong>.
+        It is what stops a review stalling if somebody never submits their side.
+      </div>
+    </div>
+
+    <details style="margin-bottom:4px">
+      <summary style="font-size:.82rem;font-weight:600;cursor:pointer">Who is eligible</summary>
+      <div style="padding-top:12px">
+        <div class="form-group" style="margin-bottom:10px">
+          <label for="pc-cutoff">Exclude people who joined within (days of the end)</label>
+          <input id="pc-cutoff" class="form-control" type="number" min="0" max="365"
+                 value="{{ default_cutoff }}" style="width:120px"
+                 aria-describedby="pc-cutoff-help">
+          <div id="pc-cutoff-help" style="font-size:.74rem;color:var(--muted);margin-top:4px">
+            Somebody who joined two weeks before the round ends has nothing to be
+            assessed on. They are in next year's round.
+          </div>
+        </div>
+        <div class="form-group" style="margin:0">
+          <label for="pc-excluded">Employment types excluded</label>
+          <input id="pc-excluded" class="form-control"
+                 value="{{ default_excluded | join(', ') }}"
+                 aria-describedby="pc-excluded-help">
+          <div id="pc-excluded-help" style="font-size:.74rem;color:var(--muted);margin-top:4px">
+            Comma separated. <strong>This round records the policy it ran under</strong>,
+            so its exclusions stay explicable years later even if you change the rules.
+          </div>
+        </div>
+      </div>
+    </details>
+
+    <div id="pc-new-error" role="alert" style="display:none;color:#b91c1c;font-size:.78rem;
+         background:#fef2f2;padding:8px 12px;border-radius:6px;margin-top:12px"></div>
+    <div style="display:flex;gap:8px;margin-top:18px;justify-content:flex-end">
+      <button class="btn btn-ghost btn-sm" onclick="pcClose('pc-new-modal')">Cancel</button>
+      <button class="btn btn-primary btn-sm" id="pc-new-save" onclick="pcSaveNew()">Create draft</button>
+    </div>
+  </div>
+</div>
+
+{# ── Who is in it — shown BEFORE opening, because opening freezes it ─────── #}
+<div id="pc-elig-modal" class="modal-overlay open" style="display:none"
+     role="dialog" aria-modal="true" aria-labelledby="pc-elig-title">
+  <div class="modal" style="padding:26px;width:720px;max-width:94vw;max-height:88vh;
+       display:flex;flex-direction:column">
+    <h3 id="pc-elig-title" style="font-size:.95rem;font-weight:700;margin:0 0 4px">Who is in this round</h3>
+    <p id="pc-elig-sub" style="font-size:.79rem;color:var(--muted);margin:0 0 14px"></p>
+    <div id="pc-elig-blockers" role="alert" style="display:none;background:#fef2f2;
+         border:1px solid #fecaca;border-radius:8px;padding:12px 14px;margin-bottom:14px;
+         font-size:.8rem;color:#b91c1c;line-height:1.55"></div>
+    <div id="pc-elig-body" style="overflow:auto;flex:1;font-size:.83rem"></div>
+    <div id="pc-elig-error" role="alert" style="display:none;color:#b91c1c;font-size:.78rem;
+         background:#fef2f2;padding:8px 12px;border-radius:6px;margin-top:12px"></div>
+    <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end">
+      <button class="btn btn-ghost btn-sm" onclick="pcClose('pc-elig-modal')">Close</button>
+      <button class="btn btn-primary btn-sm" id="pc-elig-open" onclick="pcDoOpen()">Open the round</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let PC_CYCLES = {{ cycles | tojson }};
+const PC_STATES = {{ states | tojson }};
+let pcOpener = null, pcCycleId = null;
+
+function pcEl(id) { return document.getElementById(id); }
+
+function pcRender() {
+  const body = pcEl('pc-body');
+  if (!body) return;
+  body.innerHTML = PC_CYCLES.map(c => `
+    <tr>
+      <td><strong>${escH(c.name)}</strong></td>
+      <td>${c.period_year}</td>
+      <td style="font-size:.8rem">${escH(pcPeriod(c.opens_on, c.closes_on))}</td>
+      <td style="font-size:.8rem">${c.self_assessment_deadline
+            ? escH(c.self_assessment_deadline)
+            : `<span style="color:#b45309">not set</span>`}</td>
+      <td>${pcStage(c)}</td>
+      <td>${c.snapshot_taken
+            ? `${c.included} in · ${c.excluded} out`
+            : `<span style="color:var(--muted)">not yet</span>`}</td>
+      <td class="row-actions">${pcActions(c)}</td>
+    </tr>`).join('');
+}
+
+// The window is half-open — `closes_on` is the first day NOT covered — so the
+// last covered day is the day before. Never show the raw value.
+function pcPeriod(from, to) {
+  if (!from || !to) return '—';
+  const last = new Date(to); last.setDate(last.getDate() - 1);
+  return `${from} → ${last.toISOString().slice(0, 10)}`;
+}
+
+function pcStage(c) {
+  const label = (PC_STATES.find(s => s.value === c.status) || {}).label || c.status;
+  const colour = c.status === 'CLOSED' ? 'var(--muted)'
+               : c.status === 'DRAFT'  ? '#b45309' : '#047857';
+  return `<span style="color:${colour};font-weight:600;font-size:.8rem">${escH(label)}</span>`;
+}
+
+function pcActions(c) {
+  if (c.status === 'CLOSED') return '';
+  const id = escH(c.id);
+  if (c.status === 'DRAFT') {
+    return `<button class="btn btn-primary btn-sm" onclick="pcPreview('${id}')">Review &amp; open…</button>
+            <button class="btn btn-ghost btn-sm" onclick="pcDiscard('${id}','${escH(c.name)}')">Discard</button>`;
+  }
+  // Only ever the NEXT stage: a round moves forward, never back.
+  const i = PC_STATES.findIndex(s => s.value === c.status);
+  const next = PC_STATES[i + 1];
+  let out = '';
+  if (next && next.value !== 'CLOSED') {
+    out += `<button class="btn btn-ghost btn-sm"
+              onclick="pcAdvance('${id}','${escH(next.value)}','${escH(next.label)}')">→ ${escH(next.label)}</button>`;
+  }
+  out += `<button class="btn btn-ghost btn-sm" onclick="pcCloseCycle('${id}','${escH(c.name)}')">Close</button>`;
+  return out;
+}
+
+// ── New round ───────────────────────────────────────────────────────────────
+function pcOpenNew() {
+  pcEl('pc-new-error').style.display = 'none';
+  const y = new Date().getFullYear();
+  pcEl('pc-name').value = `${y} Annual Review`;
+  pcEl('pc-year').value = y;
+  pcEl('pc-opens').value = `${y}-01-01`;
+  // Half-open: 1 Jan next year means the round covers to 31 Dec.
+  pcEl('pc-closes').value = `${y + 1}-01-01`;
+  pcEl('pc-deadline').value = '';
+  pcShow('pc-new-modal');
+}
+
+async function pcSaveNew() {
+  const err = pcEl('pc-new-error');
+  err.style.display = 'none';
+  const body = {
+    name: pcEl('pc-name').value.trim(),
+    period_year: pcEl('pc-year').value,
+    opens_on: pcEl('pc-opens').value,
+    closes_on: pcEl('pc-closes').value,
+    self_assessment_deadline: pcEl('pc-deadline').value || null,
+    joiner_cutoff_days: pcEl('pc-cutoff').value,
+    excluded_employment_types: pcEl('pc-excluded').value
+      .split(',').map(s => s.trim().toUpperCase()).filter(Boolean),
+  };
+  if (!body.name || !body.period_year || !body.opens_on || !body.closes_on) {
+    err.textContent = 'A round needs a name, a year and both dates.';
+    err.style.display = ''; announce(err.textContent, 'assertive');
+    return;
+  }
+  await pcSend('POST', '/api/performance/cycles', body, 'pc-new-error',
+               'pc-new-modal', `Draft round ${body.name} created.`);
+}
+
+// ── Eligibility, then open ──────────────────────────────────────────────────
+async function pcPreview(cycleId) {
+  pcCycleId = cycleId;
+  pcEl('pc-elig-error').style.display = 'none';
+  const res = await fetch(`/api/performance/cycles/${encodeURIComponent(cycleId)}/eligibility/preview`);
+  const d = await res.json();
+  if (!res.ok) { announce(d.error || 'Could not check eligibility.', 'assertive'); return; }
+
+  pcEl('pc-elig-sub').textContent =
+    `${d.included.length} of ${d.total} people would be in this round`
+    + (d.partial_count ? `, ${d.partial_count} on a shorter period` : '')
+    + `. Nothing is frozen until you open it.`;
+
+  // A person with no manager BLOCKS the round: there is nobody to assess them,
+  // so opening anyway guarantees it cannot be completed.
+  const blockers = pcEl('pc-elig-blockers');
+  if (d.blockers.length) {
+    blockers.innerHTML =
+      `<strong>${d.blockers.length} ${d.blockers.length === 1 ? 'person has' : 'people have'} no line manager, `
+      + `so nobody can assess them.</strong> Give them a manager, or exclude them `
+      + `deliberately, then open the round.<div style="margin-top:6px">`
+      + d.blockers.map(b => escH(b.name)).join(', ') + '</div>';
+    blockers.style.display = '';
+    pcEl('pc-elig-open').disabled = true;
+  } else {
+    blockers.style.display = 'none';
+    pcEl('pc-elig-open').disabled = false;
+  }
+
+  // Every exclusion, grouped by its NAMED reason. A silent exclusion from a
+  // review round is the thing this screen exists to prevent.
+  pcEl('pc-elig-body').innerHTML =
+    (d.excluded_by_reason.length
+      ? d.excluded_by_reason.map(g => `
+          <div style="padding:10px 0;border-top:1px solid var(--border)">
+            <div style="font-weight:600;margin-bottom:4px">
+              ${g.count} excluded — ${escH(g.label || g.reason)}
+            </div>
+            <div style="color:var(--muted);font-size:.8rem">
+              ${g.people.slice(0, 25).map(p => escH(p.name)).join(', ')}
+              ${g.people.length > 25 ? ` and ${g.people.length - 25} more` : ''}
+            </div>
+          </div>`).join('')
+      : `<div style="color:var(--muted)">Nobody is excluded.</div>`)
+    + `<div style="padding:12px 0 0;border-top:1px solid var(--border);margin-top:8px;
+                   color:var(--muted);font-size:.8rem;line-height:1.55">
+         Opening the round <strong>freezes this list</strong>. It is not re-checked
+         automatically afterwards — so somebody who joins next month will not
+         silently appear in a manager's list, and you can re-evaluate deliberately
+         when you want to.
+       </div>`;
+  pcShow('pc-elig-modal');
+}
+
+async function pcDoOpen() {
+  await pcSend('POST', `/api/performance/cycles/${encodeURIComponent(pcCycleId)}/advance`,
+               { to_status: 'OPEN' }, 'pc-elig-error', 'pc-elig-modal',
+               'Round opened and the participant list frozen.');
+}
+
+async function pcAdvance(cycleId, to, label) {
+  const res = await fetch(`/api/performance/cycles/${encodeURIComponent(cycleId)}/advance`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ to_status: to })
+  });
+  const d = await res.json();
+  if (!res.ok) { announce(d.error || 'Could not move the round on.', 'assertive'); return; }
+  announce(`Round moved to ${label}.`);
+  location.reload();
+}
+
+async function pcCloseCycle(cycleId, name) {
+  // Irreversible, so the confirmation says so rather than asking "are you sure?".
+  if (!confirm(`Close “${name}”?\n\nA closed round cannot be reopened — assessments `
+             + `and decisions point at it. A correction afterwards is an amendment, `
+             + `not a reopen.`)) return;
+  const res = await fetch(`/api/performance/cycles/${encodeURIComponent(cycleId)}/close`,
+                          { method: 'POST' });
+  const d = await res.json();
+  if (!res.ok) { announce(d.error || 'Could not close the round.', 'assertive'); return; }
+  announce(`${name} closed.`);
+  location.reload();
+}
+
+async function pcDiscard(cycleId, name) {
+  if (!confirm(`Discard the draft “${name}”? It has not run, so nothing is lost.`)) return;
+  const res = await fetch(`/api/performance/cycles/${encodeURIComponent(cycleId)}`,
+                          { method: 'DELETE' });
+  const d = await res.json();
+  if (!res.ok) { announce(d.error || 'Could not discard it.', 'assertive'); return; }
+  announce('Draft discarded.');
+  location.reload();
+}
+
+// ── Plumbing ────────────────────────────────────────────────────────────────
+function pcShow(id) {
+  pcOpener = document.activeElement;
+  pcEl(id).style.display = 'flex';
+  document.addEventListener('keydown', pcKeydown);
+  const first = pcEl(id).querySelector('input, textarea');
+  if (first) first.focus();
+}
+function pcClose(id) {
+  pcEl(id).style.display = 'none';
+  document.removeEventListener('keydown', pcKeydown);
+  if (pcOpener && pcOpener.focus) pcOpener.focus();
+}
+function pcKeydown(e) {
+  if (e.key !== 'Escape') return;
+  ['pc-new-modal', 'pc-elig-modal'].forEach(id => {
+    if (pcEl(id).style.display === 'flex') pcClose(id);
+  });
+}
+
+async function pcSend(method, url, body, errBox, modalId, okMsg) {
+  let res, d;
+  try {
+    res = await fetch(url, { method,
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    d = await res.json();
+  } catch (_) {
+    const e = pcEl(errBox);
+    e.textContent = 'That did not save. Nothing has changed — try again.';
+    e.style.display = ''; announce(e.textContent, 'assertive');
+    return;
+  }
+  if (!res.ok) {
+    const e = pcEl(errBox);
+    e.textContent = d.error || 'That did not save.';
+    e.style.display = ''; announce(e.textContent, 'assertive');
+    return;
+  }
+  pcClose(modalId);
+  announce(okMsg);
+  location.reload();
+}
+
+pcRender();
+</script>
+{% endblock %}

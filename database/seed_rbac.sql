@@ -270,3 +270,38 @@ UPDATE public.role_feature_access rfa
  WHERE rfa.role_id = ro.id AND rfa.feature_id = pf.id
    AND pf.code = 'job_architecture'
    AND ro.name IN ('SOLID_LINE_MANAGER', 'HR_ADMIN', 'PORTAL_ADMIN');
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- EP44 P0 — the `performance` feature code
+--
+-- A feature row is DATA. A fresh CI database is schema.sql + this file and
+-- migrations are NEVER replayed, so registering it only in migration 15 gives CI
+-- the cycle tables and no feature — nav hidden, routes 403, every developer
+-- machine green. That is the DEF-004 trap (CLAUDE.md).
+--
+-- `r` to every role: an employee must be able to read their own review; row
+-- scoping decides WHOSE, not whether.
+-- `w` = ADMINISTER the company's review rounds (open, configure, close), HR and
+-- Portal admin only — a line manager must not open or close the annual round.
+-- ─────────────────────────────────────────────────────────────────────────────
+
+INSERT INTO public.portal_features (id, code, label, description, sort_order, default_enabled) VALUES
+    ('c8d31f45-2b76-4e09-a1c3-6f9d84e07b21', 'performance', 'Performance Reviews',
+     'Read your own performance review; administer the company''s review rounds',
+     12, true)
+ON CONFLICT (code) DO NOTHING;
+
+INSERT INTO public.role_feature_access (role_id, feature_id, can_read, can_write, can_delete)
+SELECT ro.id, pf.id, TRUE, FALSE, FALSE
+  FROM public.roles ro
+ CROSS JOIN public.portal_features pf
+ WHERE pf.code = 'performance'
+ON CONFLICT (role_id, feature_id) DO NOTHING;
+
+UPDATE public.role_feature_access rfa
+   SET can_write = TRUE
+  FROM public.roles ro, public.portal_features pf
+ WHERE rfa.role_id = ro.id AND rfa.feature_id = pf.id
+   AND pf.code = 'performance'
+   AND ro.name IN ('HR_ADMIN', 'PORTAL_ADMIN');

@@ -2753,3 +2753,84 @@ ALTER TABLE ONLY public.employee_step_roadmaps
 CREATE UNIQUE INDEX uq_esr_one_live ON public.employee_step_roadmaps USING btree (employee_id) WHERE (superseded_at IS NULL);
 CREATE INDEX idx_esr_unacknowledged ON public.employee_step_roadmaps USING btree (company_id, authored_by_user_id) WHERE ((acknowledged_at IS NULL) AND (superseded_at IS NULL));
 CREATE INDEX idx_esr_employee ON public.employee_step_roadmaps USING btree (employee_id, version DESC);
+
+
+--
+-- ─────────────────────────────────────────────────────────────────────────────
+-- PERFORMANCE REVIEW CYCLES + ELIGIBILITY (EP44 P0) — migration 15
+--
+-- ⚠ NO PAY REFERENCE ANYWHERE. A cycle is independent of the pay round
+-- (D-009(1)), which keeps the compensation dependency one-directional and stops
+-- a rating reaching an amount through a shared key.
+-- ─────────────────────────────────────────────────────────────────────────────
+--
+
+CREATE TABLE public.performance_cycles (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    company_id uuid NOT NULL,
+    name character varying(150) NOT NULL,
+    period_year integer NOT NULL,
+    opens_on date NOT NULL,
+    closes_on date NOT NULL,
+    self_assessment_deadline date,
+    joiner_cutoff_days integer DEFAULT 90 NOT NULL,
+    excluded_employment_types text[] DEFAULT ARRAY['CONTRACTOR'::text] NOT NULL,
+    status character varying(16) DEFAULT 'DRAFT'::character varying NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    created_by_user_id uuid,
+    opened_at timestamp with time zone,
+    closed_at timestamp with time zone,
+    CONSTRAINT chk_pc_cutoff CHECK (((joiner_cutoff_days >= 0) AND (joiner_cutoff_days <= 365))),
+    CONSTRAINT chk_pc_deadline CHECK (((self_assessment_deadline IS NULL) OR ((self_assessment_deadline >= opens_on) AND (self_assessment_deadline < closes_on)))),
+    CONSTRAINT chk_pc_status CHECK (((status)::text = ANY ((ARRAY['DRAFT'::character varying, 'OPEN'::character varying, 'IN_REVIEW'::character varying, 'CALIBRATION'::character varying, 'CLOSED'::character varying])::text[]))),
+    CONSTRAINT chk_pc_window CHECK ((closes_on > opens_on))
+);
+
+COMMENT ON COLUMN public.performance_cycles.status IS 'DRAFT -> OPEN -> IN_REVIEW -> CALIBRATION -> CLOSED, FORWARD ONLY. A CLOSED cycle can never be reopened: assessments, calibration outcomes and step changes point at it, so reopening silently changes what those records mean. A correction is an amendment with an actor and a reason.';
+
+CREATE TABLE public.performance_cycle_participants (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    cycle_id uuid NOT NULL,
+    company_id uuid NOT NULL,
+    employee_id uuid NOT NULL,
+    state character varying(12) NOT NULL,
+    exclusion_reason character varying(32),
+    is_partial boolean DEFAULT false NOT NULL,
+    manager_employee_id uuid,
+    overridden_by_user_id uuid,
+    override_reason text,
+    snapshot_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT chk_pcp_override CHECK (((overridden_by_user_id IS NULL) OR (btrim(COALESCE(override_reason, ''::text)) <> ''::text))),
+    CONSTRAINT chk_pcp_reason CHECK ((((state)::text = 'EXCLUDED'::text) = (exclusion_reason IS NOT NULL))),
+    CONSTRAINT chk_pcp_reason_vocab CHECK (((exclusion_reason IS NULL) OR ((exclusion_reason)::text = ANY ((ARRAY['NEW_JOINER'::character varying, 'LEAVER'::character varying, 'EXCLUDED_EMPLOYMENT_TYPE'::character varying, 'NO_MANAGER'::character varying, 'HR_EXCLUDED'::character varying])::text[])))),
+    CONSTRAINT chk_pcp_state CHECK (((state)::text = ANY ((ARRAY['INCLUDED'::character varying, 'EXCLUDED'::character varying])::text[])))
+);
+
+COMMENT ON TABLE public.performance_cycle_participants IS 'A SNAPSHOT of who is in a review round, taken when it opens (EP44 KAN-220). Never a live query: live participation means a mid-cycle joiner silently appears, a leaver silently vanishes, and the completion meter moves for reasons nobody did. Re-evaluation is an explicit audited action that reports what changed.';
+
+ALTER TABLE ONLY public.performance_cycles ADD CONSTRAINT performance_cycles_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.performance_cycles ADD CONSTRAINT performance_cycles_company_id_period_year_key UNIQUE (company_id, period_year);
+ALTER TABLE ONLY public.performance_cycles ADD CONSTRAINT performance_cycles_id_company_id_key UNIQUE (id, company_id);
+ALTER TABLE ONLY public.performance_cycle_participants ADD CONSTRAINT performance_cycle_participants_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.performance_cycle_participants ADD CONSTRAINT performance_cycle_participants_cycle_id_employee_id_key UNIQUE (cycle_id, employee_id);
+
+ALTER TABLE ONLY public.performance_cycles
+    ADD CONSTRAINT performance_cycles_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.performance_cycles
+    ADD CONSTRAINT performance_cycles_created_by_user_id_fkey FOREIGN KEY (created_by_user_id) REFERENCES public.users(id) ON DELETE SET NULL;
+ALTER TABLE ONLY public.performance_cycle_participants
+    ADD CONSTRAINT fk_pcp_cycle FOREIGN KEY (cycle_id, company_id) REFERENCES public.performance_cycles(id, company_id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.performance_cycle_participants
+    ADD CONSTRAINT performance_cycle_participants_employee_id_fkey FOREIGN KEY (employee_id) REFERENCES public.employees(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.performance_cycle_participants
+    ADD CONSTRAINT performance_cycle_participants_manager_employee_id_fkey FOREIGN KEY (manager_employee_id) REFERENCES public.employees(id) ON DELETE SET NULL;
+ALTER TABLE ONLY public.performance_cycle_participants
+    ADD CONSTRAINT performance_cycle_participants_overridden_by_user_id_fkey FOREIGN KEY (overridden_by_user_id) REFERENCES public.users(id) ON DELETE SET NULL;
+
+-- At most ONE round per company that is not CLOSED. Two make "which round am I
+-- in?" ambiguous, and every downstream reader picks one arbitrarily.
+CREATE UNIQUE INDEX uq_pc_one_active ON public.performance_cycles USING btree (company_id) WHERE ((status)::text <> 'CLOSED'::text);
+CREATE INDEX idx_pc_company ON public.performance_cycles USING btree (company_id, period_year DESC);
+CREATE INDEX idx_pcp_cycle ON public.performance_cycle_participants USING btree (cycle_id, state);
+CREATE INDEX idx_pcp_manager ON public.performance_cycle_participants USING btree (cycle_id, manager_employee_id) WHERE ((state)::text = 'INCLUDED'::text);
+CREATE INDEX idx_pcp_employee ON public.performance_cycle_participants USING btree (employee_id);

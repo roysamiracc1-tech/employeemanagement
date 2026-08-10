@@ -1002,6 +1002,112 @@ owns that review.**
 
 ---
 
+## 8f. Performance review cycles and eligibility (EP44 P0 · A7 · D-009 · D-010)
+
+The foundation of performance management: nothing else in the epic exists without a round to hang it
+on. Migration `15_performance_cycles.sql`; service `app/services/performance_service.py`; routes
+`app/routes/performance.py`; screen `templates/admin/performance_cycles.html`.
+
+### Annual — and therefore no `period_type`
+
+A round covers one **year** (D-009(1)). There is **no `period_type` column and no cadence setting**: a
+configurable field with one legal value is a lie about what the product supports, and adding quarterly
+later should look like the real change it would be. The screen says so rather than leaving the user to
+wonder.
+
+### ⚠️ At most ONE round that is not CLOSED
+
+Enforced by a **partial unique index** (`uq_pc_one_active`), not by service code — the same reasoning as
+`uq_eja_one_current`. Two open rounds make *"which round am I in?"* ambiguous, and every downstream
+reader (the participant list, the assessment surface, calibration) would pick one arbitrarily and
+disagree with the next. The service also refuses it, so the user gets a sentence naming the blocking
+round instead of a constraint violation.
+
+### ⚠️ Forward only, and a CLOSED round is never reopened
+
+`DRAFT → OPEN → IN_REVIEW → CALIBRATION → CLOSED`. Assessments, calibration outcomes and step changes
+all point at a round, so **reopening one silently changes what those records mean** — the same ruling
+as an occupied job level's ordinal. A correction is an **amendment with an actor and a reason**, never a
+state reversal. The screen offers only the *next* stage (a dropdown of all five would invite going
+backwards) and the close confirmation states the irreversibility rather than asking "are you sure?".
+
+**Entry conditions**, both of which exist to stop a round that cannot be finished:
+
+| Moving to | Requires | Why |
+|---|---|---|
+| `OPEN` | **Nobody with no line manager** | There would be nobody to assess them, so opening guarantees an incomplete round. The refusal **names them** and offers the way out. |
+| `IN_REVIEW` | A **self-assessment deadline**, and a snapshot | OQ-10 — the employee's submission gates the manager's rating, so without a deadline a silent employee deadlocks their own review *and the round*. |
+
+A `DRAFT` may be **discarded**; anything that has run may only be **closed**. Closing a draft is refused
+because closing implies it happened.
+
+### ⚠️ Eligibility is a SNAPSHOT, not a live query
+
+The load-bearing decision in this stage. If participation were resolved live:
+
+- somebody joining mid-round would **silently appear** in a manager's list,
+- a leaver would **silently vanish** from it,
+- and the completion meter would **move for reasons nobody did** — which is indistinguishable from a
+  bug, and destroys trust in the number HR uses to chase the round.
+
+Re-evaluating is therefore an **explicit action that reports what changed** (added / removed / changed /
+overrides kept). That report is what makes it safe to run at all. **An HR override survives a
+re-evaluation untouched** — HR made that decision on purpose and a bulk re-run must not quietly reverse
+it.
+
+The **preview changes nothing** and shares the same `_evaluate()` function as the snapshot, so the
+screen cannot promise one thing and do another.
+
+### Every exclusion carries a named reason
+
+`NEW_JOINER` · `LEAVER` · `EXCLUDED_EMPLOYMENT_TYPE` · `NO_MANAGER` · `HR_EXCLUDED`. A silent exclusion
+from a review round is the defect this story exists to prevent, and it is exactly what somebody is later
+asked to justify. The vocabulary is closed in the database, and `chk_pcp_reason` makes an exclusion
+without a reason — or a reason without an exclusion — impossible.
+
+- **A leaver is excluded, and anything already written about them is retained.** An assessment is a
+  record of a conversation that happened, not a work item to tidy away.
+- **A mid-year joiner past the cut-off is INCLUDED and flagged `is_partial`**, shown at the point of
+  assessment so the manager knows they are assessing a shorter period.
+- **Only `NO_MANAGER` blocks the round.** The others are deliberate policy; that one means it cannot be
+  completed.
+- **An HR override needs a mandatory reason** (`chk_pcp_override`), visible on the participant list.
+
+**Coverage is a named figure with its denominator** and the excluded **listed by name and reason** —
+never a bare percentage, because the excluded are the actionable part.
+
+### The eligibility policy lives on the ROUND, not in a settings table
+
+`joiner_cutoff_days` and `excluded_employment_types` are columns on `performance_cycles`. A 2027 round's
+exclusions must still be explicable in 2029 even if the company changed its rules — **a settings table
+answers "what is the policy now?" when the question is "what was it then?"**. Same reasoning as
+versioning the rating scale. The policy is therefore editable only while the round is a `DRAFT`.
+
+### ⚠️ No pay reference anywhere
+
+A cycle carries **no currency, no amount and no pay-period key** (AC-219-09). That keeps the
+compensation dependency **one-directional** and stops a rating reaching an amount by way of a shared
+key. Tested against both the migration and the service's SQL.
+
+### Access, and one question deliberately left open
+
+| | Gate | Who |
+|---|---|---|
+| Read a review / see you are in the round | `performance:r` | **Every role** — row scoping decides *whose*, not *whether* |
+| **Administer** rounds: open, configure, close | `performance:w` | HR_ADMIN + PORTAL_ADMIN — **not** a line manager |
+
+> **A manager writing an assessment, and an employee writing a self-assessment, are also writes — and
+> they must not need this admin grant.** That is the same shape as **CFL-42-35**, where
+> `job_architecture:w` turned out to mean "author for your own reports" while ladder configuration
+> needed `org_structure:w`. It is **left open on purpose** and raised against the assessment stories,
+> because inventing a sixth feature code before the story that needs it is how a permission model
+> acquires codes nobody can explain.
+
+The participant list is **row-scoped at the payload**: an admin sees the company's, a manager their own
+reports', anybody else only themselves — a URL is a guess anybody can make.
+
+---
+
 ## 9. Security Considerations
 
 | Area | Implementation |

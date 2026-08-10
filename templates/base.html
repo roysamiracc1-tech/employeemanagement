@@ -246,6 +246,19 @@
     </a>
     {% endif %}
     {% endif %}
+    {# EP44 — review rounds. `performance:w` is ADMIN (open/configure/close) and
+       is HR + Portal only: a line manager must not open or close the company's
+       annual round. #}
+    {% if has_feature_access('performance', 'w') %}
+    <a href="{{ url_for('admin_performance_cycles') }}"
+       class="nav-link {% if request.endpoint == 'admin_performance_cycles' %}active{% endif %}">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>
+      </svg>
+      <span class="nav-label">Review Rounds</span>
+    </a>
+    {% endif %}
+
     {# KAN-190 — gated on READING the ladder, not on configuring it. `r` is
        seeded to every role because an employee must be able to read their own
        step and the next one; the editing affordances inside are gated

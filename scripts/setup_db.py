@@ -119,7 +119,8 @@ def step4_seed_portal_features(cur):
         ('job_architecture',     'Job Architecture',
          'Read the job ladder — families, levels, steps and what each step expects; '
          'write step roadmaps for your reports', 11),
-        # sort_order 12 is reserved for onboarding/offboarding (EP38 KAN-184/183).
+        ('performance',          'Performance Reviews',
+         "Read your own performance review; administer the company's review rounds", 12),
         ('audit_log',            'Audit Log',                'View the immutable audit trail of changes within the company',   13),
     ]
     for code, label, desc, order in features:

@@ -117,6 +117,21 @@ ACTIONS = frozenset({
     # in two years by somebody who was not in the room.
     'STEP_ROADMAP_AUTHORED',
     'STEP_ROADMAP_DISCUSSION_CONFIRMED',
+    # EP44 P0 — review cycles. `..._ADVANCED` and `..._CLOSED` are separate from
+    # `..._UPDATED` because a stage change is what every assessment and
+    # calibration outcome in the round hangs off, and it must be findable on its
+    # own. `..._DISCARDED` only ever applies to a DRAFT that never ran.
+    'PERFORMANCE_CYCLE_CREATED',
+    'PERFORMANCE_CYCLE_UPDATED',
+    'PERFORMANCE_CYCLE_ADVANCED',
+    'PERFORMANCE_CYCLE_CLOSED',
+    'PERFORMANCE_CYCLE_DISCARDED',
+    # The snapshot writes ONE row carrying counts, not one per person
+    # (ADR-009 §3.5). Re-evaluation is a distinct action because it reports what
+    # CHANGED, which is the thing that makes it safe to run.
+    'PERFORMANCE_PARTICIPANTS_SNAPSHOT',
+    'PERFORMANCE_PARTICIPANTS_RE_EVALUATED',
+    'PERFORMANCE_PARTICIPATION_OVERRIDDEN',
     'CHECKLIST_STARTED',
     'CHECKLIST_TASK_COMPLETED',
     'CHECKLIST_COMPLETED',
