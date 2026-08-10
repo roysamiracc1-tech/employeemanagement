@@ -1121,6 +1121,84 @@ file carries the numbered, individually testable criteria.
 
 ---
 
+## DEMO READINESS GATE — run 10 Aug 2026 for the EP42 W0 + W1 walkthrough
+
+> **Verdict: 🟡 CONDITIONAL GO.** The six stories delivered on 10 Aug are demoable. **Three things are
+> disclosed out loud at the start of the demo** rather than discovered in front of the stakeholder —
+> gate rule 4. Nothing here is a blocker; all three are known, recorded and deliberate.
+
+**Scope of this run:** KAN-203, KAN-204, KAN-189, KAN-188, KAN-190, KAN-191.
+
+| # | Check | Verdict | Evidence |
+|---|---|---|---|
+| **D1** | Story truth | ✅ | Each story's AC restated in its own DONE row above; every claim below maps to a demo step |
+| **D2** | Every actor | ✅ | Ladder walked as **PORTAL_ADMIN** (`ingrid.makinen`, configures), a **manager** (`ana.costa`, assesses her own 2 reports) and a **plain employee** (`tonis.rebane`, reads and is offered nothing). Self-approval walked as the subject |
+| **D3** | Both outcomes | ✅ | Refusals driven, not described: self-initiation 403; step 6 on a 5-step level refused **by the database**; cross-tenant family insert refused **by the FK**; `step_count` omitted refused; empty step submit refused; renumbering an occupied level refused; feature-off renders the explanatory screen |
+| **D4** | Feedback surfaces | 🟡 | See below — the bell rows are **N/A by design**, and that is stated rather than ticked |
+| **D5** | Access & tenancy | ✅ | 17 `@require_feature_access`, **0** `@require_roles` in `compensation.py`; no `OR company_id IS NULL` in SQL (the only match is the docstring forbidding it); SYSTEM_ADMIN bypass in the one resolver |
+| **D6** | State & rehearsal | ✅ | Rehearsed end to end twice in a headless browser before this. **Acme state: 2 families, 4 levels, 10 described steps, 3 of 46 placed, 1 assessed** — deliberately partial, see D6a |
+| **D7** | Automated evidence | 🟡 | **4,825 pytest · browser 110/110 · vacation 39/39.** Caveat disclosed below |
+| **D8** | Documentation truth | ✅ | `CLAUDE.md`, `TECHNICAL_DOCUMENTATION.md` §8b/§8c/§8d, `ARCHITECTURE_REVIEW.md` F32/F33, this file — all in the same commits as the code |
+| **D9** | Demo script | ✅ | Running order below |
+
+### D4 — the blind-spot list, answered honestly
+
+**KAN-190 and KAN-191 create no notifications at all**, so six of the ten rows are **not applicable
+by design** rather than passed: bell actionable area, badge count, icon semantics, retirement, the
+other approvers, deep links. Authoring a ladder and assessing a step are not approval events and have
+no call to action. **Stated rather than ticked, because a tick would be a false claim.** The bell rows
+were exercised for the org-change chain in the browser suite (DEF-001/2/3 checks, still green).
+
+What DOES apply, and passes:
+
+- **Empty states** ✅ — three of them, each truthful: no ladder ("No ladder yet", with the
+  renumbering warning **before** the ladder is built); no levels to map onto (points at the
+  configurator); nothing to assess. And the one that matters most — **"Step not yet assessed"**, shown
+  as itself, never `2.0`, never a dash, never blank (A6).
+- **Status vocabulary** ✅ — a step is written `level.step` everywhere: the ladder table, the
+  assessment dialog, the audit reason. `4/9` and `0/6` never become a bare percentage.
+- **The subject** ✅ — an employee can read their own level, their own step and the next one's
+  expectations. That is `job_architecture:r`, seeded to every role deliberately.
+
+### ⚠️ Disclosed at the start of the demo — gate rule 4
+
+1. **Initiator ≠ approver is accepted, not fixed** (owner Decision **D-007**). An HR admin can raise a
+   position change for somebody else and approve it themselves. Accepted in the owner's own words;
+   **documented behaviour, not an open defect.** Must be said aloud because the approval chain is on
+   screen.
+2. **DEF-004a is open and will not be fixed in the demo.** One employee has two current `DOTTED_LINE`
+   managers and the UI can only ever show one. Found by the KAN-189 non-overlap check, unrelated to
+   this work, and it needs the owner's call on whether two dotted lines are legitimate.
+3. **A test flake, not a regression.** The first browser run showed 2 failures — both *"navigation
+   interrupted by another navigation"* on the unauthenticated-redirect checks. A re-run was 110/110.
+   Disclosed because "110/110" alone would be a tidier story than the truth.
+
+### D6a — concurrency, and it is real here
+
+**`tests/ui/test_browser.py` and `tests/ui/test_vacation_workflow.py` both write to this database** —
+they raise and reject position changes and create leave. **Do not run either during the demo.** The
+ladder demo uses **Acme Corp** data (`Engineering` / `Commercial` families) that neither suite
+touches; the suites act on vacation and org-change rows.
+
+Acme is deliberately left **partially placed — 3 of 46**. That is not an unfinished demo; it is the
+state that shows the feature honestly. A fully-placed company hides the coverage remainder, the
+unplaced warning and the "not yet assessed" state, which are three of the things worth showing.
+
+### D9 — running order
+
+| # | As whom | Shown | What it proves |
+|---|---|---|---|
+| 1 | Portal admin | Job Architecture — the ladder, 3 different step shapes | `step_count` counts increments ABOVE entry: 5 → six steps `.0`–`.5`; it is per level and has no default |
+| 2 | Portal admin | Add a level; type 5 in Steps | The live preview says *"That gives 6 steps"* **before** saving. Clear it → refused, "no default" |
+| 3 | Portal admin | The incomplete banner, `0/6` on `Software Engineer` | Half-authored is visible AS half-authored, and it names the consequence |
+| 4 | Portal admin | Place on Ladder — 41 titles, biggest first; Preview | Nothing changes on preview. Skips anyone already placed |
+| 5 | **Manager** (`ana.costa`) | Team Steps — 2 reports, "Step not yet assessed" | A step is a manager's judgement, not a derivation (A6) |
+| 6 | **Manager** | Open the dialog: nothing pre-selected; pick a step | The authored expectations appear at the point of choice, with the step below for comparison |
+| 7 | **Employee** (`tonis.rebane`) | The same ladder page | Reads it all; offered no editing. Transparency is the default |
+| 8 | Employee | Attempt a self position change | Refused, and the refusal is audited as a security event (KAN-203) |
+
+---
+
 ## SEQUENCING — where performance management goes (**Decision D-008 — RESOLVED: Option C**)
 
 > **Raised 10 Aug 2026.** The owner challenged the sequencing directly: *"You said yesterday to implement
