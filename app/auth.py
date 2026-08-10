@@ -151,12 +151,20 @@ def register_context_processor(app):
         theme_pref      = session.get('theme_pref', 'light')
         is_tech_admin   = 'SYSTEM_ADMIN' in session.get('roles', [])
         is_portal_admin = 'PORTAL_ADMIN' in session.get('roles', [])
+        # Imported here, not at module scope: app.helpers imports from app.db and
+        # this module is imported during app construction.
+        from app.helpers import fmt_period, fmt_last_day
         return dict(
             has_role=has_role,
             has_feature_access=has_feature_access,
             session=session,
             request=request,
             now=datetime.datetime.now,
+            # KAN-189 / ADR-020 — the ONLY sanctioned way to render an
+            # effective-dated period. `effective_to` is exclusive, so printing it
+            # raw is always off by one day.
+            fmt_period=fmt_period,
+            fmt_last_day=fmt_last_day,
             branding=branding,
             theme_pref=theme_pref,
             is_tech_admin=is_tech_admin,

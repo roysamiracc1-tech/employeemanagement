@@ -11,6 +11,8 @@ second table and no second feature code — a transfer *is* an org change, so it
 inherits the sequential approval chain, the initiator rule and the company
 scoping unchanged.
 """
+import datetime
+
 from flask import session, request, render_template, jsonify, redirect, url_for, flash
 
 from app import app
@@ -311,7 +313,23 @@ def api_org_change_request():
             'pending_request_id': existing,
         }), 409
 
-    req_id = svc.create_request(company_id, subject_id, u['user_id'], proposed, data.get('reason'))
+    # AC-185-07 (KAN-189) — the effective date. Absent means today, which is what
+    # every request meant before the field existed, so an older client keeps
+    # working. Parsed here rather than in the engine because a malformed date is a
+    # 400 about the input, not an engine error.
+    eff_raw = (data.get('effective_date') or '').strip()
+    effective_date = None
+    if eff_raw:
+        try:
+            effective_date = datetime.date.fromisoformat(eff_raw[:10])
+        except ValueError:
+            return jsonify({'error': 'That effective date is not a valid date.'}), 400
+        problem = svc._validate_effective_date(company_id, effective_date)
+        if problem:
+            return jsonify({'error': problem}), 400
+
+    req_id = svc.create_request(company_id, subject_id, u['user_id'], proposed,
+                                data.get('reason'), effective_date=effective_date)
     return jsonify({'ok': True, 'id': req_id})
 
 
@@ -421,15 +439,31 @@ def api_org_change_prefill():
         reports = (cnt or {}).get('c') or 0
         pending_id = _pending_request_for(subject_id)
 
+    # KAN-189 — the effective-date bounds, so the picker cannot offer a day the
+    # server would refuse. `max` is TODAY, not today + the forward window: a
+    # placement move has no scheduler to apply it later, so the forward window
+    # only ever applies to a pay-bearing request (W2+). Sending the real bound
+    # here would render a picker that offers six months of dates the server
+    # rejects one by one — the "why is this control lying to me" defect.
+    eff_co = company_id or subject.get('company_id')
+    back_days, _fwd = svc._dating_window(eff_co)
+    today = datetime.date.today()
+
     return jsonify({
         'target': target, 'subject_current': subject_current,
         'business_units': bus, 'functional_units': fus,
         'locations': locs, 'managers': mgrs,
         'subject': subject,
         'subject_current_names': current_names,
-        'approval_chain': _approval_chain(company_id or subject.get('company_id')),
+        'approval_chain': _approval_chain(eff_co),
         'direct_reports': reports,
         'pending_request_id': pending_id,
+        'effective_date': {
+            'default': today.isoformat(),
+            'min':     (today - datetime.timedelta(days=back_days)).isoformat(),
+            'max':     today.isoformat(),
+            'backdate_limit_days': back_days,
+        },
     })
 
 

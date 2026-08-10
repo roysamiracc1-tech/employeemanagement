@@ -84,6 +84,19 @@
         <select id="mv-loc" class="form-control"></select>
       </div>
 
+      <!-- AC-185-07 (KAN-189) — the effective date. Deliberately absent until
+           now: there was no column to carry it, and rendering a field whose
+           value is silently discarded is worse than not offering it. -->
+      <div class="form-group" style="margin:0">
+        <label for="mv-effective">Takes effect on *</label>
+        <input type="date" id="mv-effective" class="form-control"
+               aria-describedby="mv-effective-help mv-error">
+        <div id="mv-effective-help" style="font-size:.75rem;color:#64748b;margin-top:4px">
+          The day the new position starts. Today by default;
+          <span id="mv-effective-back"></span>
+        </div>
+      </div>
+
       <div class="form-group" style="margin:0">
         <label for="mv-reason">Reason *</label>
         <textarea id="mv-reason" class="form-control" rows="2" aria-describedby="mv-error"
@@ -260,7 +273,28 @@ async function mvOpen(mode, subjectId, subjectName, subtitle, targetId) {
 
   mvLoading(false);
   mvFill(data, targetId);
+  mvEffectiveInit(data.effective_date);
   mvSay(`Loaded ${mvSubjectName}'s current position.`);
+}
+
+// ── Effective date (KAN-189 / AC-185-07) ──────────────────────────────────────
+// Bounds come from the server, never from the client: the picker and the
+// validator must agree, and there is exactly one authority on the window.
+function mvEffectiveInit(cfg) {
+  const el = mvEl('mv-effective');
+  if (!cfg) {                      // older payload — leave it empty; server uses today
+    el.value = ''; el.removeAttribute('min'); el.removeAttribute('max');
+    mvEl('mv-effective-back').textContent = '';
+    return;
+  }
+  el.value = cfg.default || '';
+  if (cfg.min) el.min = cfg.min;
+  // `max` is today for a placement move — there is no scheduler to apply a
+  // future-dated one, so offering future days would be offering a lie.
+  if (cfg.max) el.max = cfg.max;
+  mvEl('mv-effective-back').textContent = cfg.backdate_limit_days
+    ? `you can backdate up to ${cfg.backdate_limit_days} days.`
+    : '';
 }
 
 // ── Fill the selects (incl. E1 / E2 empty states) ─────────────────────────────
@@ -351,12 +385,22 @@ async function submitMove() {
     mvEl('mv-reason').focus();
     return;
   }
+  // KAN-189 — required, because "when" is not a detail on a move. The server
+  // re-validates the window; this only catches the empty box, so the user is not
+  // sent to the server to be told something the form already knew.
+  const effective = mvEl('mv-effective').value;
+  if (!effective) {
+    mvErr('Please choose the date this move takes effect.');
+    mvEl('mv-effective').focus();
+    return;
+  }
   const body = {
     employee_id:        mvSubjectId,
     manager_id:         mvEl('mv-manager').value || null,
     business_unit_id:   mvEl('mv-bu').value || null,
     functional_unit_id: mvEl('mv-fu').value || null,
     location_id:        mvEl('mv-loc').value || null,
+    effective_date:     effective,
     reason,
   };
   if (!body.manager_id && !body.business_unit_id && !body.functional_unit_id && !body.location_id) {

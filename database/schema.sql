@@ -538,6 +538,7 @@ CREATE TABLE public.org_change_requests (
     proposed_manager_id uuid,
     workflow_id uuid,
     current_step integer DEFAULT 1 NOT NULL,
+    effective_date date,
     status character varying(12) DEFAULT 'PENDING'::character varying NOT NULL,
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,

@@ -309,6 +309,78 @@ def employee_solid_manager(emp_id):
     return row['manager_id'] if row else None
 
 
+# ── Effective-dated periods (KAN-189 · ADR-020) ───────────────────────────────
+
+_PERIOD_FMT = '%d %b %Y'
+
+
+def as_date(v):
+    """Accept a date, a datetime or an ISO string; None for anything else.
+
+    Public because `to_dict()` serialises every DATE column to an ISO string
+    (`app/db.py serialize`), so anything that needs to do arithmetic on a date
+    read back from the database has to coerce it first. Shared so there is one
+    coercion and not one per caller.
+    """
+    if v is None or v == '':
+        return None
+    if isinstance(v, datetime.datetime):
+        return v.date()
+    if isinstance(v, datetime.date):
+        return v
+    try:
+        return datetime.date.fromisoformat(str(v)[:10])
+    except ValueError:
+        return None
+
+
+def fmt_period(effective_from, effective_to=None):
+    """Render a half-open `[from, to)` period the way a human reads it.
+
+    **`effective_to` is the first day NOT covered** (ADR-020), so the last day of
+    the period is `effective_to - 1`. A period stored as
+    `2026-01-01 → 2026-04-01` covers January, February and March, and reads:
+
+        "1 Jan 2026 – 31 Mar 2026"
+
+    NOT "1 Jan – 1 Apr", which is the off-by-one that half-open intervals invite
+    and the reason no surface may print `effective_to` raw. A grep-assert in
+    `tests/test_org_change.py` fails if a template does.
+
+    An open period (`effective_to` NULL — the row is current) renders as
+    "since <from>", because "1 Jan 2026 – " reads as truncated rather than open.
+    """
+    start, end = as_date(effective_from), as_date(effective_to)
+    if start is None and end is None:
+        return '—'
+    if start is None:                       # end-dated with no start: show what we know
+        return f'until {(end - datetime.timedelta(days=1)).strftime(_PERIOD_FMT)}'
+    if end is None:
+        return f'since {start.strftime(_PERIOD_FMT)}'
+
+    last = end - datetime.timedelta(days=1)
+    if last < start:
+        # A same-day close: `from == to` covers nothing at all under `[from, to)`.
+        # Say so rather than rendering a backwards range like "5 Mar – 4 Mar",
+        # which reads as corrupt data when it is in fact a zero-length period.
+        return f'{start.strftime(_PERIOD_FMT)} (no full day)'
+    if last == start:
+        return start.strftime(_PERIOD_FMT)
+    return f'{start.strftime(_PERIOD_FMT)} – {last.strftime(_PERIOD_FMT)}'
+
+
+def fmt_last_day(effective_to):
+    """Just the last covered day of a half-open period — `effective_to - 1`.
+
+    For the many places that show an end date in a column of its own rather than
+    a full period string. Same convention, one implementation.
+    """
+    end = as_date(effective_to)
+    if end is None:
+        return '—'
+    return (end - datetime.timedelta(days=1)).strftime(_PERIOD_FMT)
+
+
 def used_days(emp_id, vt_id, year):
     row = query(
         "SELECT COALESCE(SUM(working_days),0)::int AS used FROM vacation_requests "

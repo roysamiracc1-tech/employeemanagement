@@ -709,6 +709,88 @@ def run_all(playwright):
     except Exception as e:
         fail("Profile Transfer… opens the dialog with a non-empty approval chain", str(e))
 
+    # ── The effective date (KAN-189 / AC-185-07) — the field KAN-185 left out ──
+    try:
+        el = page.query_selector("#mv-effective")
+        assert el, "the effective-date field is not in the dialog"
+        assert el.get_attribute("type") == "date", "not a real date input"
+        # Defaults to today, so the common case is one less decision.
+        import datetime as _d
+        today = _d.date.today().isoformat()
+        assert el.input_value() == today, f"default was {el.input_value()!r}, expected {today}"
+        ok("KAN-189 · Effective date defaults to today")
+    except Exception as e:
+        fail("KAN-189 · Effective date defaults to today", str(e))
+
+    try:
+        el = page.query_selector("#mv-effective")
+        # `max` is today: a placement move has no scheduler, so offering future
+        # days would be offering something the server refuses. `min` is the
+        # backdate window, so the picker and the validator cannot disagree.
+        import datetime as _d
+        assert el.get_attribute("max") == _d.date.today().isoformat(), \
+            f"max was {el.get_attribute('max')!r} — a future date would be offered and refused"
+        mn = el.get_attribute("min")
+        assert mn and mn < _d.date.today().isoformat(), f"min was {mn!r}"
+        ok("KAN-189 · The picker is bounded by the server's window, not the client's")
+    except Exception as e:
+        fail("KAN-189 · The picker is bounded by the server's window, not the client's", str(e))
+
+    try:
+        # Labelled and described — WCAG 3.3.2 / 1.3.1. The field is required, so
+        # an unlabelled date box would be the worst control in the dialog.
+        lbl = page.eval_on_selector(
+            "label[for=mv-effective]", "e => e.textContent.trim()")
+        assert lbl, "the effective-date field has no label"
+        assert page.query_selector("#mv-effective[aria-describedby]"), \
+            "no aria-describedby tying the help/error text to the field"
+        assert "backdate" in page.inner_text("#mv-effective-help").lower(), \
+            "the help text does not say how far back you may date it"
+        ok("KAN-189 · The date field is labelled and its limits are explained")
+    except Exception as e:
+        fail("KAN-189 · The date field is labelled and its limits are explained", str(e))
+
+    try:
+        # Clearing it must be refused client-side, and said out loud — an empty
+        # required field that fails silently on submit is the E5 pattern.
+        # The reason is filled first because it is validated BEFORE the date, so
+        # without it this would only re-prove the reason check.
+        page.fill("#mv-reason", "Probe: the date field is required")
+        page.fill("#mv-effective", "")
+        page.click("#mv-submit")
+        page.wait_for_timeout(400)
+        err = page.inner_text("#mv-error")
+        assert "date" in err.lower(), f"submit with no date was not refused; error was {err!r}"
+        assert page.eval_on_selector("#mv-error", "e => e.style.display") != "none"
+        ok("KAN-189 · Submitting with no effective date is refused with a reason")
+    except Exception as e:
+        fail("KAN-189 · Submitting with no effective date is refused with a reason", str(e))
+
+    try:
+        # And the server refuses an out-of-window date even when the picker is
+        # bypassed — the bound on the input is a convenience, not the control.
+        # A REAL subject id, so the request reaches the date check instead of
+        # dying earlier on a malformed UUID (which would pass this test for the
+        # wrong reason). The body is not parsed as JSON: an earlier guard may
+        # legitimately answer with an HTML error page, and the assertion here is
+        # only that nothing was created.
+        import datetime as _d
+        subj_id = subject_href.rsplit("/", 1)[-1] if subject_href else None
+        assert subj_id, "no subject id to probe with"
+        future = (_d.date.today() + _d.timedelta(days=30)).isoformat()
+        status = page.evaluate("""async ([id, d]) => {
+          const r = await fetch('/api/org-change/request', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({employee_id: id, business_unit_id: null,
+                                  manager_id: null, reason: 'probe',
+                                  effective_date: d})});
+          return r.status;
+        }""", [subj_id, future])
+        assert status != 200, "a future-dated placement was accepted"
+        ok("KAN-189 · A future-dated placement is refused server-side too")
+    except Exception as e:
+        fail("KAN-189 · A future-dated placement is refused server-side too", str(e))
+
     try:
         # Nothing is applied by opening or cancelling — the dialog only ever
         # creates a PENDING request, and only on submit.

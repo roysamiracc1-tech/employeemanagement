@@ -1285,13 +1285,75 @@ manager, a reporting cycle, and any BU/FU/location/manager belonging to another 
 company's configured approval chain (read from `workflow_steps`, so it can never describe a chain the
 engine would not build) and warns that direct reports do **not** move with a manager.
 
-> **`AC-185-07` effective-dating is not implemented and is deliberately absent from the UI.**
-> `org_change_requests` has no column for an effective date and `create_request()` takes no such
-> parameter, so rendering the field would silently discard what the user typed. Blocked pending a
-> schema decision (CFL-4).
-
 Because the drag is a pointer-only interaction, the org-tree legend names the keyboard equivalent —
 "open a person's profile and choose Transfer…" (WCAG 2.1.1 / 2.5.7).
+
+### 22.5a Effective dating — half-open intervals, **project-wide** (KAN-189 · ADR-020 · closes CFL-4)
+
+**`AC-185-07` is implemented.** The dialog carries a required **Takes effect on** date, defaulting to
+today, bounded by the company window; `org_change_requests.effective_date` persists it (migration
+`10_org_change_effective_date.sql`).
+
+#### The convention — this is a project-wide rule, not an org-change detail
+
+> **Every effective-dated period in this system is half-open: `[effective_from, effective_to)`.**
+> **`effective_to` is the first day the row does NOT cover** — the day its successor starts.
+
+The consequence that catches everybody: **a period ending 31 March stores `2026-04-01`.**
+
+- **Never render `effective_to` raw.** Use `fmt_period(from, to)` or `fmt_last_day(to)` from
+  `app/helpers.py` (both registered as template globals). They subtract the day. A grep-assert in
+  `tests/test_org_change.py` fails the build if a template prints it directly.
+- **Coerce before doing arithmetic.** `to_dict()` serialises every DATE to an ISO string
+  (`app/db.py serialize`), so use `helpers.as_date()` first. `_apply_change` does exactly this: without
+  it, "the same date closes and opens" would be true only because two *strings* happened to match.
+- **Adjacent, not overlapping.** Closing with `effective_to = D` and opening with `effective_from = D`
+  is gapless and overlap-free. That is the whole mechanism.
+
+#### Why CFL-4 needed no history rewrite
+
+The old code closed an assignment with `effective_to = CURRENT_DATE` and let the new row default
+`effective_from` to `CURRENT_DATE` too. Read as **inclusive** `[from, to]` that is a one-day overlap —
+both rows claim today — and fixing it would have meant rewriting every historical row. Read as
+**half-open** the very same data is already correct.
+
+**The defect was the absence of a stated convention, not the data.** Stating it closed the finding and
+changed nothing on disk. That is why ADR-020 is a documentation change with a small code change
+attached, rather than a migration.
+
+#### One date drives the whole move
+
+`_apply_change` reads `effective_date` once and uses it as the single boundary for the outgoing
+assignment's `effective_to`, the incoming one's `effective_from`, and both ends of the `SOLID_LINE`
+re-point. The two ends of a boundary cannot drift apart because there is only one value.
+
+**DEF-42-2 fixed here too:** the manager re-point used to set `is_current = FALSE` and nothing else,
+leaving every superseded reporting line with a NULL end date — closed by the flag, open-ended by the
+dates, and read as still in force by anything trusting the dates. Migration 10 also **repairs** the
+rows the old code left behind, deriving each end date from its successor's `effective_from` (recovered,
+not invented) and leaving any row with no successor honestly NULL.
+
+#### The dating window, and what is not yet delivered
+
+`_validate_effective_date(company_id, date, request_type)` enforces it:
+
+| Rule | Value | Why |
+|---|---|---|
+| Backdating | 90 days | Payroll and history corrections need a window; unbounded backdating rewrites the past. |
+| Forward dating | 180 days | Applies to **pay** only. |
+| **Future-dated placement** | **Refused** | There is **no scheduler**. A future date would silently mean "applied the moment the last approver clicked" — precisely the lie the effective date exists to prevent. The error says so. |
+| Future-dated **pay** | Allowed | Inert data until its date; every read filters on the date, so nothing needs to wake up. |
+
+The picker's `max` is therefore **today**, not today + 180: offering six months of dates the server
+refuses one by one is a control that lies about itself.
+
+> **Not yet delivered: per-company values.** D1 puts these limits on
+> `company_compensation_settings`, a **W1** table that does not exist yet. Creating a stub of it early
+> would be actively harmful — that table is created with `CREATE TABLE IF NOT EXISTS`, so a partial
+> version would make W1's own migration silently skip and leave its remaining columns missing (the
+> exact CI-drift trap in `CLAUDE.md`). So `_dating_window(company_id)` returns the documented defaults
+> and is **company-scoped by signature**: when the table lands, that one function changes and no caller
+> does.
 
 ### 22.6 Tests
 

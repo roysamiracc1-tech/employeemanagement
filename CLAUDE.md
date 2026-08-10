@@ -86,7 +86,7 @@ before confirming, so nothing silently breaks. This is in addition to `pytest`. 
 
 1. Ensure the app is running on `http://localhost:8000` (`python run.py`) against the seeded dev DB.
 2. Run both headless browser regression suites and confirm **0 failures**:
-   - `python tests/ui/test_browser.py` — 100 checks across login, admin, org tree, search, vacation
+   - `python tests/ui/test_browser.py` — 105 checks across login, admin, org tree, search, vacation
      calendar, bell, dark mode, directory, Portal-Admin scoping, restricted access, mobile, redirects,
      the Transfer… entry point (KAN-185), **bell content** — that an approval awaiting you is
      actionable there, wears the right icon, and leaves once decided (DEF-001/2/3) — and the
@@ -96,7 +96,7 @@ before confirming, so nothing silently breaks. This is in addition to `pytest`. 
    - `python tests/ui/test_vacation_workflow.py` — 39 checks: the full submit → approve → reject →
      history → dashboard vacation workflow. It resets the leave it created on start-up, so it is
      safe to re-run — do not "fix" an `Exceeds annual limit` failure by relaxing the limit.
-3. Report the pass counts (e.g. "browser 100/100, vacation 39/39") alongside the `pytest` result.
+3. Report the pass counts (e.g. "browser 105/105, vacation 39/39") alongside the `pytest` result.
 4. If a regression suite fails, **investigate whether it's a real regression or a stale assertion** —
    drive the specific flow in a browser and check console/page errors before deciding. Fix real
    regressions; correct genuinely stale assertions (and say which). Never delete a check to go green.
@@ -175,6 +175,10 @@ Drag-and-drop employee moves (BU / functional unit / location / manager) go thro
 3. Approvals are **sequential**: level N+1 is only reached after level N approves; any single rejection sets `status=REJECTED` and applies **no** change. Nothing is applied until the final level approves.
 4. All org-change queries are **company-scoped** (`company_id = %s::uuid`) — same rule as everything else. Approver resolution matches role by **name** within the company (roles are per-company).
 5. The engine lives in `app/services/org_change_service.py`; reuse it — do not re-implement approval logic inline in routes.
+6. **Effective dates are HALF-OPEN, `[effective_from, effective_to)`, project-wide** (ADR-020 / KAN-189). `effective_to` is the **first day the row does NOT cover** — the day its successor starts. Three consequences, all load-bearing:
+   - **A period ending 31 March stores `2026-04-01`.** Never render `effective_to` raw; use `fmt_period()` / `fmt_last_day()` from `app/helpers.py` (both are template globals). A grep-assert in `tests/test_org_change.py` fails the build if a template prints it directly.
+   - **Coerce before any date arithmetic.** `to_dict()` serialises DATE columns to ISO strings (`app/db.py serialize`), so call `helpers.as_date()` first — otherwise "the same date on both ends" is only two strings that happen to match.
+   - **One date drives both ends of a boundary.** `_apply_change` closes the outgoing row and opens the incoming one with the same value, so they cannot drift. Reintroducing `CURRENT_DATE` on either side is CFL-4 coming back.
 
 **Past mistakes to never repeat:**
 - Skills Intelligence had a legacy `enabled_for_hr` flag that blocked HR_ADMIN even after they were granted access via `role_feature_access`. This was removed. Never add sub-flags like this again.

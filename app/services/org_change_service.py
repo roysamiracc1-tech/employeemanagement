@@ -19,6 +19,7 @@ import datetime
 import logging
 
 from app.db import query, execute, insert_returning, to_dict, transaction
+from app.helpers import as_date
 from app.services import audit_service
 from app.services import notification_service as notif
 
@@ -29,6 +30,84 @@ _DEFAULT_STEPS = [
     {'step_order': 1, 'approver_type': 'ROLE', 'approver_role': 'HR_ADMIN',
      'approver_employee_id': None, 'label': 'HR approval'},
 ]
+
+# ── Effective dating (KAN-189 · ADR-020) ──────────────────────────────────────
+#
+# HALF-OPEN INTERVALS, `[effective_from, effective_to)`, PROJECT-WIDE.
+# `effective_to` is the first day the row does NOT cover — the day the next row
+# starts. So one date closes the outgoing row and opens the incoming one, and the
+# two physically cannot disagree about the boundary.
+#
+# This is what closes CFL-4 **with no history rewritten**. The old code closed an
+# assignment with `effective_to = CURRENT_DATE` and let the new row default
+# `effective_from` to CURRENT_DATE too. Read as inclusive `[from, to]` that is a
+# one-day overlap — both rows claim today — and the fix would have meant
+# rewriting every historical row. Read as half-open it is already correct and
+# gapless. The defect was the *absence of a stated convention*, not the data.
+#
+# The visible consequence: a period ending 31 March STORES 2026-04-01. Never
+# render `effective_to` raw — use `fmt_period()` in app/helpers.py, which
+# subtracts the day. A test greps templates to enforce it.
+
+# The company-configurable window. D1 puts these on `company_compensation_settings`
+# (technical design §3.4) — a W1/W2 table that does not exist yet, and creating a
+# stub of it here would be worse than waiting: that table is created with
+# `IF NOT EXISTS`, so a partial early version would make W1's migration silently
+# skip and leave the rest of its columns missing. That is the CI-drift trap in
+# CLAUDE.md, not a hypothetical.
+#
+# So the defaults are the documented ones, and `_dating_window()` is the SINGLE
+# place that changes when the table lands: it starts returning the company's row
+# and every caller is already asking per-company. Per-company configurability is
+# therefore NOT yet delivered — see BACKLOG.md KAN-189 for that being stated
+# plainly rather than implied.
+_BACKDATE_LIMIT_DAYS     = 90
+_FORWARD_DATE_LIMIT_DAYS = 180
+
+# Request types whose effect is a PLACEMENT — where somebody physically reports
+# or sits. These can never be future-dated: there is no scheduler to wake up and
+# apply them (EP38 R5.6 / S16), so a future date would silently become "applied
+# the moment the last approver clicked", which is precisely the lie the effective
+# date exists to stop. A future-dated PAY record is inert data until its date and
+# every read filters on the date, so that case is permitted — hence the asymmetry.
+_PLACEMENT_REQUEST_TYPES = frozenset({'TRANSFER', 'LEVEL_CHANGE'})
+
+
+def _dating_window(company_id):
+    """(backdate_limit_days, forward_date_limit_days) for *company_id*.
+
+    Company-scoped by signature from day one, so the switch to the real settings
+    table is a change inside this function and nowhere else.
+    """
+    return _BACKDATE_LIMIT_DAYS, _FORWARD_DATE_LIMIT_DAYS
+
+
+def _validate_effective_date(company_id, eff, request_type='TRANSFER'):
+    """Return None if *eff* is allowed, else a human error naming the reason.
+
+    Returns a message rather than raising: every caller is a route that owes the
+    user a specific 400, and the reason is the whole value of the check.
+    """
+    if eff is None:
+        return None                          # means "apply on approval" (pre-KAN-189)
+    if not isinstance(eff, datetime.date):
+        return 'The effective date is not a valid date.'
+    today = datetime.date.today()
+    back, fwd = _dating_window(company_id)
+
+    if eff > today and request_type in _PLACEMENT_REQUEST_TYPES:
+        # Named, not generic: an HR user who picked next Monday needs to know the
+        # move is not queued for next Monday, because they would otherwise assume
+        # it was and stop watching for it.
+        return ('A move cannot be dated in the future — there is nothing to apply '
+                'it on the day. Raise it on or before the day it takes effect.')
+    if eff < today - datetime.timedelta(days=back):
+        return (f'That date is more than {back} days ago. '
+                f'Backdating is limited to {back} days.')
+    if eff > today + datetime.timedelta(days=fwd):
+        return (f'That date is more than {fwd} days ahead. '
+                f'Forward dating is limited to {fwd} days.')
+    return None
 
 
 # ── Workflow config ───────────────────────────────────────────────────────────
@@ -174,8 +253,25 @@ def current_placement(emp_id):
 
 # ── Create ────────────────────────────────────────────────────────────────────
 
-def create_request(company_id, subject_id, requester_user_id, proposed, reason):
-    """Create a PENDING request and notify step-1 approvers + the requester."""
+def create_request(company_id, subject_id, requester_user_id, proposed, reason,
+                   *, effective_date=None):
+    """Create a PENDING request and notify step-1 approvers + the requester.
+
+    *effective_date* (KAN-189) defaults to today — the behaviour every request
+    raised before this existed already had. Keyword-only so the four positional
+    arguments keep their meaning and a future `request_type` / `compensation`
+    (ADR-021) can be added beside it without re-ordering anything.
+
+    The date is validated by the route, which owes the user the specific reason;
+    it is re-checked here so the engine cannot be handed an out-of-window date by
+    a second caller. Same rule as the initiator check: the route's guard is the
+    message, the service's is the control.
+    """
+    effective_date = effective_date or datetime.date.today()
+    problem = _validate_effective_date(company_id, effective_date)
+    if problem:
+        raise ValueError(problem)
+
     cur   = current_placement(subject_id)
     steps = workflow_steps(company_id)
     wf = query("SELECT id::text FROM org_change_workflows WHERE company_id=%s::uuid AND is_active",
@@ -191,17 +287,17 @@ def create_request(company_id, subject_id, requester_user_id, proposed, reason):
               (company_id, employee_id, requested_by_user_id, reason,
                from_business_unit_id, from_functional_unit_id, from_location_id, from_manager_id,
                proposed_business_unit_id, proposed_functional_unit_id, proposed_location_id, proposed_manager_id,
-               workflow_id, current_step, status)
+               workflow_id, current_step, effective_date, status)
             VALUES (%s::uuid,%s::uuid,%s::uuid,%s,
                     %s::uuid,%s::uuid,%s::uuid,%s::uuid,
                     %s::uuid,%s::uuid,%s::uuid,%s::uuid,
-                    %s::uuid,1,'PENDING')
+                    %s::uuid,1,%s,'PENDING')
             RETURNING id::text
         """, (company_id, subject_id, requester_user_id, (reason or None),
               cur['bu'], cur['fu'], cur['loc'], cur['mgr'],
               proposed.get('business_unit_id'), proposed.get('functional_unit_id'),
               proposed.get('location_id'), proposed.get('manager_id'),
-              wf_id))
+              wf_id, effective_date))
         req_id = req['id']
 
         for s in steps:
@@ -408,10 +504,23 @@ def _apply_change(request_id):
     r = to_dict(query("""
         SELECT employee_id::text, from_manager_id::text AS from_manager_id,
                proposed_business_unit_id::text AS bu, proposed_functional_unit_id::text AS fu,
-               proposed_location_id::text AS loc, proposed_manager_id::text AS mgr
+               proposed_location_id::text AS loc, proposed_manager_id::text AS mgr,
+               effective_date
         FROM org_change_requests WHERE id=%s::uuid
     """, (request_id,), one=True))
     emp_id = r['employee_id']
+
+    # ONE boundary date for the whole move (KAN-189 · ADR-020). Falls back to
+    # today for a request raised before the column existed, whose meaning was
+    # always "apply on approval".
+    #
+    # Coerced to a real `date` because `to_dict()` serialises every DATE column to
+    # an ISO string (`app/db.py serialize`). Postgres would cast the string back
+    # happily, so this works either way today — but then "the same date closes and
+    # opens" would be true only because two strings happen to be equal, and any
+    # arithmetic added here later (a pay date offset, a proration) would break on
+    # a string. The invariant should be real, not incidental.
+    eff = as_date(r.get('effective_date')) or datetime.date.today()
 
     # Carry EVERY unchanged field forward from the outgoing current assignment.
     #
@@ -436,26 +545,38 @@ def _apply_change(request_id):
     fu  = r['fu']  or old.get('fu')
     cc  = old.get('cc')
 
+    # The SAME `eff` closes the outgoing row and opens the incoming one. Under
+    # half-open `[from, to)` that is exactly abutting: no overlapping day, no gap,
+    # and no way for the two ends of the boundary to drift apart — which is what
+    # made CFL-4 possible when one side was CURRENT_DATE and the other a default.
     execute("""
         UPDATE employee_org_assignments
-        SET is_current=FALSE, effective_to=CURRENT_DATE
+        SET is_current=FALSE, effective_to=%s
         WHERE employee_id=%s::uuid AND is_current
-    """, (emp_id,))
+    """, (eff, emp_id))
     execute("""
         INSERT INTO employee_org_assignments
-          (employee_id, location_id, business_unit_id, functional_unit_id, cost_center_id, is_current)
-        VALUES (%s::uuid,%s::uuid,%s::uuid,%s::uuid,%s::uuid,TRUE)
-    """, (emp_id, loc, bu, fu, cc))
+          (employee_id, location_id, business_unit_id, functional_unit_id, cost_center_id,
+           effective_from, is_current)
+        VALUES (%s::uuid,%s::uuid,%s::uuid,%s::uuid,%s::uuid,%s,TRUE)
+    """, (emp_id, loc, bu, fu, cc, eff))
 
     if r['mgr'] and r['mgr'] != r['from_manager_id']:
+        # DEF-42-2 — this UPDATE set `is_current=FALSE` and nothing else, so every
+        # superseded reporting line was left with a NULL `effective_to`: closed,
+        # but with no end date. Two such rows exist in the dev database. It reads
+        # as an open-ended relationship to anything that trusts the dates instead
+        # of the flag, and EP42 was about to copy this pattern into three new
+        # tables. Both ends of the boundary are now explicit.
         execute("""
-            UPDATE manager_relationships SET is_current=FALSE
+            UPDATE manager_relationships SET is_current=FALSE, effective_to=%s
             WHERE employee_id=%s::uuid AND relationship_type='SOLID_LINE' AND is_current
-        """, (emp_id,))
+        """, (eff, emp_id))
         execute("""
-            INSERT INTO manager_relationships (employee_id, manager_id, relationship_type, is_current)
-            VALUES (%s::uuid,%s::uuid,'SOLID_LINE',TRUE)
-        """, (emp_id, r['mgr']))
+            INSERT INTO manager_relationships
+              (employee_id, manager_id, relationship_type, effective_from, is_current)
+            VALUES (%s::uuid,%s::uuid,'SOLID_LINE',%s,TRUE)
+        """, (emp_id, r['mgr'], eff))
 
 
 # ── Cancel ────────────────────────────────────────────────────────────────────
@@ -483,7 +604,7 @@ def cancel(request_id, user):
 # ── Queries for the inbox ─────────────────────────────────────────────────────
 
 _DETAIL_COLS = """
-    r.id::text, r.status, r.current_step, r.reason, r.created_at,
+    r.id::text, r.status, r.current_step, r.reason, r.created_at, r.effective_date,
     (se.first_name||' '||se.last_name) AS employee_name, se.id::text AS employee_id,
     se.job_title,
     (rb.first_name||' '||rb.last_name) AS requested_by_name,
