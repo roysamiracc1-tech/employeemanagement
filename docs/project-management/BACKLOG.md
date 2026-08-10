@@ -58,7 +58,7 @@
 | EP34 | Architecture & Structure | KAN-178 · KAN-179 · KAN-180 · KAN-181 · KAN-182 | ⬜ Planned |
 | EP38 | Employee Lifecycle Workflows | KAN-187 · KAN-183 · KAN-184 · KAN-185 · KAN-186 | 🟡 In progress · **first roadmap growth epic in the backlog** (BG4) — build stage **S3** (D-004); ✅ KAN-187 (audit), 🟡 KAN-185 (transfer); KAN-186 is **Later** |
 | EP42 | Compensation, Job Architecture & Pay Equity | **W0** KAN-203 · KAN-204 · KAN-188 · KAN-189 · **W1** KAN-190 · KAN-191 · KAN-207 · **W2** KAN-199 · KAN-206 · KAN-210 · KAN-193 · KAN-194 · KAN-218 · KAN-195 · KAN-209 · **W3** KAN-196 · KAN-197 · KAN-198 · KAN-192 · **W4** KAN-200 · KAN-201 · KAN-202 · *(conditional)* KAN-208 | ⬜ Planned · **BG7** — W0 builds in **S2**, W1–W4 in **S3** (D-004). **23 stories in 5 waves** (A1 · Wave-5 · A2 · A3 · **A4–A6**). **⚠ A6 overturned the pay/step model**: the job decides the step, the step decides base pay, **pay never decides the step**. KAN-218 (additional pay) is new, KAN-209 is repurposed as the pay reconciliation, KAN-205 moved to Later, KAN-208 is conditional. Carries **KAN-203, a P0 Critical pre-existing defect fix** — **✅ landed 10 Aug 2026, DEF-42-4 + DEF-42-5 closed** — and **unblocks KAN-185** |
-| EP44 | Performance Management | **P0** KAN-219 · KAN-220 · **P1** KAN-221 · KAN-222 · KAN-223 · **P2** KAN-224 · KAN-225 · KAN-226 · KAN-227 · KAN-228 · **P3** KAN-229 · KAN-230 · KAN-231 · KAN-232 · **P4** KAN-233 · KAN-234 · KAN-235 · KAN-236 · KAN-237 · **P5** KAN-238 · KAN-239 · KAN-240 | ⬜ Planned · **BG7** · **entered by A4/A5** — the owner chose full performance management over the 2-story input, **accepting the delay in his own words** (Decision D-006). **22 stories**, stage **S3**, **sequenced after EP42 and before EP43**. Outline depth — entering **S1**, not build. Carries the **EU AI Act / GDPR Art. 22 gate as stories (KAN-232, KAN-240), not notes**, and works-council inspectability (KAN-238) |
+| EP44 | Performance Management **(⚠ sequencing open — D-008)** | **P0** KAN-219 · KAN-220 · **P1** KAN-221 · KAN-222 · KAN-223 · **P2** KAN-224 · KAN-225 · KAN-226 · KAN-227 · KAN-228 · **P3** KAN-229 · KAN-230 · KAN-231 · KAN-232 · **P4** KAN-233 · KAN-234 · KAN-235 · KAN-236 · KAN-237 · **P5** KAN-238 · KAN-239 · KAN-240 | ⬜ Planned · **BG7** · **entered by A4/A5** — the owner chose full performance management over the 2-story input, **accepting the delay in his own words** (Decision D-006). **22 stories**, stage **S3**, **sequenced after EP42 and before EP43**. Outline depth — entering **S1**, not build. Carries the **EU AI Act / GDPR Art. 22 gate as stories (KAN-232, KAN-240), not notes**, and works-council inspectability (KAN-238) |
 | EP43 | Annual Compensation Review Cycle | KAN-216 · KAN-211 · KAN-213 · KAN-214 · KAN-215 | ⬜ Planned · **BG7** · new in A2, **reduced by A6 from 7 stories to 5**. KAN-212 withdrawn (merged into KAN-216 and EP42's rate schedule); KAN-217 withdrawn (superseded by EP44). A6 collapsed the per-employee hike percentage, so this is now a **round-management** epic, not a differentiation one. **Sequenced last**, stage **S3**. **The natural descope if S3 runs long** |
 
 > **EP28–EP34** are sourced from the architecture review in [`docs/ARCHITECTURE_REVIEW.md`](../ARCHITECTURE_REVIEW.md)
@@ -1117,6 +1117,81 @@ file carries the numbered, individually testable criteria.
    representative has no clean grant. **Accepted as a named product limitation for this cycle**; no fourth
    feature code and no `scope` column, because changing the platform's access model deserves its own decision
    rather than arriving as a side-effect of EP42. Revisit if OQ-8 comes back "yes".
+
+---
+
+## SEQUENCING OPTION PAPER — where performance management goes (D-008, **open, for the owner**)
+
+> **Raised 10 Aug 2026.** The owner challenged the sequencing directly: *"You said yesterday to implement
+> Level base people alignment and then aligning that to promotion you need finalise implement the performance
+> implementation first. Why is it still not done…?"*
+>
+> **He is right about the seam.** EP42's **KAN-192** makes step advancement an explicit decision carrying a
+> mandatory `review_context` — `PROBATION_REVIEW` · `MID_TERM_GOAL_REVIEW` · `PERFORMANCE_REVIEW` ·
+> `OFF_CYCLE` — and §14.5 states plainly that *"EP42 records that a step change happened at a review; it does
+> not build the review."* **That dropdown points at nothing until EP44's KAN-236 lands.** Promotion, as
+> sequenced, ships with a review-shaped hole in it.
+>
+> **He is not right that this is why performance has not started**, and the record should say so: EP44 is 22
+> stories and 12–16 weeks, sequenced after EP42's 23 by his own Decision **D-006** on 9 Aug, and its
+> requirements exercise is gated on him confirming the 22-story shape. No amount of reordering the last week
+> of work would have started it.
+
+### ⚠️ A CORRECTION TO ENGINEERING'S FIRST ANSWER
+
+Engineering initially suggested *"compensation W0–W2 → performance → compensation W3–W4, costs no extra
+weeks."* **That was checked and it is wrong on two counts. Recorded rather than quietly dropped, because the
+owner would otherwise be choosing against it.**
+
+1. **KAN-236 is in EP44's P4** — the fourth of six priority groups. It needs a **closed review cycle**, which
+   needs P0 (cycles, eligibility) *plus* enough of a round to run and close it (P1–P2: goals, self- and
+   manager assessment). So "performance before W3" does not mean a short detour; it means **roughly
+   two-thirds of a 12–16 week epic** before W3 may start.
+2. **It trades one gap for two worse ones.** The `review_context` gap is a **recording** gap — the step
+   change still happens, still needs a reason, still gets audited. W3 contains **control** gaps: KAN-196
+   (a move can never be applied with the pay question unanswered) and KAN-198 (four eyes on money).
+   Delaying those by 12–16 weeks to close a recording gap is the wrong risk trade.
+
+### The one fact that makes a better option possible
+
+**KAN-192 is the LAST story in W3** — `196 (8.5) → 197 (5.5) → 198 (6.5) → 192 (6.5)`, and it depends on
+KAN-206, not on anything in W3 before it. The seam therefore does not bite until ~27 dev-days into W3, which
+is the maximum possible slack. And **EP44's early stories touch nothing EP42 touches** — cycles, goals and
+assessments, against different tables from the ladder and the pay record. There is no schema contention.
+
+### The three options, with the numbers
+
+Baselines: EP42 critical path **71.0 dev-days ≈ 14–16 calendar weeks** at 2 SNR + 2 MID (the critical path,
+not the total, is binding). W1 shippable at 35.5 days; minimum shippable slice at 45.5. EP44 is **22 stories,
+12–16 weeks, and has no task-level estimate yet** — it is at outline depth, so its figures below are the
+epic-level range and not a breakdown. EP43 is 5 stories.
+
+| | Sequence | Promotion ships with a real review? | Time to the hike cycle | Extra capacity | Verdict |
+|---|---|---|---|---|---|
+| **A** | **As documented (serial).** EP42 W1–W4 → EP44 → EP43 | ❌ No — seam open ~12–16 wks after KAN-192 ships | **~30–36 wks** | none | Safe, cheapest, and leaves the owner's actual complaint unaddressed for a quarter |
+| **B** | **Performance before W3.** W1–W2 → EP44 → W3–W4 → EP43 | ✅ Yes | **~30–36 wks** | none | **Not recommended.** Same elapsed time, but the two money controls in W3 slip a quarter to close a recording gap |
+| **C** | **Parallel early slice.** EP44 **P0–P2** alongside EP42 W1–W3; rest of EP44 after W4 | ✅ Yes — a closed cycle exists before KAN-192 starts | **~26–30 wks** | **yes — 1 SNR + 1 MID for ~8–10 wks** | **Recommended** |
+
+**Why C wins.** It uses the slack that already exists rather than reordering against it: KAN-192 is 27
+dev-days into W3, and EP44 P0–P2 fits inside that window on a separate track with no shared tables. Nothing in
+EP42 is delayed, the seam is closed the first time promotion ships, and the hike cycle arrives **sooner** than
+in A because EP44 partially overlaps instead of queueing behind.
+
+**What C costs, stated plainly:** additional capacity for roughly 8–10 weeks, and **EP44's requirements
+exercise has to start now** — which needs the owner's confirmation of the 22-story shape. That gate exists
+because A4–A6 were expensive precisely when specification ran ahead of agreement; C is the one option that
+requires opening it early, and that is a real risk, not a formality.
+
+### Recommendation
+
+**Option C, and it is a budget decision, not a technical one** — the binding constraint is people, which is
+the owner's call and not engineering's. If the extra capacity is not available, **take A rather than B**: with
+one team, closing a recording gap is not worth slipping two money controls by a quarter.
+
+**Also unchanged by any option, and still the highest-value unanswered question in the programme: OQ-8,
+works councils.** Performance-related pay with calibration across Germany and the Nordics is plausibly
+market-gating. It blocks no engineering and it can block a launch, and it gets more expensive the more that
+is built on top of it.
 
 ---
 
