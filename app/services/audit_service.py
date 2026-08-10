@@ -95,6 +95,15 @@ ACTIONS = frozenset({
     # answerable, so every toggle is attributed whichever way it moved.
     'COMPANY_FEATURE_ENABLED',
     'COMPANY_FEATURE_DISABLED',
+    # KAN-190 — the job ladder. Every change is audited because the ladder is
+    # what later decides somebody's pay point: a level renamed or a step's
+    # expectations rewritten changes what a person is measured against.
+    'JOB_FAMILY_CREATED',
+    'JOB_FAMILY_UPDATED',
+    'JOB_LEVEL_CREATED',
+    'JOB_LEVEL_UPDATED',
+    'JOB_STEP_EXPECTATION_AUTHORED',
+    'JOB_STEP_EXPECTATION_UPDATED',
     'CHECKLIST_STARTED',
     'CHECKLIST_TASK_COMPLETED',
     'CHECKLIST_COMPLETED',

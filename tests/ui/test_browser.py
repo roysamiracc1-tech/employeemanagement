@@ -1049,6 +1049,90 @@ def run_all(playwright):
     except Exception as e:
         fail("prefers-reduced-motion shortens transitions without reaching 0s", str(e))
 
+    # ── 20 · Job architecture — the ladder (KAN-190) ────────────────
+    # The step arithmetic is the thing worth checking in a browser: `step_count`
+    # counts increments ABOVE entry, so 5 must READ as six steps everywhere a
+    # human looks. An off-by-one here becomes a wrong salary in W2.
+    section("20 · Job architecture ladder (KAN-190)")
+
+    logout(page)
+    login(page, PORTAL_ADMIN)           # also HR_ADMIN → holds org_structure:w
+    page.goto(BASE + "/admin/job-architecture")
+    page.wait_for_load_state("networkidle")
+
+    try:
+        assert page.query_selector("a[href='/admin/job-architecture']"), \
+            "no nav link — the feature code is not granting read access"
+        assert "const JA_CAN_CONFIGURE = true" in page.content(), \
+            "HR/Portal admin cannot configure; org_structure:w is not resolving"
+        ok("Ladder page loads and offers configuration to org_structure:w")
+    except Exception as e:
+        fail("Ladder page loads and offers configuration to org_structure:w", str(e))
+
+    try:
+        body = page.content()
+        # The seeded worked example: 5 above entry renders as .0–.5 and "(6)".
+        assert "2.0 – 2.5" in body, "the step range is not rendered from step_count"
+        assert "(6)" in body, "5 increments above entry did not read as 6 steps"
+        # And a level with THREE above entry reads as four — proving it is per
+        # level and not a constant.
+        assert "1.0 – 1.3" in body and "(4)" in body, \
+            "step counts are not per level"
+        ok("step_count reads as increments ABOVE entry (5 → 6 steps, 3 → 4)")
+    except Exception as e:
+        fail("step_count reads as increments ABOVE entry (5 → 6 steps, 3 → 4)", str(e))
+
+    try:
+        body = page.content()
+        # The half-authored level must be visible AS half-authored.
+        assert "0/6" in body, "an undescribed level does not show as undescribed"
+        assert "6/6" in body, "a fully described level does not show as complete"
+        assert "Software Engineer" in body
+        assert "cannot assess somebody against a step that has not been described" in body, \
+            "the incomplete banner does not explain the consequence"
+        ok("Incomplete steps are named, with their denominator and consequence")
+    except Exception as e:
+        fail("Incomplete steps are named, with their denominator and consequence", str(e))
+
+    try:
+        # The live preview is the guard against the off-by-one at entry time.
+        page.click("button:has-text('+ Add level')")
+        page.wait_for_timeout(400)
+        page.fill("#ja-lvl-ordinal", "9")
+        page.fill("#ja-lvl-steps", "4")
+        page.wait_for_timeout(250)
+        preview = page.inner_text("#ja-lvl-steps-preview")
+        assert "5 steps" in preview and "9.0 to 9.4" in preview, \
+            f"the preview does not show what the number means: {preview!r}"
+        # And the field ships EMPTY — a pre-filled 5 would record a decision
+        # nobody made.
+        page.fill("#ja-lvl-steps", "")
+        page.click("#ja-lvl-save")
+        page.wait_for_timeout(400)
+        assert "no default" in page.inner_text("#ja-lvl-error").lower(), \
+            "a level saved with no step count"
+        page.keyboard.press("Escape")
+        ok("Step count is previewed, required, and has no default")
+    except Exception as e:
+        fail("Step count is previewed, required, and has no default", str(e))
+
+    try:
+        # A plain employee may READ the ladder — that is the transparency the
+        # owner asked for — but must see no editing affordance.
+        logout(page)
+        login(page, EMPLOYEE)
+        page.goto(BASE + "/admin/job-architecture")
+        page.wait_for_load_state("networkidle")
+        body = page.content()
+        assert "Junior Software Fullstack Engineer" in body, \
+            "an employee cannot read the ladder; job_architecture:r is not seeded to EMPLOYEE"
+        assert "const JA_CAN_CONFIGURE = false" in body, \
+            "an employee was offered ladder configuration"
+        assert "+ Add family" not in body
+        ok("An employee reads the ladder and is offered no editing")
+    except Exception as e:
+        fail("An employee reads the ladder and is offered no editing", str(e))
+
     browser.close()
 
 # ── Summary ───────────────────────────────────────────────────

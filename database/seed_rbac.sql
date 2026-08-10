@@ -229,3 +229,44 @@ SELECT ro.id, f.id, TRUE, TRUE, TRUE
 FROM public.roles ro, public.portal_features f
 WHERE f.code = 'audit_log' AND ro.name = 'SYSTEM_ADMIN'
 ON CONFLICT (role_id, feature_id) DO NOTHING;
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- KAN-190 — the `job_architecture` feature code (EP42 W1)
+--
+-- A feature row is DATA. A fresh CI database is schema.sql + this file and
+-- migrations are NEVER replayed, so registering it only in migration 12 gives CI
+-- the ladder tables and no feature — nav hidden, routes 403, every developer
+-- machine green. That is the DEF-004 trap (CLAUDE.md); this is the other half.
+--
+-- ⚠ THE DESCRIPTION IS PART OF THE ACCEPTANCE CRITERIA (CFL-42-35).
+-- `job_architecture:w` does NOT grant ladder editing — it grants ROADMAP
+-- AUTHORING for a manager's own reports (KAN-207). Ladder configuration is
+-- `org_structure:w`. A grant reading "Job Architecture: write" would mislead the
+-- PORTAL_ADMIN at the moment they make it, so the text says what it does.
+-- ─────────────────────────────────────────────────────────────────────────────
+
+INSERT INTO public.portal_features (id, code, label, description, sort_order, default_enabled) VALUES
+    ('b41e5d07-9c2a-4f18-8e3b-7a6d10f4c295', 'job_architecture', 'Job Architecture',
+     'Read the job ladder — families, levels, steps and what each step expects; write step roadmaps for your reports',
+     11, true)
+ON CONFLICT (code) DO NOTHING;
+
+-- `r` to EVERY role, including EMPLOYEE. An employee must be able to read their
+-- own step and the next one — that is the transparency the owner asked for
+-- twice, so it is the default rather than a grant somebody has to remember.
+INSERT INTO public.role_feature_access (role_id, feature_id, can_read, can_write, can_delete)
+SELECT ro.id, pf.id, TRUE, FALSE, FALSE
+  FROM public.roles ro
+ CROSS JOIN public.portal_features pf
+ WHERE pf.code = 'job_architecture'
+ON CONFLICT (role_id, feature_id) DO NOTHING;
+
+-- `w` — roadmap authoring only — to the manager who must write them, plus
+-- HR/Portal admin. Deliberately NOT the ladder-editing grant.
+UPDATE public.role_feature_access rfa
+   SET can_write = TRUE
+  FROM public.roles ro, public.portal_features pf
+ WHERE rfa.role_id = ro.id AND rfa.feature_id = pf.id
+   AND pf.code = 'job_architecture'
+   AND ro.name IN ('SOLID_LINE_MANAGER', 'HR_ADMIN', 'PORTAL_ADMIN');

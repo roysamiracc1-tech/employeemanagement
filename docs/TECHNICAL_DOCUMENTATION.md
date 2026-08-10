@@ -762,6 +762,139 @@ exception, never added, and `SYSTEM_ADMIN` cells may never move at all.
 
 ---
 
+## 8d. Job architecture — the ladder (KAN-190 · EP42 W1 · ADR-017)
+
+A company defines its own **families** → **levels** → **steps**. Everything in EP42 hangs off this
+shape: pay points (KAN-206), step assessment (KAN-191), the equity check (KAN-200), promotions
+(KAN-192). Migration `12_job_architecture.sql`; service `app/services/job_architecture_service.py`;
+routes `app/routes/compensation.py`; screen `templates/admin/job_architecture.html`.
+
+### ⚠️ `step_count` counts increments ABOVE entry
+
+> **`step_count = 5` means SIX steps — `.0 .1 .2 .3 .4 .5`.** The owner's own example is `2.0 … 2.5`.
+
+This is the single most dangerous number in the epic. An off-by-one is **not cosmetic**: it produces a
+pay point compounded once too often, a `PAY_BELOW_STEP` finding against a rate nobody is entitled to,
+and a "Propose adjustment" button pre-filled from a figure that should not exist.
+
+Three defences, because a convention alone would not survive:
+
+1. **A database trigger**, `employee_job_assignment_step_valid()`. `step_no` lives on
+   `employee_job_assignments` and `step_count` on `job_levels`, so no single-table CHECK can express
+   the bound. §3.2 accepted that gap as **TD-21**; A1 withdrew that judgement because the bound is
+   load-bearing on money, and TD-21 is now **closed**. The exception message states the rule.
+2. **`step_total` is computed once**, in `list_levels()`. No template and no JS recomputes it.
+3. **The form previews what the number means** — typing 5 shows *"That gives 6 steps: 2.0 to 2.5"*
+   before it is saved.
+
+### `step_count` has NO default, deliberately
+
+Trainee→Junior and Junior→Mid are genuinely different distances. The demo ladder has levels with 3, 5
+and 2 steps for exactly that reason. **A column default is how "we never decided" becomes
+indistinguishable from "we decided five"** — so the column is `NOT NULL` with no `DEFAULT`, the API
+refuses an absent value with a message naming why, and the form field ships empty.
+
+The table was empty when the column was added, so this was free. **It is the last moment it ever will
+be.**
+
+### An ordinal is immutable once occupied (ADR-017b)
+
+A step is written **`level.step`** — `2.3` means level 2, step 3. Renumbering level 2 therefore
+silently rewrites what every historical record means. `update_level()` refuses it when **any**
+assignment exists, and the refusal names the count and the reason.
+
+- **Occupancy counts historic assignments, not just current ones.** A past record still points at the
+  ordinal, so *"nobody is on it now"* is the wrong question.
+- **Renaming is always allowed** — only the coordinate is frozen; the title is a label.
+- **Reducing `step_count` below an occupied step is refused**, naming who is affected.
+- **The empty state warns before the ladder is built**, not at the moment it refuses.
+
+### Two different gates on one screen (CFL-42-35)
+
+| Action | Gate | Who has it |
+|---|---|---|
+| **Read** the ladder | `job_architecture:r` | **Every role**, EMPLOYEE included |
+| **Configure** the ladder | `org_structure:w` | HR_ADMIN + PORTAL_ADMIN — **not** a manager |
+| Author **step roadmaps** | `job_architecture:w` | SOLID_LINE_MANAGER + HR + Portal (KAN-207) |
+| Level **pay point** / increment | `compensation:w` | KAN-206 — not in this module |
+
+> **`job_architecture:w` is NOT a ladder-editing grant.** Both halves of CFL-42-35 matter: a manager
+> must author roadmaps, and a manager must **not** edit the company's job architecture. Gating the
+> ladder on it would hand every `SOLID_LINE_MANAGER` the job architecture — the half people forget. A
+> test asserts no write route in the module uses it.
+>
+> **The feature's label and description are part of the acceptance criteria**, not decoration: they read
+> *"Read the job ladder …; write step roadmaps for your reports"*, because a grant reading
+> "Job Architecture: write" would mislead the PORTAL_ADMIN at the moment they make it.
+
+A tenant that genuinely wants engineering managers to own the ladder **creates a role and grants
+`org_structure:w`** — the permission matrix already solves that and it needs no code.
+
+`r` is seeded to every role because an employee must be able to read their own step and the next one.
+That is the transparency the owner asked for twice, so it is the **default**, not a grant somebody has
+to remember to make.
+
+### Step expectations — sparse, and never inherited
+
+`job_step_expectations` is sparse: a level may exist before its expectations are authored. An
+unauthored step renders **"Expectations not yet defined"** — an explicit empty state, never a blank,
+and **never inherited from the step below** (an inherited expectation is a false claim about what that
+step asks of somebody). `level_steps()` returns *every* step, authored or not, so an incomplete ladder
+cannot look complete.
+
+**Completeness is reported as a named figure with its denominator** (D7) — `4/9`, never a bare
+percentage — and the incomplete levels are listed by name, because the missing ones are the actionable
+part. An empty ladder reports **no** percentage rather than 0%.
+
+**Nothing here can test whether the content is any good.** A ladder whose six steps all read "does
+more of what the last one did" passes every automated check and delivers none of the transparency this
+epic is for (R-18, escalated to High × High by A4–A6 because KAN-191's step assessment has authored
+expectations as a **hard dependency**). *"The ladder reads as a real description of the work"* is
+therefore on the **Demo Readiness Gate's must-be-walked-by-a-human list.**
+
+`drafted_by` is free text on purpose: in most companies the content is written by engineering managers
+and transcribed by HR, so attributing it to the person who typed it would be a false claim.
+
+### ⚠️ No ratings, no scores — and the schema says so
+
+There is **no** `score`, `rating`, `achieved` or `met_expectations` column on any ladder table, and
+**there must never be one.** That is the §14.5 / R-17 boundary written where it is enforceable rather
+than as a note in a design document: a PR adding an assessment column here is the first increment of a
+performance-management module arriving through an entirely reasonable-sounding change. Performance
+management is **EP44** and has its own tables. `TestNoAssessmentColumnsOnTheLadder` fails the build,
+against both the migration and `schema.sql`.
+
+### Save is publish
+
+No draft state, no review cycle — and the screen says so, with the button reading **"Save & publish"**.
+A half-authored ladder is visible *as* half-authored, which is honest; a draft that silently is not
+live is not. Asserted by a test that no `is_draft` / `status` column appears on the table.
+
+### `STEP_NOT_ASSESSED` is not step 0
+
+`employee_job_assignments.step_no` is **nullable**, and NULL is a distinct state from `0` (A6).
+"Everyone defaults to `.0`" was itself a claim that a person is at entry level. An employee with no
+assessed step has **no derived base pay**, is **not evaluable** by the equity check, and renders
+*"Step not yet assessed"* — never `2.0`, never a dash, never blank. Populated by KAN-191.
+
+### Tenancy is enforced by the database, not by the service
+
+Every level and every expectation carries `company_id`, and the foreign keys are **composite** against
+`UNIQUE (id, company_id)` targets. A cross-tenant `job_family_id` is refused by the FK, not by code
+somebody could bypass — verified by inserting one. `ON DELETE RESTRICT` also means a family holding
+levels cannot be deleted out from under them.
+
+### Demo data
+
+`database/seed_demo_job_architecture.sql` — **dev and demo only, never CI, never referenced from
+`seed_rbac.sql`.** The product ships a *configurator*, not a ladder: an opinionated default would be a
+claim about how a customer organises work that they must undo before starting. The demo ladder carries
+**no pay data at all** (pay arrives on `compensation:w` in KAN-206, and everyone can read the ladder),
+and leaves one level deliberately undescribed so the **half-authored** state — the one where the
+product has to be honest — is demoable.
+
+---
+
 ## 9. Security Considerations
 
 | Area | Implementation |

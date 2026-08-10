@@ -35,6 +35,7 @@ register_context_processor(app)
 from app.routes import auth, dashboard, employees, admin, org, company, vacation  # noqa: F401
 from app.routes import notifications, search, calendar, imports, analytics, benchmarks, skills_intelligence  # noqa: F401
 from app.routes import org_change  # noqa: F401
+from app.routes import compensation  # noqa: F401
 
 # Register page-view tracker (after_request hook)
 from app.services import page_tracker as _pt

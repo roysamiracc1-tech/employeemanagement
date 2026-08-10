@@ -116,7 +116,10 @@ def step4_seed_portal_features(cur):
         ('system_config',        'System Configuration',     'Widget settings and global platform config',                8),
         ('skills_intelligence',  'Skills Intelligence',      'Benchmark company skills against industry trends',          9),
         ('org_change',           'Position Change Requests', 'Raise and approve business unit / department / manager changes', 10),
-        # sort_order 11/12 are reserved for onboarding/offboarding (EP38 KAN-184/183).
+        ('job_architecture',     'Job Architecture',
+         'Read the job ladder — families, levels, steps and what each step expects; '
+         'write step roadmaps for your reports', 11),
+        # sort_order 12 is reserved for onboarding/offboarding (EP38 KAN-184/183).
         ('audit_log',            'Audit Log',                'View the immutable audit trail of changes within the company',   13),
     ]
     for code, label, desc, order in features:

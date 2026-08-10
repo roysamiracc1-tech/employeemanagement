@@ -24,6 +24,11 @@ SET row_security = off;
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA public;
 
+-- KAN-190 (T-190-1): exclusion constraints need this, and the effective-dated
+-- pay tables in W2 will use them. Here so a fresh database built from this file
+-- alone can create one.
+CREATE EXTENSION IF NOT EXISTS btree_gist WITH SCHEMA public;
+
 
 --
 -- Name: EXTENSION "uuid-ossp"; Type: COMMENT; Schema: -; Owner: -
@@ -2541,3 +2546,143 @@ ALTER TABLE ONLY public.visibility_scopes
 
 \unrestrict XiY6RKY4mDMxOg9WG7uxJWOUuRmRfembAemzlsOCUmUTwm0MLc9MGiUUryDTvF0
 
+
+
+--
+-- ─────────────────────────────────────────────────────────────────────────────
+-- JOB ARCHITECTURE (KAN-190 · EP42 W1) — migration 12_job_architecture.sql
+--
+-- Hand-added rather than swept in by a full `pg_dump` regeneration, so the diff
+-- shows exactly the new objects and nothing that had drifted onto a dev database
+-- by hand. Keep it in step with the migration; `TestJobArchitectureSchemaParity`
+-- fails the build if they diverge.
+-- ─────────────────────────────────────────────────────────────────────────────
+--
+
+CREATE TABLE public.job_families (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    company_id uuid NOT NULL,
+    code character varying(50) NOT NULL,
+    name character varying(150) NOT NULL,
+    description text,
+    sort_order integer DEFAULT 0 NOT NULL,
+    is_active boolean DEFAULT true NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+CREATE TABLE public.job_levels (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    company_id uuid NOT NULL,
+    job_family_id uuid NOT NULL,
+    ordinal integer NOT NULL,
+    title character varying(150) NOT NULL,
+    short_code character varying(20),
+    step_count integer NOT NULL,
+    description text,
+    is_active boolean DEFAULT true NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT chk_job_levels_ordinal CHECK (((ordinal >= 1) AND (ordinal <= 30))),
+    CONSTRAINT chk_job_levels_step_count CHECK (((step_count >= 1) AND (step_count <= 12)))
+);
+
+COMMENT ON COLUMN public.job_levels.step_count IS 'Number of increments ABOVE entry (EP42 §12.4.1). step_count = 5 means SIX steps: .0 .1 .2 .3 .4 .5. Never defaulted — the configurator must require an answer.';
+
+CREATE TABLE public.job_step_expectations (
+    job_level_id uuid NOT NULL,
+    company_id uuid NOT NULL,
+    step_no integer NOT NULL,
+    summary character varying(200) NOT NULL,
+    description text NOT NULL,
+    drafted_by character varying(150),
+    updated_by_user_id uuid,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT chk_jse_step CHECK (((step_no >= 0) AND (step_no <= 12))),
+    CONSTRAINT chk_jse_text CHECK (((btrim((summary)::text) <> ''::text) AND (btrim(description) <> ''::text)))
+);
+
+CREATE TABLE public.employee_job_assignments (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    company_id uuid NOT NULL,
+    employee_id uuid NOT NULL,
+    job_level_id uuid NOT NULL,
+    step_no integer,
+    effective_from date DEFAULT CURRENT_DATE NOT NULL,
+    effective_to date,
+    is_current boolean DEFAULT true NOT NULL,
+    assigned_by_user_id uuid,
+    reason text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT chk_eja_dates CHECK (((effective_to IS NULL) OR (effective_to > effective_from))),
+    CONSTRAINT chk_eja_step CHECK (((step_no IS NULL) OR ((step_no >= 0) AND (step_no <= 12))))
+);
+
+COMMENT ON COLUMN public.employee_job_assignments.step_no IS 'NULL = STEP_NOT_ASSESSED, a distinct state and NOT step 0 (EP42 A6). No derived base pay, not evaluable, renders "Step not yet assessed".';
+
+ALTER TABLE ONLY public.job_families ADD CONSTRAINT job_families_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.job_families ADD CONSTRAINT job_families_company_id_code_key UNIQUE (company_id, code);
+ALTER TABLE ONLY public.job_families ADD CONSTRAINT job_families_company_id_name_key UNIQUE (company_id, name);
+ALTER TABLE ONLY public.job_families ADD CONSTRAINT job_families_id_company_id_key UNIQUE (id, company_id);
+
+ALTER TABLE ONLY public.job_levels ADD CONSTRAINT job_levels_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.job_levels ADD CONSTRAINT job_levels_job_family_id_ordinal_key UNIQUE (job_family_id, ordinal);
+ALTER TABLE ONLY public.job_levels ADD CONSTRAINT job_levels_job_family_id_title_key UNIQUE (job_family_id, title);
+ALTER TABLE ONLY public.job_levels ADD CONSTRAINT job_levels_id_company_id_key UNIQUE (id, company_id);
+
+ALTER TABLE ONLY public.job_step_expectations ADD CONSTRAINT job_step_expectations_pkey PRIMARY KEY (job_level_id, step_no);
+ALTER TABLE ONLY public.employee_job_assignments ADD CONSTRAINT employee_job_assignments_pkey PRIMARY KEY (id);
+
+ALTER TABLE ONLY public.job_families
+    ADD CONSTRAINT job_families_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.job_levels
+    ADD CONSTRAINT fk_job_levels_family FOREIGN KEY (job_family_id, company_id) REFERENCES public.job_families(id, company_id) ON DELETE RESTRICT;
+ALTER TABLE ONLY public.job_step_expectations
+    ADD CONSTRAINT fk_jse_level FOREIGN KEY (job_level_id, company_id) REFERENCES public.job_levels(id, company_id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.job_step_expectations
+    ADD CONSTRAINT job_step_expectations_updated_by_user_id_fkey FOREIGN KEY (updated_by_user_id) REFERENCES public.users(id) ON DELETE SET NULL;
+ALTER TABLE ONLY public.employee_job_assignments
+    ADD CONSTRAINT employee_job_assignments_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.employee_job_assignments
+    ADD CONSTRAINT employee_job_assignments_employee_id_fkey FOREIGN KEY (employee_id) REFERENCES public.employees(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.employee_job_assignments
+    ADD CONSTRAINT fk_eja_level FOREIGN KEY (job_level_id, company_id) REFERENCES public.job_levels(id, company_id) ON DELETE RESTRICT;
+ALTER TABLE ONLY public.employee_job_assignments
+    ADD CONSTRAINT employee_job_assignments_assigned_by_user_id_fkey FOREIGN KEY (assigned_by_user_id) REFERENCES public.users(id) ON DELETE SET NULL;
+
+CREATE INDEX idx_job_families_company ON public.job_families USING btree (company_id, is_active, sort_order);
+CREATE INDEX idx_job_levels_family ON public.job_levels USING btree (company_id, job_family_id, ordinal);
+CREATE INDEX idx_jse_company ON public.job_step_expectations USING btree (company_id, job_level_id, step_no);
+CREATE INDEX idx_eja_employee ON public.employee_job_assignments USING btree (employee_id, is_current);
+CREATE INDEX idx_eja_level ON public.employee_job_assignments USING btree (company_id, job_level_id);
+
+--
+-- The step bound as a CONSTRAINT, not a convention (EP42 §12.4.1). `step_no`
+-- lives on employee_job_assignments and `step_count` on job_levels, so no
+-- single-table CHECK can express it. A step_no of 6 on a step_count = 5 level
+-- produces a pay point compounded six times — a wrong salary, not a cosmetic
+-- error — so TD-21 is closed rather than accepted.
+--
+
+CREATE OR REPLACE FUNCTION public.employee_job_assignment_step_valid() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE max_step INT;
+BEGIN
+    IF NEW.step_no IS NULL THEN
+        RETURN NEW;
+    END IF;
+    SELECT step_count INTO max_step FROM job_levels WHERE id = NEW.job_level_id;
+    IF max_step IS NULL THEN
+        RAISE EXCEPTION 'job level % does not exist', NEW.job_level_id;
+    END IF;
+    IF NEW.step_no < 0 OR NEW.step_no > max_step THEN
+        RAISE EXCEPTION 'step_no % is outside level %''s ladder: valid steps are 0..% (step_count counts increments ABOVE entry, so a step_count of % yields % discrete values). EP42 ADR-017 §12.4.1.',
+                        NEW.step_no, NEW.job_level_id, max_step, max_step, max_step + 1;
+    END IF;
+    RETURN NEW;
+END $$;
+
+CREATE TRIGGER trg_eja_step_valid
+    BEFORE INSERT OR UPDATE OF step_no, job_level_id ON public.employee_job_assignments
+    FOR EACH ROW EXECUTE FUNCTION public.employee_job_assignment_step_valid();
